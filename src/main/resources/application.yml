@@ -67,6 +67,21 @@ application:
         new-offer-id: 1001
         accepted-offer-id: 1002
 
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: ["health","info","prometheus"]
+    endpoint:
+      health:
+        show-details: "always"
+        probes:
+          enabled: true
+    metrics:
+      export:
+        prometheus:
+          enabled: true
+
 # RESILIENCE4J 
 resilience4j:
   circuitbreaker:
