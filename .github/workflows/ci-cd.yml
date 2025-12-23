@@ -49,6 +49,13 @@ jobs:
         run: |
           echo "${{ secrets.PERSONAL_ACCESS_TOKEN }}" | docker login ghcr.io -u ${{ secrets.REGISTRY_NAMESPACE }} --password-stdin
 
+      - name: Use prod.application.yml
+        run: |
+          echo "Using prod.application.yml"
+          rm src/main/resources/application.yml
+          mv src/main/resources/prod.application.yml src/main/resources/application.yml
+          cat src/main/resources/application.yml
+
       - name: Build Docker image
         run: |
           echo "Building Docker image..."
