@@ -93,3 +93,11 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 5s
         slidingWindowSize: 5
+
+# swagger & Doc
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger
+    operationsSorter: method
