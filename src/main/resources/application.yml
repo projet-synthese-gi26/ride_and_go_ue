@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: reactive-hexagonal
+    name: ride-and-go
 
   docker:
     compose:
@@ -31,6 +31,7 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_HOST:localhost}:${KAFKA_PORT:9092}
     consumer:
+      group-id: ride-and-go-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
@@ -43,14 +44,11 @@ spring:
 # CUSTOM CONFIG 
 application:
   external:
-    stock-service-url: http://${EXTERNAL_HOST:localhost}:8081
     fare-calculator-url: https://fare-calculator-service.pynfi.com
 
   kafka:
     topics:
-      product-events: test-topic
       notification-service-create-topic: notification-create-topic
-      # Utilisez un nom de topic dédié pour cet événement
       offer-created: offer-created-topic
       offer-send: notification-send-topic
     notification-registration:
