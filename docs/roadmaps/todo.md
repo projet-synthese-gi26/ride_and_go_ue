@@ -1,16 +1,16 @@
 ### 📋 Roadmap API RIDE & GO 
 
 - [ ] **Tâche 1 :** Configuration du projet (config,Sécurité, alignement BD Centrale & Seeding,swagger).
-- [ ] **1.1 : Identité & Nettoyage (Metadata)**
+- [x] **1.1 : Identité & Nettoyage (Metadata)**
     - [x] Mettre à jour le `pom.xml` (artifactId: `ride-and-go`, name: `Ride & Go API`).
-    - [ ] Renommer le package racine `com.yowyob.rideandgo` en `com.yowyob.rideandgo`.
-    - [ ] Supprimer tous les fichiers liés au domaine "Product" (Entities, Mappers, Services, Controllers).
-    - [ ] Nettoyer `application.yml` (nom de l'app, group-id Kafka, suppression des clés inutiles).
+    - [x] Renommer le package racine `com.yowyob.rideandgo` en `com.yowyob.rideandgo`.
+    - [x] Supprimer tous les fichiers liés au domaine "Product" (Entities, Mappers, Services, Controllers).
+    - [x] Nettoyer `application.yml` (nom de l'app, group-id Kafka, suppression des clés inutiles).
 
-- [ ] **1.2 : Alignement avec la DB Centrale (Structure)**
-    - [ ] Harmoniser les scripts SQL : Utiliser les noms de tables globaux (`users`, `roles`, `business_actors`) au lieu des préfixes `ride_and_go_`.
-    - [ ] Mettre à jour les entités Java (`UserEntity`, `RoleEntity`, etc.) avec les bonnes annotations `@Table`.
-    - [ ] Valider la cohérence des types UUID pour toutes les clés primaires et étrangères.
+- [x] **1.2 : Alignement avec la DB Centrale (Structure)**
+    - [x] Harmoniser les scripts SQL : Utiliser les noms de tables globaux (`users`, `roles`, `business_actors`) au lieu des préfixes `ride_and_go_`.
+    - [x] Mettre à jour les entités Java (`UserEntity`, `RoleEntity`, etc.) avec les bonnes annotations `@Table`.
+    - [x] Valider la cohérence des types UUID pour toutes les clés primaires et étrangères.
 
 - [ ] **1.3 : Sécurité Réactive & Documentation (Security/Swagger)**
     - [ ] Implémentation de `SecurityConfig` : Configuration WebFlux réactive (Stateless, protection des routes, désactivation du mot de passe par défaut).

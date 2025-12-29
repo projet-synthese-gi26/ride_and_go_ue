@@ -11,10 +11,11 @@ import org.springframework.data.relational.core.mapping.Table;
 import java.util.UUID;
 
 @EqualsAndHashCode(callSuper = true)
-@Data @NoArgsConstructor
+@Data 
+@NoArgsConstructor
 @AllArgsConstructor
-@Table("ride_and_go_offer_agreement")
-public class OfferAgreementEntity extends AbstractAuditingEntity{
+@Table("offer_driver_linkages") 
+public class OfferAgreementEntity extends AbstractAuditingEntity {
     @Id
     private UUID id;
 

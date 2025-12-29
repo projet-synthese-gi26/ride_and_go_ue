@@ -23,6 +23,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -57,24 +58,25 @@ public class OfferService implements CreateOfferUseCase, ResponseToOfferUseCase,
         data.put("price", offer.price());
 
         return repository.save(offer)
-                .publishOn(Schedulers.boundedElastic())
-                .map(savedOffer -> {
-                    log.info("Offer created: {}", offer);
-                    cache.saveInCache(savedOffer).subscribe();
-
-                    List<String> drivers = userRepositoryPort.findByRoleNameList(RoleType.DRIVER)
-                            .stream().map(User::email).toList();
-                    SendNotificationRequest notification = SendNotificationRequest.builder()
-                            .notificationType(NotificationType.EMAIL)
-                            .templateId(templateCreateOfferId)
-                            .to(drivers)
-                            .data(data)
-                            .build();
-
-                    sendNotificationPort.sendNotification(notification).subscribe();
-                    //eventPublisher.publishOfferCreatedEvent(savedOffer).subscribe();
-                    return savedOffer;
-                });
+                .flatMap(savedOffer -> 
+                    userRepositoryPort.findByRoleName(RoleType.DRIVER)
+                        .map(User::email)
+                        .collectList()
+                        .flatMap(emails -> {
+                            SendNotificationRequest notification = SendNotificationRequest.builder()
+                                    .notificationType(NotificationType.EMAIL)
+                                    .templateId(templateCreateOfferId)
+                                    .to(emails)
+                                    .data(data)
+                                    .build();
+                            
+                            return Mono.zip(
+                                sendNotificationPort.sendNotification(notification),
+                                cache.saveInCache(savedOffer)
+                            ).thenReturn(savedOffer);
+                        })
+                )
+                .doOnSuccess(p -> log.info("Offer successfully created and drivers notified: {}", p.id()));
     }
 
     @Override
@@ -84,19 +86,21 @@ public class OfferService implements CreateOfferUseCase, ResponseToOfferUseCase,
                 .switchIfEmpty(repository.findById(offerId))
                 .flatMap(offer -> userRepositoryPort.findUserById(driverId)
                         .flatMap(driver -> {
-                            if (!driver.role().type().equals(RoleType.DRIVER)) {
+                            boolean isDriver = driver.roles().stream()
+                                    .anyMatch(r -> r.type().equals(RoleType.DRIVER));
+
+                            if (!isDriver) {
                                 log.error("User {} is not driver", driverId);
-                                return Mono.error(new UserIsNotDriverException("User " + driverId + " is not driver. Only driver can accept offer."));
+                                return Mono.error(new UserIsNotDriverException("User " + driverId + " is not driver."));
                             }
-                            log.info("Driver {} is interested in offer {}, offer found {}", driverId, offerId, offer);
+
                             List<UUID> interestedDrivers = new ArrayList<>(offer.interestedDrivers());
                             interestedDrivers.add(driverId);
 
                             Offer updatedOffer = offer.withInterestedDriversAndState(interestedDrivers, OfferState.CHOSEN);
 
-                            log.info("Offer {} updated: {}", offerId, updatedOffer);
                             return repository.save(updatedOffer)
-                                    .doOnSuccess(cache::saveInCache);
+                                    .flatMap(saved -> cache.saveInCache(saved).thenReturn(saved));
                         })
                 );
     }
@@ -106,25 +110,20 @@ public class OfferService implements CreateOfferUseCase, ResponseToOfferUseCase,
         return cache.findOfferById(offerId)
                 .switchIfEmpty(repository.findById(offerId))
                 .flatMap(offer -> {
-                    log.info("Offer {} found: {}", offerId, offer);
                     if (!offer.state().equals(OfferState.CHOSEN) && !offer.state().equals(OfferState.PENDING)) {
-                        return Mono.error(new OfferStatutNotMatchException("Offer " + offerId + " is not in CHOSEN or PENDING state."));
+                        return Mono.error(new OfferStatutNotMatchException("Offer " + offerId + " is not in valid state."));
                     }
 
                     if (!offer.interestedDrivers().contains(driverId)) {
-                        return Mono.error(new IllegalArgumentException("Driver " + driverId + " is not interested in offer " + offerId + "."));
+                        return Mono.error(new IllegalArgumentException("Driver not in interested list."));
                     }
 
                     if (!offer.passengerId().equals(passengerId)) {
-                        return Mono.error(new IllegalArgumentException("Passenger " + passengerId + " is not the owner of offer " + offerId + "."));
+                        return Mono.error(new IllegalArgumentException("Passenger mismatch."));
                     }
 
-
-                    Offer newOffer = offer.withState(OfferState.TERMINATED);
-
-                    log.info("updated offer: {}", newOffer);
-
-                    return repository.save(newOffer);
+                    Offer terminatedOffer = offer.withState(OfferState.TERMINATED);
+                    return repository.save(terminatedOffer);
                 })
                 .flatMap(savedOffer -> {
                     Ride ride = Ride.builder()
@@ -132,8 +131,6 @@ public class OfferService implements CreateOfferUseCase, ResponseToOfferUseCase,
                             .offerId(savedOffer.id())
                             .passengerId(passengerId)
                             .driverId(driverId)
-                            //.distance(savedOffer.di)
-                            //.duration(savedOffer.)
                             .state(RideState.CONFIRMED)
                             .timeReal(0)
                             .build();

@@ -13,39 +13,35 @@ import java.util.stream.Collectors;
 
 @Mapper(componentModel = "spring")
 public interface OfferMapper {
+
     @Mapping(source = "agreements", target = "interestedDrivers")
     Offer toDomain(OfferEntity entity);
 
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "interestedDrivers", ignore = true)
+    @Mapping(target = "version", ignore = true)
     Offer toDomain(CreateOfferRequest request);
 
     OfferResponse toResponse(Offer domain);
 
-    @Mapping(source = "interestedDrivers", target = "agreements")
+    // Fix: We ignore 'agreements' here because the persistence adapter 
+    // handles the saving of links in the 'offer_driver_linkages' table separately.
+    @Mapping(target = "agreements", ignore = true) 
+    @Mapping(target = "createdBy", ignore = true)
+    @Mapping(target = "createdDate", ignore = true)
+    @Mapping(target = "lastModifiedBy", ignore = true)
+    @Mapping(target = "lastModifiedDate", ignore = true)
     OfferEntity toEntity(Offer domain);
 
+    /**
+     * Helper to map list of entities to list of UUIDs (Entity -> Domain)
+     */
     default List<UUID> mapAgreementsToDriversIds(List<OfferAgreementEntity> agreements) {
-        if (agreements == null || agreements.isEmpty()) return Collections.emptyList();
-
-        return agreements.stream()
-                .map(OfferAgreementEntity::getDriverId)
-                .collect(Collectors.toCollection(ArrayList::new));
-    }
-
-    default List<OfferAgreementEntity> mapDriversIdsToAgreements(List<UUID> driversIds) {
-        if (driversIds == null || driversIds.isEmpty()) {
+        if (agreements == null || agreements.isEmpty()) {
             return Collections.emptyList();
         }
-        /*
-        return driversIds.stream()
-                .map(driverId -> {
-                    OfferAgreementEntity agreement = new OfferAgreementEntity();
-                    agreement.setDriverId(driverId);
-                    return agreement;
-                })
-                .collect(Collectors.toSet());
-
-         */
-
-        return Collections.emptyList();
+        return agreements.stream()
+                .map(OfferAgreementEntity::getDriverId)
+                .collect(Collectors.toList());
     }
 }

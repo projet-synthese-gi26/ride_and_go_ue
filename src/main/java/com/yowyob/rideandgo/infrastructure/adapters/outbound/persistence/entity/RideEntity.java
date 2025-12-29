@@ -15,8 +15,8 @@ import java.util.UUID;
 @EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor
 @AllArgsConstructor
-@Table("ride_and_go_ride")
-public class RideEntity extends AbstractAuditingEntity{
+@Table("rides")
+public class RideEntity extends AbstractAuditingEntity {
     @Id
     private UUID id;
 
@@ -29,11 +29,12 @@ public class RideEntity extends AbstractAuditingEntity{
     @Column("passenger_id")
     private UUID passengerId;
 
-    double distance;
+    private double distance;
 
-    int duration;
+    private int duration;
 
-    RideState state;
+    private RideState state;
 
-    int timeReal;
+    @Column("real_time") 
+    private int timeReal;
 }

@@ -10,10 +10,12 @@ import org.springframework.data.relational.core.mapping.Table;
 
 import java.util.UUID;
 
-@Data @EqualsAndHashCode(callSuper = true)
-@NoArgsConstructor @AllArgsConstructor
-@Table("ride_and_go_role")
-public class RoleEntity extends AbstractAuditingEntity{
+@Data 
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor 
+@AllArgsConstructor
+@Table("roles")
+public class RoleEntity extends AbstractAuditingEntity {
     @Id
     private UUID id;
 

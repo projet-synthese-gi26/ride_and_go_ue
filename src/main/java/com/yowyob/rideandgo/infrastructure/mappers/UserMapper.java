@@ -4,35 +4,38 @@ import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.CreateUserRequest;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.UserResponse;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.UserEntity;
-import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository.RoleR2dbcRepository;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import reactor.core.publisher.Mono;
+import org.mapstruct.ReportingPolicy;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface UserMapper {
-    @Mapping(target = "role", ignore = true)
+
+    /**
+     * Maps database entity to domain model.
+     * Roles and permissions are handled manually in the Persistence Adapter.
+     */
+    @Mapping(target = "roles", ignore = true)
+    @Mapping(target = "directPermissions", ignore = true)
     User toDomain(UserEntity entity);
 
-    default Mono<User> toDomain(UserEntity entity, RoleR2dbcRepository roleRepository, RoleMapper roleMapper) {
-        User user = toDomain(entity);
-        return roleRepository.findById(entity.getRoleId())
-                .map(roleMapper::toDomain)
-                .map(role -> User.builder()
-                        .id(user.id())
-                        .name(user.name())
-                        .email(user.email())
-                        .telephone(user.telephone())
-                        .role(role)
-                        .build()
-                );
-    }
-
-    @Mapping(target = "roleId", source = "role.id")
+    /**
+     * Maps domain model to database entity.
+     * Join tables are handled separately in the persistence layer.
+     */
     UserEntity toEntity(User domain);
 
+    /**
+     * Maps registration request to domain model.
+     */
+    @Mapping(target = "roles", ignore = true)
+    @Mapping(target = "directPermissions", ignore = true)
     User toDomain(CreateUserRequest request);
 
-    @Mapping(target = "role", source = "role.type")
+    /**
+     * Maps domain model to API response.
+     * The specific RoleType is manually set in the Controller.
+     */
+    @Mapping(target = "role", ignore = true)
     UserResponse toResponse(User domain);
 }

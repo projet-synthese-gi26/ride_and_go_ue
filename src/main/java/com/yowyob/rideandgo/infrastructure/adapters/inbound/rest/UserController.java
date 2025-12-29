@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Collections;
+import java.util.Set;
 import java.util.UUID;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,94 +39,103 @@ public class UserController {
     private final PasswordEncoder passwordEncoder;
     private final RoleRepositoryPort roleRepository;
 
+    /**
+     * Creates a new user and assigns a primary role.
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create a user", description = "Creates a new user with a role")
+    @Operation(summary = "Create a user", description = "Creates a new user with a specified role type")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "User created", content = @Content(schema = @Schema(implementation = UserResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid input")
+            @ApiResponse(responseCode = "400", description = "Invalid input data")
     })
     public Mono<UserResponse> createUser(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "User creation payload", required = true,
                     content = @Content(schema = @Schema(implementation = CreateUserRequest.class)))
             @RequestBody CreateUserRequest request) {
-        return Mono.just(request)
-                .map(userMapper::toDomain)
-                .flatMap(user ->
-                        roleRepository.findByRoleName(request.getType())
-                                .map(role -> User.builder()
-                                        .id(Utils.generateUUID())
-                                        .name(user.name())
-                                        .email(user.email())
-                                        .telephone(user.telephone())
-                                        .password(passwordEncoder.encode(user.password()))
-                                        .role(role)
-                                        .build())
-                )
-                .flatMap(userUseCases::saveUser)
-                .map(user -> User.builder()
-                        .id(user.id())
-                        .name(user.name())
-                        .email(user.email())
-                        .telephone(user.telephone())
-                        .password(user.password())
-                        .role(Role.builder().id(user.role().id()).type(user.role().type()).build())
-                        .build())
-                .map(userMapper::toResponse);
+        
+        return roleRepository.findByRoleName(request.getType())
+                .flatMap(role -> {
+                    User userToSave = User.builder()
+                            .id(Utils.generateUUID())
+                            .name(request.getName())
+                            .email(request.getEmail())
+                            .telephone(request.getTelephone())
+                            .password(passwordEncoder.encode(request.getPassword()))
+                            .roles(Set.of(role)) // Wrap role in a Set for the new RBAC domain model
+                            .directPermissions(Collections.emptySet()) // Initialize empty direct permissions
+                            .build();
+
+                    return userUseCases.saveUser(userToSave);
+                })
+                .map(savedUser -> {
+                    UserResponse response = userMapper.toResponse(savedUser);
+                    // Map the first role type back to the DTO for the frontend
+                    if (!savedUser.roles().isEmpty()) {
+                        response.setRole(savedUser.roles().iterator().next().type());
+                    }
+                    return response;
+                });
     }
 
+    /**
+     * Retrieves a detailed user profile including roles and permissions.
+     */
     @GetMapping("/{userId}")
-    @Operation(summary = "Get user by id", description = "Retrieve a user by its UUID")
+    @Operation(summary = "Get user by id", description = "Retrieve a user profile by its UUID")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "User found", content = @Content(schema = @Schema(implementation = UserResponse.class))),
             @ApiResponse(responseCode = "404", description = "User not found")
     })
     public Mono<UserResponse> getUserById(
             @Parameter(description = "User identifier", required = true) @PathVariable UUID userId) {
-        log.info("Getting user by id: {}", userId);
+        log.info("Fetching user details for id: {}", userId);
+        
         return userUseCases.getUserById(userId)
                 .map(user -> {
                     UserResponse response = userMapper.toResponse(user);
-                    log.info("User found {}", user);
-                    response.setRole(user.role().type());
-                    log.info("User found: {}", response);
+                    // Set the primary role type in the DTO
+                    if (user.roles() != null && !user.roles().isEmpty()) {
+                        response.setRole(user.roles().iterator().next().type());
+                    }
                     return response;
                 });
     }
 
+    /**
+     * Lists all users, optionally filtered by their primary role.
+     */
     @GetMapping
-    @Operation(summary = "List users", description = "Get all users or filter by role")
+    @Operation(summary = "List users", description = "Get all users or filter by their primary role")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "List of users", content = @Content(schema = @Schema(implementation = UserResponse.class)))
     })
     public Flux<UserResponse> getAllUsers(
             @Parameter(description = "Optional role filter") @RequestParam(required = false) RoleType role) {
-        Flux<UserResponse> users;
-        if (role != null) {
-            users = userUseCases.getUsersByRole(role)
-                    .map(userMapper::toResponse)
-                    .map(user -> UserResponse.builder()
-                            .id(user.getId())
-                            .name(user.getName())
-                            .email(user.getEmail())
-                            .telephone(user.getTelephone())
-                            .role(role)
-                            .build());
-        } else {
-            users = userUseCases.getAllUsers()
-                    .map(userMapper::toResponse);
-        }
-        return users;
+        
+        Flux<User> userFlux = (role != null) ? userUseCases.getUsersByRole(role) : userUseCases.getAllUsers();
+
+        return userFlux.map(user -> {
+            UserResponse response = userMapper.toResponse(user);
+            if (user.roles() != null && !user.roles().isEmpty()) {
+                response.setRole(user.roles().iterator().next().type());
+            }
+            return response;
+        });
     }
 
+    /**
+     * Deletes a user from the system.
+     */
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete user", description = "Delete a user by its UUID")
+    @Operation(summary = "Delete user", description = "Permanently delete a user by its UUID")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "User deleted"),
+            @ApiResponse(responseCode = "200", description = "User successfully deleted"),
             @ApiResponse(responseCode = "404", description = "User not found")
     })
     public Mono<Boolean> deleteById(
             @Parameter(description = "User identifier", required = true) @PathVariable UUID id) {
+        log.info("Deleting user with id: {}", id);
         return userUseCases.deleteUserById(id);
     }
 }

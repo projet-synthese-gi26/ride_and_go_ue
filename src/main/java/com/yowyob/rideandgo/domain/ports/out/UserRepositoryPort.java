@@ -23,5 +23,4 @@ public interface UserRepositoryPort {
 
     Flux<User> findAll();
 
-    List<User> findByRoleNameList(RoleType type);
 }
