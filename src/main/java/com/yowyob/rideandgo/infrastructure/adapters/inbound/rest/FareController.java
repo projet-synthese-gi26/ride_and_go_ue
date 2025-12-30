@@ -22,7 +22,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/fares")
-@Tag(name = "Fares", description = "Fare calculation endpoints")
+@Tag(name = "Fares", description = "Trip price estimation")
 public class FareController {
     private final FareCalculatorClient client;
     private final FareMapper mapper;

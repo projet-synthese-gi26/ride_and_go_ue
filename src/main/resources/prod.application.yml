@@ -1,49 +1,48 @@
+# ===================================================================
+# PRODUCTION CONFIGURATION - RIDE & GO API
+# ===================================================================
+
 server:
   port: 8080
+  error:
+    include-message: always # Useful for frontend debugging
 
 spring:
   application:
-    name: reactive-hexagonal
-    
-  docker:
-    compose:
-      enabled: false
+    name: ride-and-go
 
-  # POSTGRESQL (R2DBC)
+  # DATABASE CONFIGURATION (REACTIVE R2DBC)
   r2dbc:
-    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:payment_db}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:password}
+    url: r2dbc:postgresql://${DB_HOST:168.119.122.86}:${DB_PORT:5432}/${DB_NAME:yowyob}
+    username: ${DB_USERNAME:master}
+    password: ${DB_PASSWORD:Azerty1234*}
     pool:
       enabled: true
-      initial-size: 1
-      max-size: 5
+      initial-size: 5
+      max-size: 20
       max-idle-time: 30m
-      max-life-time: 10m
-      acquire-retry: 3
-      max-acquire-time: 30s
       validation-query: SELECT 1
+
+  # CRITICAL SECURITY: Never run local scripts on production server
   sql:
     init:
-      mode: always
+      mode: never
 
-  # REDIS CLUSTER 
+  # REDIS CACHE (CLUSTER MODE)
   data:
     redis:
-      password: ${REDIS_PASSWORD:password}
+      password: ${REDIS_PASSWORD:Azerty1234*}
       cluster:
         nodes:
-          - ${REDIS_HOST:localhost}:7001
-          - ${REDIS_HOST:localhost}:7002
-          - ${REDIS_HOST:localhost}:7003
-          - ${REDIS_HOST:localhost}:7004
-          - ${REDIS_HOST:localhost}:7005
-          - ${REDIS_HOST:localhost}:7006
+          - ${REDIS_HOST:168.119.122.86}:7001
+          - ${REDIS_HOST:168.119.122.86}:7002
+          - ${REDIS_HOST:168.119.122.86}:7003
 
-  # KAFKA 
+  # MESSAGING SYSTEM (KAFKA)
   kafka:
-    bootstrap-servers:  ${KAFKA_HOST:localhost}:${KAFKA_PORT:9092}
+    bootstrap-servers: ${KAFKA_HOST:168.119.122.86}:${KAFKA_PORT:9092}
     consumer:
+      group-id: ride-and-go-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
@@ -53,37 +52,29 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
-# CUSTOM CONFIG 
+# CUSTOM BUSINESS SERVICES CONFIGURATION
 application:
   external:
-    stock-service-url: http://${EXTERNAL_HOST:localhost}:8081
+    # URL of the Fleet & Vehicle technical service
+    vehicle-service-url: https://vehicule-service.pynfi.com
+    # URL of the Fare calculation engine
     fare-calculator-url: https://fare-calculator-service.pynfi.com
+    
+  auth:
+    mode: remote # Switch to real TraMaSys authentication
+    url: https://auth-service.pynfi.com
 
   kafka:
     topics:
-      product-events: test-topic
-      notification-service-create-topic: notification-create-topic
-      # Utilisez un nom de topic dédié pour cet événement
       offer-created: offer-created-topic
-      offer-send: notification-send-topic
-    notification-registration:
-      name: "Nom du projet"
-      email:
-        host: ${SMTP_HOST:smtp.gmail.com}
-        port: ${SMTP_PORT:587}
-        username: ${SMTP_USERNAME}
-        password: ${SMTP_PASSWORD}
-    notification-service:
-      token: token-topic
-      template:
-        new-offer-id: 1001
-        accepted-offer-id: 1002
+      notification-service-create-topic: notification-create-topic
 
+# MONITORING & HEALTH CHECK (ACTUATOR)
 management:
   endpoints:
     web:
       exposure:
-        include: ["health","info","prometheus"]
+        include: ["health", "info", "prometheus"]
   endpoint:
     health:
       show-details: "always"
@@ -94,12 +85,15 @@ management:
       prometheus:
         enabled: true
 
-# RESILIENCE4J 
+# RESILIENCE CONFIGURATION (CIRCUIT BREAKERS)
 resilience4j:
   circuitbreaker:
     instances:
-      stock-service:
+      fare-calculator-service:
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        slidingWindowSize: 10
+      auth-service:
         failureRateThreshold: 50
         waitDurationInOpenState: 5s
         slidingWindowSize: 5
-

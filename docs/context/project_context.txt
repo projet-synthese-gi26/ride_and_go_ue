@@ -1,5 +1,5 @@
 # Contexte du Projet : Fleet & Geofence API
-Généré le : Mon 29 Dec 2025 09:16:09 PM WAT
+Généré le : Tue 30 Dec 2025 01:07:34 AM WAT
 Framework : Spring Boot WebFlux (Reactive)
 
 ## 1. Arborescence du Projet
@@ -52,6 +52,7 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   │   │   └── RoleType.java
     │   │               │   │   ├── Fare.java
     │   │               │   │   ├── Offer.java
+    │   │               │   │   ├── Permission.java
     │   │               │   │   ├── Ride.java
     │   │               │   │   ├── Role.java
     │   │               │   │   └── User.java
@@ -92,6 +93,7 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   │   │       │   └── UserResponse.java
     │   │               │   │   │       ├── FareController.java
     │   │               │   │   │       ├── GlobalExceptionHandler.java
+    │   │               │   │   │       ├── HealthCheckController.java
     │   │               │   │   │       ├── OfferController.java
     │   │               │   │   │       └── UserController.java
     │   │               │   │   └── outbound
@@ -99,10 +101,8 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   │       │   └── RedisAdapter.java
     │   │               │   │       ├── external
     │   │               │   │       │   ├── client
-    │   │               │   │       │   │   ├── FareCalculatorClient.java
-    │   │               │   │       │   │   └── StockApiClient.java
-    │   │               │   │       │   ├── FareAdapter.java
-    │   │               │   │       │   └── StockAdapter.java
+    │   │               │   │       │   │   └── FareCalculatorClient.java
+    │   │               │   │       │   └── FareAdapter.java
     │   │               │   │       ├── messaging
     │   │               │   │       │   ├── OfferEventPublisherAdapter.java
     │   │               │   │       │   └── SendNotificationAdapter.java
@@ -111,6 +111,7 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   │           │   ├── AbstractAuditingEntity.java
     │   │               │   │           │   ├── OfferAgreementEntity.java
     │   │               │   │           │   ├── OfferEntity.java
+    │   │               │   │           │   ├── PermissionEntity.java
     │   │               │   │           │   ├── RideEntity.java
     │   │               │   │           │   ├── RoleEntity.java
     │   │               │   │           │   └── UserEntity.java
@@ -118,6 +119,7 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   │           ├── repository
     │   │               │   │           │   ├── OfferAgreementR2dbcRepository.java
     │   │               │   │           │   ├── OfferR2dbcRepository.java
+    │   │               │   │           │   ├── PermissionR2dbcRepository.java
     │   │               │   │           │   ├── RideR2dbcRepository.java
     │   │               │   │           │   ├── RoleR2dbcRepository.java
     │   │               │   │           │   └── UserR2dbcRepository.java
@@ -141,8 +143,10 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               └── tmp
     │   └── resources
     │       ├── application.yml
-    │       ├── prod.application.yml
-    │       └── schema.sql
+    │       ├── local
+    │       │   ├── data.sql
+    │       │   └── schema.sql
+    │       └── prod.application.yml
     └── test
         └── java
             └── com
@@ -150,7 +154,7 @@ Framework : Spring Boot WebFlux (Reactive)
                     └── reactive_hexagonal
                         └── ReactiveHexagonalApplicationTests.java
 
-45 directories, 99 files
+46 directories, 102 files
 ```
 ## 2. Contenu des Fichiers
 
@@ -962,26 +966,26 @@ showToast(error.message)
 ### 📋 Roadmap API RIDE & GO 
 
 - [ ] **Tâche 1 :** Configuration du projet (config,Sécurité, alignement BD Centrale & Seeding,swagger).
-- [ ] **1.1 : Identité & Nettoyage (Metadata)**
+- [x] **1.1 : Identité & Nettoyage (Metadata)**
     - [x] Mettre à jour le `pom.xml` (artifactId: `ride-and-go`, name: `Ride & Go API`).
-    - [ ] Renommer le package racine `com.yowyob.rideandgo` en `com.yowyob.rideandgo`.
-    - [ ] Supprimer tous les fichiers liés au domaine "Product" (Entities, Mappers, Services, Controllers).
-    - [ ] Nettoyer `application.yml` (nom de l'app, group-id Kafka, suppression des clés inutiles).
+    - [x] Renommer le package racine `com.yowyob.rideandgo` en `com.yowyob.rideandgo`.
+    - [x] Supprimer tous les fichiers liés au domaine "Product" (Entities, Mappers, Services, Controllers).
+    - [x] Nettoyer `application.yml` (nom de l'app, group-id Kafka, suppression des clés inutiles).
 
-- [ ] **1.2 : Alignement avec la DB Centrale (Structure)**
-    - [ ] Harmoniser les scripts SQL : Utiliser les noms de tables globaux (`users`, `roles`, `business_actors`) au lieu des préfixes `ride_and_go_`.
-    - [ ] Mettre à jour les entités Java (`UserEntity`, `RoleEntity`, etc.) avec les bonnes annotations `@Table`.
-    - [ ] Valider la cohérence des types UUID pour toutes les clés primaires et étrangères.
+- [x] **1.2 : Alignement avec la DB Centrale (Structure)**
+    - [x] Harmoniser les scripts SQL : Utiliser les noms de tables globaux (`users`, `roles`, `business_actors`) au lieu des préfixes `ride_and_go_`.
+    - [x] Mettre à jour les entités Java (`UserEntity`, `RoleEntity`, etc.) avec les bonnes annotations `@Table`.
+    - [x] Valider la cohérence des types UUID pour toutes les clés primaires et étrangères.
 
-- [ ] **1.3 : Sécurité Réactive & Documentation (Security/Swagger)**
-    - [ ] Implémentation de `SecurityConfig` : Configuration WebFlux réactive (Stateless, protection des routes, désactivation du mot de passe par défaut).
-    - [ ] Autorisation des routes Swagger et HealthCheck dans la chaîne de filtres.
-    - [ ] Organisation du Swagger UI par tags métier (Auth, Fares, Offers, Trips) selon les spécifications.
+- [x] **1.3 : Sécurité Réactive & Documentation (Security/Swagger)**
+    - [x] Implémentation de `SecurityConfig` : Configuration WebFlux réactive (Stateless, protection des routes, désactivation du mot de passe par défaut).
+    - [x] Autorisation des routes Swagger et HealthCheck dans la chaîne de filtres.
+    - [x] Organisation du Swagger UI par tags métier (Auth, Fares, Offers, Trips) selon les spécifications.
 
-- [ ] **1.4 : Automatisation & Seeding (Données de test)**
-    - [ ] Configurer `DatabaseInitConfig` pour une exécution séquentielle (Schema -> Check -> Data).
-    - [ ] Préparer `src/main/resources/local/data.sql` avec les rôles (`PASSENGER`, `DRIVER`) et des utilisateurs de test Ride & Go.
-    - [ ] **Validation finale** : Démarrage complet de l'application et vérification des 100+ utilisateurs via Swagger.
+- [x] **1.4 : Automatisation & Seeding (Données de test)**
+    - [x] Configurer `DatabaseInitConfig` pour une exécution séquentielle (Schema -> Check -> Data).
+    - [x] Préparer `src/main/resources/local/data.sql` avec les rôles (`PASSENGER`, `DRIVER`) et des utilisateurs de test Ride & Go.
+    - [x] **Validation finale** : Démarrage complet de l'application et vérification des 100+ utilisateurs via Swagger.
 - [ ] **Tâche 2 :** Gestion de l'Authentification (auth fake,Liaison TraMaSys & Profils).
 - [ ] **Tâche 3 :** Gestion des Offres (Flux Marketplace : Estimation -> Publication -> Bidding -> Sélection).
 - [ ] **Tâche 4 :** Gestion des Courses (Cycle de vie : Création -> Démarrage -> Fin).
@@ -1048,6 +1052,1291 @@ class ReactiveHexagonalApplicationTests {
 ```
 
 ---
+### Fichier : `./src/main/resources/local/data.sql`
+```sql
+-- =====================================================
+-- YOWYOB DB - DATA SEEDING SCRIPT
+-- PostgreSQL
+-- =====================================================
+
+
+-- =====================================================
+-- 1. CLEANUP EXISTING DATA
+-- =====================================================
+TRUNCATE TABLE 
+    users, images, countries, business_actors, 
+    admins, fleet_managers, drivers, customers, 
+    providers, employees, prospects, sales_persons,
+    profiles, settings, addresses, contacts,
+    roles, permissions, role_has_permissions,  user_has_permissions,user_has_roles,
+    organizations, agencies, business_domains, organization_business_domains,
+    certifications, third_parties, proposed_activities, services, branches,
+    fleets, vehicles, geofence_zones, geofence_points, geofence_events,
+    roads, trips, offers, rides, reviews, offer_driver_linkages,
+    operational_parameters, financial_parameters, maintenance_parameters,
+    geofence_point_zone_linkages,
+    syndicats, abstract_products, products, 
+    publications, publication_images, publication_votes, votes,
+    events, event_images, reactions, comments, avis,
+    subscriptions, payments
+    RESTART IDENTITY CASCADE;
+
+-- =====================================================
+-- 2. STATIC REFERENCE DATA
+-- =====================================================
+
+-- Countries
+INSERT INTO countries (name, code) VALUES
+('Cameroun', 'CM'), ('Sénégal', 'SN'), ('Côte d''Ivoire', 'CI'), 
+('Gabon', 'GA'), ('Nigéria', 'NG'), ('Togo', 'TG');
+
+-- Roles
+INSERT INTO roles (name, guard_name) VALUES
+('ADMIN', 'web'), ('FLEET_MANAGER', 'web'), ('DRIVER', 'web'), ('CUSTOMER', 'web');
+
+-- Images (Random placeholders from Picsum)
+INSERT INTO images (url, alt_text) 
+SELECT 
+    'https://picsum.photos/seed/' || i || '/800/600', 
+    'Image aléatoire ' || i
+FROM generate_series(1, 50) as i;
+
+-- =====================================================
+-- 3. USERS GENERATION (100 users)
+-- =====================================================
+
+INSERT INTO users (name, phone_number, email_address)
+SELECT 
+    (ARRAY['Mamadou', 'Jean-Pierre', 'Ibrahim', 'Fatou', 'Aminata', 'Ngolo', 'Aboubakar', 'Clarisse', 'Samuel', 'Kouamé', 'Aissatou', 'Bachelard', 'Landry', 'Thérèse'])[floor(random()*14)+1] 
+    || ' ' || 
+    (ARRAY['Diop', 'Njoya', 'Mbarga', 'Kone', 'Sow', 'Etoundi', 'Kamga', 'Traoré', 'Diallo', 'Fofana', 'Mensah', 'Atangana', 'Eto''o', 'Drogba'])[floor(random()*14)+1],
+    (ARRAY['+237', '+221', '+225'])[floor(random()*3)+1] || (600000000 + floor(random()*99999999)::int),
+    'user_' || i || '@yowyob.test'
+FROM generate_series(1, 100) as i;
+
+-- Settings & Profiles
+INSERT INTO settings (user_id, theme, language, receive_push_notifications)
+SELECT id, 'LIGHT', 'fr', true FROM users;
+
+INSERT INTO profiles (user_id, first_name, nationality, is_verified)
+SELECT id, split_part(name, ' ', 1), 'Camerounais', (random() > 0.5) FROM users;
+
+-- =====================================================
+-- 4. ACTORS DISPATCHING
+-- User -> BusinessActor -> SpecificActor
+-- =====================================================
+
+-- 4.1 Admins (First 5 users)
+INSERT INTO admins (id, name, email_address)
+SELECT id, name, email_address FROM users ORDER BY email_address LIMIT 5;
+
+-- 4.2 Fleet Managers (Next 5 users)
+-- STEP 1: Insert into PARENT (BusinessActor)
+INSERT INTO business_actors (id, name, phone_number, email_address)
+SELECT id, name, phone_number, email_address FROM users ORDER BY email_address LIMIT 5 OFFSET 5;
+
+-- STEP 2: Insert into CHILD (FleetManager)
+INSERT INTO fleet_managers (id, name, email_address)
+SELECT id, name, email_address FROM users ORDER BY email_address LIMIT 5 OFFSET 5;
+
+-- 4.3 Drivers (Next 30 users)
+-- STEP 1: Insert into PARENT (BusinessActor)
+INSERT INTO business_actors (id, name, phone_number, email_address)
+SELECT id, name, phone_number, email_address FROM users ORDER BY email_address LIMIT 30 OFFSET 10;
+
+-- STEP 2: Insert into CHILD (Driver)
+INSERT INTO drivers (id, status, license_number, has_car)
+SELECT 
+    id, 
+    (ARRAY['AVAILABLE', 'BUSY', 'OFFLINE'])[floor(random()*3)+1], 
+    'LIC-' || floor(random()*100000) || '-CM',
+    (random() > 0.3)
+FROM users ORDER BY email_address LIMIT 30 OFFSET 10;
+
+-- 4.4 Customers (Remaining 60 users)
+INSERT INTO customers (id, code, payment_method)
+SELECT 
+    id, 
+    'CUST-' || substr(id::text, 1, 8),
+    (ARRAY['CASH', 'MOBILE_MONEY', 'CARD'])[floor(random()*3)+1]
+FROM users ORDER BY email_address LIMIT 60 OFFSET 40;
+
+-- Assign Roles
+INSERT INTO user_has_roles (user_id, role_id)
+SELECT id, (SELECT id FROM roles WHERE name = 'ADMIN') FROM users ORDER BY email_address LIMIT 5;
+
+INSERT INTO user_has_roles (user_id, role_id)
+SELECT id, (SELECT id FROM roles WHERE name = 'FLEET_MANAGER') FROM users ORDER BY email_address LIMIT 5 OFFSET 5;
+
+INSERT INTO user_has_roles (user_id, role_id)
+SELECT id, (SELECT id FROM roles WHERE name = 'DRIVER') FROM users ORDER BY email_address LIMIT 30 OFFSET 10;
+
+INSERT INTO user_has_roles (user_id, role_id)
+SELECT id, (SELECT id FROM roles WHERE name = 'CUSTOMER') FROM users ORDER BY email_address LIMIT 60 OFFSET 40;
+
+-- =====================================================
+-- 5. ORGANIZATIONS & AGENCIES
+-- =====================================================
+
+INSERT INTO organizations (
+    business_actor_id, logo_id, code, short_name, long_name, 
+    description, tax_number, is_active, status
+)
+SELECT
+    (SELECT id FROM fleet_managers ORDER BY random() LIMIT 1),
+    (SELECT id FROM images ORDER BY random() LIMIT 1),
+    'ORG-' || i,
+    'Transport ' || i,
+    'Société de Transport ' || i,
+    'Description ' || i,
+    'TAX-' || floor(random()*1000000),
+    true,
+    'PUBLISHED'
+FROM generate_series(1, 35) as i;
+
+INSERT INTO agencies (
+    organization_id, manager_id, name, city, location, is_headquarter
+)
+SELECT 
+    id, 
+    (SELECT id FROM fleet_managers ORDER BY random() LIMIT 1),
+    'Agence Centrale',
+    (ARRAY['Douala', 'Yaoundé', 'Abidjan'])[floor(random()*3)+1],
+    'Rue Principale',
+    true
+FROM organizations;
+
+-- =====================================================
+-- 6. FLEETS & VEHICLES
+-- =====================================================
+
+INSERT INTO fleets (fleet_manager_id, name, phone_number)
+SELECT 
+    id, 'Flotte de ' || name, '+237699000000'
+FROM fleet_managers;
+
+-- Vehicles
+INSERT INTO vehicles (
+    fleet_id, user_id, driver_id, license_plate, brand, model, type, color, manufacturing_year
+)
+SELECT 
+    f.id,
+    f.fleet_manager_id,
+    (SELECT id FROM drivers ORDER BY random() LIMIT 1),
+    'LT-' || floor(random()*999)::text || '-AA',
+    (ARRAY['Toyota', 'Peugeot'])[floor(random()*2)+1],
+    (ARRAY['Yaris', 'Partner'])[floor(random()*2)+1],
+    (ARRAY['CAR', 'VAN'])[floor(random()*2)+1]::vehicle_type_enum,
+    'Jaune',
+    2020
+FROM fleets f;
+
+-- =====================================================
+-- 7. OFFERS & RIDES
+-- =====================================================
+
+INSERT INTO offers (
+    passenger_id, start_point, end_point, price, state, created_at
+)
+SELECT 
+    (SELECT id FROM customers ORDER BY random() LIMIT 1),
+    'Point A', 'Point B', 
+    2000, 
+    'CHOSEN',
+    NOW()
+FROM generate_series(1, 60) as i;
+
+-- Rides
+INSERT INTO rides (
+    offer_id, passenger_id, driver_id, 
+    distance, time_estimation, real_time, state, created_at
+)
+SELECT 
+    id, -- offer_id
+    passenger_id,
+    (SELECT id FROM drivers ORDER BY random() LIMIT 1),
+    15.5, 30, 35,
+    'COMPLETED',
+    created_at
+FROM offers 
+LIMIT 40;
+
+-- Reviews
+INSERT INTO reviews (ride_id, author_id, subject, comment, rating)
+SELECT 
+    id,
+    passenger_id,
+    'Chauffeur',
+    'Bonne course, chauffeur ponctuel',
+    5
+FROM rides
+WHERE state = 'COMPLETED';
+
+-- =====================================================
+-- 8. PRODUCTS
+-- =====================================================
+
+INSERT INTO products (
+    organization_id, name, description, standard_price, 
+    status, is_active, departure_location
+)
+SELECT 
+    (SELECT id FROM organizations ORDER BY random() LIMIT 1),
+    'Trajet Spécial ' || i,
+    'Description produit',
+    5000,
+    'PUBLISHED',
+    true,
+    'Douala'
+FROM generate_series(1, 40) as i;
+
+-- =====================================================
+-- 9. SUBSCRIPTIONS & PAYMENTS
+-- =====================================================
+
+INSERT INTO subscriptions (
+    admin_id, label, price, duration_in_days, description, is_active
+) VALUES 
+((SELECT id FROM admins LIMIT 1), 'Pack Hebdo', 2500, 7, 'Standard', true),
+((SELECT id FROM admins LIMIT 1), 'Pack Mensuel', 10000, 30, 'Pro', true),
+((SELECT id FROM admins LIMIT 1), 'Pack Annuel', 100000, 365, 'VIP', true);
+
+INSERT INTO payments (
+    driver_id, user_id, subscription_id, amount_paid, status, id_provider_transaction, created_at
+)
+SELECT 
+    d.id, -- Driver ID
+    d.id, -- Payer ID
+    s.id, -- Subscription ID
+    s.price,
+    'SUCCESS',
+    'TXN-' || floor(random()*10000000),
+    NOW()
+FROM drivers d
+CROSS JOIN subscriptions s
+ORDER BY random()
+LIMIT 50;
+
+-- =====================================================
+-- 10. SOCIAL & ADDRESSES
+-- =====================================================
+
+INSERT INTO syndicats (organization_id, name, is_approved)
+SELECT id, 'Syndicat Transports', true FROM organizations LIMIT 1;
+
+INSERT INTO branches (id, syndicat_id, name, location)
+SELECT 
+    ag.id,
+    (SELECT id FROM syndicats LIMIT 1),
+    'Branche ' || ag.name, 
+    ag.location 
+FROM agencies ag 
+LIMIT 10;
+
+INSERT INTO publications (branch_id, author_id, content, status, n_likes)
+SELECT 
+    (SELECT id FROM branches ORDER BY random() LIMIT 1),
+    (SELECT id FROM admins ORDER BY random() LIMIT 1),
+    'Info Trafic ' || i,
+    'PUBLISHED',
+    floor(random() * 50)::int
+FROM generate_series(1, 40) as i;
+
+-- =====================================================
+-- SEEDING DIRECT PERMISSIONS (Test)
+-- =====================================================
+
+-- On crée quelques permissions
+INSERT INTO permissions (id, name) VALUES 
+(uuid_generate_v4(), 'extra:special_access'),
+(uuid_generate_v4(), 'fleet:emergency_stop');
+
+-- On donne la première permission au premier utilisateur (Admin 1)
+INSERT INTO user_has_permissions (user_id, permission_id)
+VALUES (
+    (SELECT id FROM users ORDER BY email_address LIMIT 1),
+    (SELECT id FROM permissions WHERE name = 'extra:special_access' LIMIT 1)
+);
+```
+
+---
+### Fichier : `./src/main/resources/local/schema.sql`
+```sql
+-- =====================================================
+-- YOWYOB DB - INIT SCRIPT
+-- PostgreSQL
+-- Structure: Core -> Organization -> RBAC
+-- =====================================================
+
+-- Clean up existing tables and types to ensure a fresh start
+-- We drop them in reverse order of dependency
+DROP TABLE IF EXISTS user_has_roles CASCADE;
+DROP TABLE IF EXISTS role_has_permissions CASCADE;
+DROP TABLE IF EXISTS permissions CASCADE;
+DROP TABLE IF EXISTS roles CASCADE;
+DROP TABLE IF EXISTS reviews CASCADE;
+DROP TABLE IF EXISTS payments CASCADE;
+DROP TABLE IF EXISTS subscriptions CASCADE;
+DROP TABLE IF EXISTS admins CASCADE;
+DROP TABLE IF EXISTS profiles CASCADE;
+DROP TABLE IF EXISTS comments CASCADE;
+DROP TABLE IF EXISTS reactions CASCADE;
+DROP TABLE IF EXISTS event_images CASCADE;
+DROP TABLE IF EXISTS events CASCADE;
+DROP TABLE IF EXISTS publication_images CASCADE;
+DROP TABLE IF EXISTS publications CASCADE;
+DROP TABLE IF EXISTS branches CASCADE;
+DROP TABLE IF EXISTS avis CASCADE;
+DROP TABLE IF EXISTS votes CASCADE;
+DROP TABLE IF EXISTS publication_votes CASCADE;
+DROP TABLE IF EXISTS products CASCADE;
+DROP TABLE IF EXISTS abstract_products CASCADE;
+DROP TABLE IF EXISTS syndicats CASCADE;
+DROP TABLE IF EXISTS offer_driver_linkages CASCADE;
+DROP TABLE IF EXISTS geofence_events CASCADE;
+DROP TABLE IF EXISTS geofence_point_zone_linkages CASCADE;
+DROP TABLE IF EXISTS geofence_points CASCADE;
+DROP TABLE IF EXISTS maintenance_parameters CASCADE;
+DROP TABLE IF EXISTS financial_parameters CASCADE;
+DROP TABLE IF EXISTS operational_parameters CASCADE;
+DROP TABLE IF EXISTS trips CASCADE;
+DROP TABLE IF EXISTS roads CASCADE;
+DROP TABLE IF EXISTS vehicles CASCADE;
+DROP TABLE IF EXISTS geofence_zones CASCADE;
+DROP TABLE IF EXISTS fleets CASCADE;
+DROP TABLE IF EXISTS fleet_managers CASCADE;
+DROP TABLE IF EXISTS rides CASCADE;
+DROP TABLE IF EXISTS offers CASCADE;
+DROP TABLE IF EXISTS drivers CASCADE;
+DROP TABLE IF EXISTS services CASCADE;
+DROP TABLE IF EXISTS customers CASCADE;
+DROP TABLE IF EXISTS sales_persons CASCADE;
+DROP TABLE IF EXISTS prospects CASCADE;
+DROP TABLE IF EXISTS employees CASCADE;
+DROP TABLE IF EXISTS providers CASCADE;
+DROP TABLE IF EXISTS addresses CASCADE;
+DROP TABLE IF EXISTS proposed_activities CASCADE;
+DROP TABLE IF EXISTS settings CASCADE;
+DROP TABLE IF EXISTS third_parties CASCADE;
+DROP TABLE IF EXISTS certifications CASCADE;
+DROP TABLE IF EXISTS organization_business_domains CASCADE;
+DROP TABLE IF EXISTS contacts CASCADE;
+DROP TABLE IF EXISTS business_domains CASCADE;
+DROP TABLE IF EXISTS agencies CASCADE;
+DROP TABLE IF EXISTS organizations CASCADE;
+DROP TABLE IF EXISTS business_actors CASCADE;
+DROP TABLE IF EXISTS countries CASCADE;
+DROP TABLE IF EXISTS images CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+-- Drop existing types
+DROP TYPE IF EXISTS reaction_type_enum CASCADE;
+DROP TYPE IF EXISTS type_enum CASCADE;
+DROP TYPE IF EXISTS role_type_enum CASCADE;
+DROP TYPE IF EXISTS engine_status_enum CASCADE;
+DROP TYPE IF EXISTS maintenance_status_enum CASCADE;
+DROP TYPE IF EXISTS event_type_enum CASCADE;
+DROP TYPE IF EXISTS ride_state_enum CASCADE;
+DROP TYPE IF EXISTS offer_state_enum CASCADE;
+DROP TYPE IF EXISTS vehicle_type_enum CASCADE;
+DROP TYPE IF EXISTS action_enum CASCADE;
+DROP TYPE IF EXISTS category_enum CASCADE;
+DROP TYPE IF EXISTS status_enum CASCADE;
+
+-- Re-enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+
+-- =====================================================
+-- ENUM TYPES
+-- =====================================================
+
+CREATE TYPE status_enum AS ENUM (
+  'DRAFT', 'WAITING_CONFIRMATION', 'PUBLISHED', 'IN_PROGRESS', 'CANCELLED', 'EXPIRED'
+);
+
+CREATE TYPE category_enum AS ENUM (
+  'ANNOUNCE', 'PLANNING', 'VEHICLE', 'ADDRESS', 'EXPERIENCE'
+);
+
+CREATE TYPE action_enum AS ENUM (
+  'CREATE', 'UPDATE', 'READ', 'DELETE'
+);
+
+CREATE TYPE vehicle_type_enum AS ENUM (
+  'CAR', 'VAN', 'TRUCK', 'BIKE'
+);
+
+CREATE TYPE offer_state_enum AS ENUM (
+  'NEW', 'PENDING', 'CHOSEN', 'TERMINATED', 'CANCELED'
+);
+
+CREATE TYPE ride_state_enum AS ENUM (
+  'CONFIRMED', 'ONGOING', 'COMPLETED', 'CANCELED'
+);
+
+CREATE TYPE event_type_enum AS ENUM (
+  'ENTRY', 'EXIT'
+);
+
+CREATE TYPE maintenance_status_enum AS ENUM (
+  'UP_TO_DATE', 'PENDING', 'OVERDUE'
+);
+
+CREATE TYPE engine_status_enum AS ENUM (
+  'OK', 'NEED_SERVICE', 'OUT_OF_SERVICE'
+);
+
+CREATE TYPE role_type_enum AS ENUM (
+  'CUSTOMER', 'DRIVER', 'FLEET_MANAGER', 'ADMIN', 'PASSENGER', 'PRESIDENT', 'MODERATOR', 'CLIENT'
+);
+
+CREATE TYPE type_enum AS ENUM (
+  'NOTIFICATION', 'CHAT', 'PAYMENT', 'MEDIA'
+);
+
+CREATE TYPE reaction_type_enum AS ENUM (
+  'LIKE', 'LOVE', 'HAHA', 'WOW', 'SAD', 'ANGRY'
+);
+
+-- =====================================================
+-- CORE TABLES
+-- =====================================================
+
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  phone_number TEXT,
+  email_address TEXT UNIQUE
+);
+
+CREATE TABLE images (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  url TEXT NOT NULL,
+  alt_text TEXT,
+  uploaded_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE countries (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  code TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE business_actors (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT,
+  phone_number TEXT,
+  email_address TEXT,
+  CONSTRAINT fk_business_actor_user
+    FOREIGN KEY (id) REFERENCES users(id)
+    ON DELETE CASCADE
+);
+
+-- =====================================================
+-- ORGANIZATION TABLES
+-- =====================================================
+
+CREATE TABLE organizations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  business_actor_id UUID REFERENCES business_actors(id),
+  logo_id UUID REFERENCES images(id),
+
+  code TEXT,
+  service TEXT,
+  is_individual_business BOOLEAN DEFAULT false,
+  email TEXT,
+  short_name TEXT,
+  long_name TEXT,
+  description TEXT,
+  logo_uri TEXT,
+  website_url TEXT,
+  social_network TEXT,
+  business_registration_number TEXT,
+  tax_number TEXT,
+  capital_share NUMERIC,
+  ceo_name TEXT,
+  year_founded INT,
+  keywords TEXT,
+  number_of_employees INT,
+  legal_form TEXT,
+  is_active BOOLEAN DEFAULT true,
+  status status_enum DEFAULT 'DRAFT',
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  deleted_at TIMESTAMP
+);
+
+CREATE TABLE agencies (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, -- Must belong to an org
+
+  owner_id UUID REFERENCES business_actors(id),
+  manager_id UUID REFERENCES business_actors(id),
+  logo_id UUID REFERENCES images(id),
+
+  code TEXT,
+  name TEXT,
+  location TEXT,
+  description TEXT,
+  transferable BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
+  logo_uri TEXT,
+  short_name TEXT,
+  long_name TEXT,
+  is_individual_business BOOLEAN DEFAULT false,
+  is_headquarter BOOLEAN DEFAULT false,
+  country TEXT,
+  city TEXT,
+  latitude NUMERIC,
+  longitude NUMERIC,
+  open_time TIME,
+  close_time TIME,
+  phone TEXT,
+  email TEXT,
+  whatsapp TEXT,
+  greeting_message TEXT,
+  average_revenue NUMERIC,
+  capital_share NUMERIC,
+  registration_number TEXT,
+  social_network TEXT,
+  tax_number TEXT,
+  keywords TEXT,
+  is_public BOOLEAN DEFAULT false,
+  is_business BOOLEAN DEFAULT true,
+  total_affiliated_customers INT DEFAULT 0,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  deleted_at TIMESTAMP
+);
+
+CREATE TABLE business_domains (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL, -- optional link to organization
+  parent_id UUID REFERENCES business_domains(id) ON DELETE SET NULL,   -- self-referential for hierarchy
+  image_id UUID REFERENCES images(id),
+
+  code TEXT,
+  service TEXT,
+  name TEXT,
+  image_uri TEXT,
+  type TEXT,
+  type_label TEXT,
+  description TEXT,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  deleted_at TIMESTAMP
+);
+
+CREATE TABLE organization_business_domains (
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  business_domain_id UUID REFERENCES business_domains(id) ON DELETE CASCADE,
+  PRIMARY KEY (organization_id, business_domain_id)
+);
+
+CREATE TABLE contacts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  contactable_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+
+  contactable_type TEXT,
+  first_name TEXT,
+  last_name TEXT,
+  title TEXT,
+  is_email_verified BOOLEAN DEFAULT false,
+  is_phone_number_verified BOOLEAN DEFAULT false,
+  is_favorite BOOLEAN DEFAULT false,
+  phone_number TEXT,
+  secondary_phone_number TEXT,
+  fax_number TEXT,
+  email TEXT,
+  secondary_email TEXT,
+  email_verified_at TIMESTAMP,
+  phone_verified_at TIMESTAMP,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  deleted_at TIMESTAMP
+);
+
+CREATE TABLE certifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+
+  type TEXT,
+  name TEXT,
+  description TEXT,
+  obtainment_date DATE,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  deleted_at TIMESTAMP
+);
+
+CREATE TABLE third_parties (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  logo_id UUID REFERENCES images(id),
+
+  code TEXT,
+  type TEXT,
+  legal_form TEXT,
+  unique_identification_number TEXT,
+  trade_registration_number TEXT,
+  name TEXT,
+  acronym TEXT,
+  long_name TEXT,
+  logo_uri TEXT,
+  accounting_account_numbers TEXT,
+  authorized_payment_methods TEXT,
+  authorized_credit_limit NUMERIC,
+  max_discount_rate NUMERIC,
+  vat_subject BOOLEAN,
+  operations_balance NUMERIC,
+  opening_balance NUMERIC,
+  pay_term_number INT,
+  pay_term_type TEXT,
+  third_party_family TEXT,
+  classification TEXT,
+  tax_number TEXT,
+  loyalty_points NUMERIC,
+  loyalty_points_used NUMERIC,
+  loyalty_points_expired NUMERIC,
+  enabled BOOLEAN DEFAULT true,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  deleted_at TIMESTAMP
+);
+
+CREATE TABLE settings (
+  user_id UUID PRIMARY KEY REFERENCES users(id),
+  theme TEXT,
+  language TEXT,
+  long_ride_enabled BOOLEAN DEFAULT false,
+  short_ride_enabled BOOLEAN DEFAULT false,
+  privacy_enable BOOLEAN DEFAULT true,
+  allow_calls BOOLEAN DEFAULT true,
+  allow_messages BOOLEAN DEFAULT true,
+  notify_new_rides BOOLEAN DEFAULT true,
+  notify_ratings BOOLEAN DEFAULT true,
+  notify_practical_tips BOOLEAN DEFAULT true,
+  notify_promotions BOOLEAN DEFAULT true,
+  notify_policy_updates BOOLEAN DEFAULT true,
+  notify_peak_hour_recommendations BOOLEAN DEFAULT true,
+  receive_email BOOLEAN DEFAULT true,
+  receive_sms BOOLEAN DEFAULT true,
+  receive_push_notifications BOOLEAN DEFAULT true,
+  receive_whatsapp BOOLEAN DEFAULT true,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE proposed_activities (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+
+  type TEXT,
+  name TEXT,
+  rate NUMERIC,
+  description TEXT,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE addresses (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  addressable_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  country_id UUID REFERENCES countries(id) ON DELETE SET NULL,
+
+  addressable_type TEXT,
+  type TEXT,
+  address_line_1 TEXT,
+  address_line_2 TEXT,
+  city TEXT,
+  state TEXT,
+  locality TEXT,
+  zip_code TEXT,
+  postal_code TEXT,
+  po_box TEXT,
+  is_default BOOLEAN DEFAULT false,
+  neighbor_hood TEXT,
+  informal_description TEXT,
+  latitude NUMERIC,
+  longitude NUMERIC,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  deleted_at TIMESTAMP
+);
+
+-- =====================================================
+-- USERS EXTENDED
+-- =====================================================
+
+CREATE TABLE providers (
+  id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+
+  code TEXT,
+  contact_info TEXT,
+  address TEXT,
+  is_active BOOLEAN DEFAULT true,
+  product_service_type TEXT,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  deleted_at TIMESTAMP
+);
+
+CREATE TABLE employees (
+  id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+
+  code TEXT,
+  is_manager BOOLEAN DEFAULT false,
+  role TEXT,
+  department TEXT,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  deleted_at TIMESTAMP
+);
+
+CREATE TABLE prospects (
+  id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+
+  code TEXT,
+  payment_method TEXT,
+  amount_paid NUMERIC,
+  interest_level TEXT,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE sales_persons (
+  id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+
+  code TEXT,
+  commission_rate NUMERIC,
+  credit NUMERIC,
+  current_balance NUMERIC,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  deleted_at TIMESTAMP
+);
+
+CREATE TABLE customers (
+  id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+
+  code TEXT,
+  payment_method TEXT,
+  amount_paid NUMERIC,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  deleted_at TIMESTAMP
+);
+
+CREATE TABLE services (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+  name TEXT,
+  phone_number TEXT,
+  email_address TEXT
+);
+
+-- =====================================================
+-- RIDE & FLEET MANAGEMENT
+-- =====================================================
+
+CREATE TABLE drivers (
+  id UUID PRIMARY KEY REFERENCES business_actors(id) ON DELETE CASCADE,
+
+  status TEXT,
+  license_number TEXT,
+  has_car BOOLEAN DEFAULT false
+);
+
+CREATE TABLE offers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  passenger_id UUID REFERENCES customers(id) ON DELETE CASCADE,
+
+  start_point TEXT,
+  end_point TEXT,
+  price NUMERIC,
+  state offer_state_enum DEFAULT 'NEW',
+  ids_interested_drivers TEXT,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE rides (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  offer_id UUID REFERENCES offers(id) ON DELETE SET NULL,
+  passenger_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  driver_id UUID REFERENCES drivers(id) ON DELETE SET NULL,
+
+  distance NUMERIC,
+  time_estimation NUMERIC,
+  real_time NUMERIC,
+  state ride_state_enum DEFAULT 'CONFIRMED',
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE fleet_managers (
+  id UUID PRIMARY KEY REFERENCES business_actors(id) ON DELETE CASCADE,
+
+  name TEXT,
+  phone_number TEXT,
+  email_address TEXT
+);
+
+CREATE TABLE fleets (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  fleet_manager_id UUID REFERENCES fleet_managers(id) ON DELETE SET NULL,
+
+  name TEXT,
+  phone_number TEXT,
+  email_address TEXT,
+
+  created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE geofence_zones (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+  surface_area NUMERIC,
+  perimeter NUMERIC
+);
+
+CREATE TABLE vehicles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  driver_id UUID REFERENCES drivers(id) ON DELETE SET NULL,
+  fleet_id UUID REFERENCES fleets(id) ON DELETE SET NULL,
+  zone_id UUID REFERENCES geofence_zones(id) ON DELETE SET NULL,
+
+  license_plate TEXT,
+  model TEXT,
+  brand TEXT,
+  manufacturing_year INT,
+  type vehicle_type_enum,
+  color TEXT
+);
+
+CREATE TABLE roads (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+  start_point TEXT,
+  end_point TEXT
+);
+
+CREATE TABLE trips (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  road_id UUID REFERENCES roads(id) ON DELETE SET NULL,
+  driver_id UUID REFERENCES drivers(id) ON DELETE SET NULL,
+
+  start_date DATE,
+  end_date DATE,
+  start_time TIME,
+  end_time TIME,
+  type TEXT,
+  color TEXT
+);
+
+CREATE TABLE operational_parameters (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  vehicle_id UUID REFERENCES vehicles(id) ON DELETE CASCADE,
+  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
+
+  statut TEXT,
+  current_location TEXT,
+  current_speed NUMERIC,
+  fuel_level NUMERIC,
+  mileage NUMERIC,
+  odometer_reading NUMERIC,
+  bearing NUMERIC,
+
+  timestamp TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE financial_parameters (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  vehicle_id UUID REFERENCES vehicles(id) ON DELETE CASCADE,
+  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
+
+  insurance_number TEXT,
+  insurance_expired_at DATE,
+  registered_at DATE,
+  purchased_at DATE,
+  depreciation_rate NUMERIC,
+  cost_per_km NUMERIC
+);
+
+CREATE TABLE maintenance_parameters (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  vehicle_id UUID REFERENCES vehicles(id) ON DELETE CASCADE,
+  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
+
+  last_maintenance_at DATE,
+  next_maintenance_at DATE,
+  engine_status engine_status_enum DEFAULT 'OK',
+  battery_health TEXT,
+  maintenance_status maintenance_status_enum DEFAULT 'UP_TO_DATE'
+);
+
+CREATE TABLE geofence_points (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+  latitude NUMERIC,
+  longitude NUMERIC
+);
+
+CREATE TABLE geofence_point_zone_linkages (
+  point_id UUID REFERENCES geofence_points(id) ON DELETE CASCADE,
+  zone_id UUID REFERENCES geofence_zones(id) ON DELETE CASCADE,
+  PRIMARY KEY (point_id, zone_id)
+);
+
+CREATE TABLE geofence_events (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  vehicle_id UUID REFERENCES vehicles(id) ON DELETE CASCADE,
+  zone_id UUID REFERENCES geofence_zones(id) ON DELETE SET NULL,
+  point_id UUID REFERENCES geofence_points(id) ON DELETE SET NULL,
+
+  type event_type_enum,
+
+  timestamp TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE offer_driver_linkages (
+  offer_id UUID REFERENCES offers(id) ON DELETE CASCADE,
+  driver_id UUID REFERENCES drivers(id) ON DELETE CASCADE,
+  PRIMARY KEY (offer_id, driver_id),
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+-- =====================================================
+-- OTHERS: PRODUCTS, SYNDICATS, PUBLICATIONS & REVIEWS
+-- =====================================================
+
+CREATE TABLE syndicats (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+
+  is_approved BOOLEAN DEFAULT false,
+  name TEXT,
+  description TEXT,
+  domain TEXT,
+  type TEXT,
+  charte_url TEXT,
+  status_url TEXT,
+  members_list_url TEXT,
+  commitment_certificate_url TEXT,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE abstract_products (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  syndicat_id UUID REFERENCES syndicats(id) ON DELETE SET NULL,
+
+  name TEXT,
+  description TEXT,
+
+  created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE products (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  abstract_product_id UUID REFERENCES abstract_products(id) ON DELETE SET NULL,
+
+  name TEXT,
+  description TEXT,
+  is_active BOOLEAN DEFAULT true,
+  standard_price NUMERIC,
+  departure_location TEXT,
+  arrival_location TEXT,
+  start_date DATE,
+  start_time TIME,
+  end_date DATE,
+  end_time TIME,
+  baggage_info TEXT,
+  is_negotiable BOOLEAN DEFAULT false,
+  payment_method TEXT,
+  title TEXT,
+  status status_enum DEFAULT 'DRAFT',
+  product_urls TEXT,
+  regular_amount NUMERIC,
+  discount_percentage NUMERIC,
+  discounted_amount NUMERIC,
+  metadata JSONB,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE publication_votes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+  title TEXT,
+  description TEXT,
+  closing_at TIMESTAMP,
+  type category_enum
+);
+
+CREATE TABLE votes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  publication_vote_id UUID REFERENCES publication_votes(id) ON DELETE CASCADE,
+
+  label TEXT
+);
+
+CREATE TABLE avis (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+  syndicat_id UUID REFERENCES syndicats(id) ON DELETE SET NULL,
+
+  comment TEXT,
+  number INT,
+
+  created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE branches (
+  id UUID PRIMARY KEY REFERENCES agencies(id),
+  syndicat_id UUID REFERENCES syndicats(id) ON DELETE SET NULL,
+
+  name TEXT,
+  location TEXT,
+  contact TEXT,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE publications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  branch_id UUID REFERENCES branches(id) ON DELETE SET NULL,
+  author_id UUID REFERENCES users(id) ON DELETE SET NULL,
+
+  content TEXT,
+  status status_enum DEFAULT 'DRAFT',
+  n_likes INT DEFAULT 0,
+
+  created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE publication_images (
+  publication_id UUID REFERENCES publications(id) ON DELETE CASCADE,
+  image_id UUID REFERENCES images(id) ON DELETE CASCADE,
+  PRIMARY KEY (publication_id, image_id),
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE events (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  branch_id UUID REFERENCES branches(id) ON DELETE SET NULL,
+
+  title TEXT,
+  description TEXT,
+  location TEXT,
+  date DATE,
+  start_time TIME,
+  end_time TIME,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE event_images (
+  event_id UUID REFERENCES events(id) ON DELETE CASCADE,
+  image_id UUID REFERENCES images(id) ON DELETE CASCADE,
+  PRIMARY KEY (event_id, image_id),
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE reactions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  publication_id UUID REFERENCES publications(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+
+  type reaction_type_enum,
+
+  reacted_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE comments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  author_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  publication_id UUID REFERENCES publications(id) ON DELETE CASCADE,
+  parent_id UUID REFERENCES comments(id) ON DELETE SET NULL,
+  image_id UUID REFERENCES images(id) ON DELETE SET NULL,
+
+  content TEXT,
+
+  created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE profiles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+
+  first_name TEXT,
+  last_name TEXT,
+  nickname TEXT,
+  profile_image_url TEXT,
+  birth_date DATE,
+  nationality TEXT,
+  gender TEXT,
+  language TEXT,
+  company_name TEXT,
+  biography TEXT,
+  rating NUMERIC,
+  total_trips INT,
+  is_available BOOLEAN DEFAULT true,
+  is_verified BOOLEAN DEFAULT false,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+-- =====================================================
+-- PAYMENTS & SUBSCRIPTIONS
+-- =====================================================
+
+CREATE TABLE admins (
+  id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+
+  name TEXT,
+  phone_number TEXT,
+  email_address TEXT
+);
+
+CREATE TABLE subscriptions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  admin_id UUID REFERENCES admins(id) ON DELETE SET NULL,
+
+  label TEXT,
+  price NUMERIC,
+  duration_in_days INT,
+  description TEXT,
+  is_active BOOLEAN DEFAULT true,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE payments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  driver_id UUID REFERENCES drivers(id) ON DELETE SET NULL,
+  subscription_id UUID REFERENCES subscriptions(id) ON DELETE SET NULL,
+  user_id UUID REFERENCES business_actors(id) ON DELETE SET NULL,
+
+  amount_paid NUMERIC,
+  status TEXT,
+  id_provider_transaction TEXT,
+
+  created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE reviews (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  ride_id UUID REFERENCES rides(id) ON DELETE CASCADE,
+  author_id UUID REFERENCES users(id) ON DELETE SET NULL,
+
+  subject TEXT,
+  comment TEXT,
+  rating NUMERIC,
+
+  created_at TIMESTAMP DEFAULT now()
+);
+
+-- =====================================================
+-- ROLE-BASED ACCESS CONTROL (RBAC)
+-- =====================================================
+
+CREATE TABLE roles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+  name TEXT NOT NULL,
+  guard_name TEXT,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE permissions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+  name TEXT NOT NULL,
+  guard_name TEXT,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE role_has_permissions (
+  role_id UUID REFERENCES roles(id) ON DELETE CASCADE,
+  permission_id UUID REFERENCES permissions(id) ON DELETE CASCADE,
+  PRIMARY KEY (role_id, permission_id),
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE user_has_roles (
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  role_id UUID REFERENCES roles(id) ON DELETE CASCADE,
+  PRIMARY KEY (user_id, role_id),
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+-- =====================================================
+-- FIX: DIRECT PERMISSIONS (USER <-> PERMISSIONS)
+-- =====================================================
+
+-- Table de liaison pour les permissions accordées directement à un utilisateur
+CREATE TABLE IF NOT EXISTS user_has_permissions (
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  permission_id UUID REFERENCES permissions(id) ON DELETE CASCADE,
+  PRIMARY KEY (user_id, permission_id),
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+-- Commit the transaction
+
+
+-- =====================================================
+-- END OF SCRIPT. NOTHING AFTER HERE!
+-- =====================================================
+```
+
+---
 ### Fichier : `./src/main/resources/application.yml`
 ```yaml
 server:
@@ -1056,16 +2345,26 @@ server:
 spring:
   application:
     name: ride-and-go
-
+  profiles:
+    active: local
   docker:
     compose:
       enabled: false
 
   # POSTGRESQL (R2DBC)
   r2dbc:
-    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:payment_db}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:password}
+    url: r2dbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:yowyob_db}
+    username: ${DB_USERNAME:fleet_admin}
+    password: ${DB_PASSWORD:fleet_password}
+    pool:
+      enabled: true
+      initial-size: 1
+      max-size: 5
+      max-idle-time: 30m
+      max-life-time: 10m
+      acquire-retry: 3
+      max-acquire-time: 30s
+      validation-query: SELECT 1
   sql:
     init:
       mode: always
@@ -1146,133 +2445,53 @@ resilience4j:
 ```
 
 ---
-### Fichier : `./src/main/resources/schema.sql`
-```sql
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
-DROP TABLE IF EXISTS products CASCADE;
-
-
--- Create tables
-CREATE TABLE IF NOT EXISTS products (
-                                        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255),
-    price DECIMAL(10, 2),
-    status VARCHAR(50)
-    );
-
-CREATE TABLE IF NOT EXISTS ride_and_go_role (
-                                                id UUID PRIMARY KEY,
-                                                type VARCHAR(50) NOT NULL,
-    created_by VARCHAR(255),
-    created_date TIMESTAMP,
-    last_modified_by VARCHAR(255),
-    last_modified_date TIMESTAMP,
-    version BIGINT
-    );
-
-CREATE TABLE IF NOT EXISTS ride_and_go_user (
-                                                id UUID PRIMARY KEY,
-                                                name VARCHAR(255),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    telephone VARCHAR(255),
-    password VARCHAR(255) NOT NULL,
-    role_id UUID,
-    created_by VARCHAR(255),
-    created_date TIMESTAMP,
-    last_modified_by VARCHAR(255),
-    last_modified_date TIMESTAMP,
-    version BIGINT,
-    FOREIGN KEY (role_id) REFERENCES ride_and_go_role(id)
-    );
-
-CREATE TABLE IF NOT EXISTS ride_and_go_offer (
-                                                 id UUID PRIMARY KEY,
-                                                 passenger_id UUID NOT NULL,
-                                                 start_point VARCHAR(255),
-    end_point VARCHAR(255),
-    price DOUBLE PRECISION,
-    state VARCHAR(50),
-    created_by VARCHAR(255),
-    created_date TIMESTAMP,
-    last_modified_by VARCHAR(255),
-    last_modified_date TIMESTAMP,
-    version BIGINT,
-    FOREIGN KEY (passenger_id) REFERENCES ride_and_go_user(id)
-    );
-
-CREATE TABLE IF NOT EXISTS ride_and_go_offer_agreement (
-                                                           id UUID PRIMARY KEY,
-                                                           offer_id UUID NOT NULL,
-                                                           driver_id UUID NOT NULL,
-                                                           created_by VARCHAR(255),
-    created_date TIMESTAMP,
-    last_modified_by VARCHAR(255),
-    last_modified_date TIMESTAMP,
-    version BIGINT,
-    FOREIGN KEY (offer_id) REFERENCES ride_and_go_offer(id),
-    FOREIGN KEY (driver_id) REFERENCES ride_and_go_user(id)
-    );
-
-CREATE TABLE IF NOT EXISTS ride_and_go_ride (
-    id UUID PRIMARY KEY,
-    offer_id UUID NOT NULL,
-    driver_id UUID NOT NULL,
-    passenger_id UUID NOT NULL,
-    distance DOUBLE PRECISION,
-    duration INT,
-    state VARCHAR(50),
-    time_real INT,
-    created_by VARCHAR(255),
-    created_date TIMESTAMP,
-    last_modified_by VARCHAR(255),
-    last_modified_date TIMESTAMP,
-    version BIGINT,
-    FOREIGN KEY (offer_id) REFERENCES ride_and_go_offer(id),
-    FOREIGN KEY (driver_id) REFERENCES ride_and_go_user(id),
-    FOREIGN KEY (passenger_id) REFERENCES ride_and_go_user(id)
-);```
-
----
 ### Fichier : `./src/main/resources/prod.application.yml`
 ```yaml
+# ===================================================================
+# PRODUCTION CONFIGURATION - RIDE & GO API
+# ===================================================================
+
 server:
   port: 8080
+  error:
+    include-message: always # Useful for frontend debugging
 
 spring:
   application:
-    name: reactive-hexagonal
-    
-  docker:
-    compose:
-      enabled: false
+    name: ride-and-go
 
-  # POSTGRESQL (R2DBC)
+  # DATABASE CONFIGURATION (REACTIVE R2DBC)
   r2dbc:
-    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:payment_db}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:password}
+    url: r2dbc:postgresql://${DB_HOST:168.119.122.86}:${DB_PORT:5432}/${DB_NAME:yowyob}
+    username: ${DB_USERNAME:master}
+    password: ${DB_PASSWORD:Azerty1234*}
+    pool:
+      enabled: true
+      initial-size: 5
+      max-size: 20
+      max-idle-time: 30m
+      validation-query: SELECT 1
+
+  # CRITICAL SECURITY: Never run local scripts on production server
   sql:
     init:
-      mode: always
+      mode: never
 
-  # REDIS CLUSTER 
+  # REDIS CACHE (CLUSTER MODE)
   data:
     redis:
-      password: ${REDIS_PASSWORD:password}
+      password: ${REDIS_PASSWORD:Azerty1234*}
       cluster:
         nodes:
-          - ${REDIS_HOST:localhost}:7001
-          - ${REDIS_HOST:localhost}:7002
-          - ${REDIS_HOST:localhost}:7003
-          - ${REDIS_HOST:localhost}:7004
-          - ${REDIS_HOST:localhost}:7005
-          - ${REDIS_HOST:localhost}:7006
+          - ${REDIS_HOST:168.119.122.86}:7001
+          - ${REDIS_HOST:168.119.122.86}:7002
+          - ${REDIS_HOST:168.119.122.86}:7003
 
-  # KAFKA 
+  # MESSAGING SYSTEM (KAFKA)
   kafka:
-    bootstrap-servers:  ${KAFKA_HOST:localhost}:${KAFKA_PORT:9092}
+    bootstrap-servers: ${KAFKA_HOST:168.119.122.86}:${KAFKA_PORT:9092}
     consumer:
+      group-id: ride-and-go-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
@@ -1282,37 +2501,29 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
-# CUSTOM CONFIG 
+# CUSTOM BUSINESS SERVICES CONFIGURATION
 application:
   external:
-    stock-service-url: http://${EXTERNAL_HOST:localhost}:8081
+    # URL of the Fleet & Vehicle technical service
+    vehicle-service-url: https://vehicule-service.pynfi.com
+    # URL of the Fare calculation engine
     fare-calculator-url: https://fare-calculator-service.pynfi.com
+    
+  auth:
+    mode: remote # Switch to real TraMaSys authentication
+    url: https://auth-service.pynfi.com
 
   kafka:
     topics:
-      product-events: test-topic
-      notification-service-create-topic: notification-create-topic
-      # Utilisez un nom de topic dédié pour cet événement
       offer-created: offer-created-topic
-      offer-send: notification-send-topic
-    notification-registration:
-      name: "Nom du projet"
-      email:
-        host: ${SMTP_HOST:smtp.gmail.com}
-        port: ${SMTP_PORT:587}
-        username: ${SMTP_USERNAME}
-        password: ${SMTP_PASSWORD}
-    notification-service:
-      token: token-topic
-      template:
-        new-offer-id: 1001
-        accepted-offer-id: 1002
+      notification-service-create-topic: notification-create-topic
 
+# MONITORING & HEALTH CHECK (ACTUATOR)
 management:
   endpoints:
     web:
       exposure:
-        include: ["health","info","prometheus"]
+        include: ["health", "info", "prometheus"]
   endpoint:
     health:
       show-details: "always"
@@ -1323,16 +2534,18 @@ management:
       prometheus:
         enabled: true
 
-# RESILIENCE4J 
+# RESILIENCE CONFIGURATION (CIRCUIT BREAKERS)
 resilience4j:
   circuitbreaker:
     instances:
-      stock-service:
+      fare-calculator-service:
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        slidingWindowSize: 10
+      auth-service:
         failureRateThreshold: 50
         waitDurationInOpenState: 5s
-        slidingWindowSize: 5
-
-```
+        slidingWindowSize: 5```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/RideAndGoApplication.java`
@@ -1360,14 +2573,22 @@ package com.yowyob.rideandgo.infrastructure.mappers;
 import com.yowyob.rideandgo.domain.model.Role;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.RoleEntity;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface RoleMapper {
+
+    @Mapping(target = "permissions", ignore = true)
     Role toDomain(RoleEntity entity);
 
+    @Mapping(target = "createdBy", ignore = true)
+    @Mapping(target = "createdDate", ignore = true)
+    @Mapping(target = "lastModifiedBy", ignore = true)
+    @Mapping(target = "lastModifiedDate", ignore = true)
+    @Mapping(target = "version", ignore = true)
     RoleEntity toEntity(Role domain);
-}
-```
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/mappers/RideMapper.java`
@@ -1384,11 +2605,15 @@ import org.mapstruct.Mapping;
 public interface RideMapper {
     Ride toDomain(RideEntity entity);
 
+    @Mapping(target = "createdBy", ignore = true)
+    @Mapping(target = "createdDate", ignore = true)
+    @Mapping(target = "lastModifiedBy", ignore = true)
+    @Mapping(target = "lastModifiedDate", ignore = true)
+    @Mapping(target = "version", ignore = true)
     RideEntity toEntity(Ride domain);
 
     RideResponse toResponse(Ride domain);
-}
-```
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/mappers/UserMapper.java`
@@ -1399,39 +2624,41 @@ import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.CreateUserRequest;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.UserResponse;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.UserEntity;
-import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository.RoleR2dbcRepository;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import reactor.core.publisher.Mono;
+import org.mapstruct.ReportingPolicy;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface UserMapper {
-    @Mapping(target = "role", ignore = true)
+
+    /**
+     * Maps database entity to domain model.
+     * Roles and permissions are handled manually in the Persistence Adapter.
+     */
+    @Mapping(target = "roles", ignore = true)
+    @Mapping(target = "directPermissions", ignore = true)
     User toDomain(UserEntity entity);
 
-    default Mono<User> toDomain(UserEntity entity, RoleR2dbcRepository roleRepository, RoleMapper roleMapper) {
-        User user = toDomain(entity);
-        return roleRepository.findById(entity.getRoleId())
-                .map(roleMapper::toDomain)
-                .map(role -> User.builder()
-                        .id(user.id())
-                        .name(user.name())
-                        .email(user.email())
-                        .telephone(user.telephone())
-                        .role(role)
-                        .build()
-                );
-    }
-
-    @Mapping(target = "roleId", source = "role.id")
+    /**
+     * Maps domain model to database entity.
+     * Join tables are handled separately in the persistence layer.
+     */
     UserEntity toEntity(User domain);
 
+    /**
+     * Maps registration request to domain model.
+     */
+    @Mapping(target = "roles", ignore = true)
+    @Mapping(target = "directPermissions", ignore = true)
     User toDomain(CreateUserRequest request);
 
-    @Mapping(target = "role", source = "role.type")
+    /**
+     * Maps domain model to API response.
+     * The specific RoleType is manually set in the Controller.
+     */
+    @Mapping(target = "role", ignore = true)
     UserResponse toResponse(User domain);
-}
-```
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/mappers/FareMapper.java`
@@ -1443,23 +2670,38 @@ import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FareRequest
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FareResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface FareMapper {
 
+    /**
+     * Maps API response to domain model.
+     */
     @Mapping(target = "startPoint", source = "startLocationName")
     @Mapping(target = "endPoint", source = "endLocationName")
+    @Mapping(target = "userId", ignore = true)
     Fare toDomain(FareResponse response);
 
+    /**
+     * Maps domain model to API response for the frontend.
+     */
     @Mapping(target = "startLocationName", source = "domain.startPoint")
     @Mapping(target = "endLocationName", source = "domain.endPoint")
     @Mapping(target = "cached", source = "isCached")
     FareResponse toResponse(Fare domain, boolean isCached);
 
+    /**
+     * Maps initial request to domain model.
+     */
     @Mapping(target = "startPoint", source = "startLocationName")
     @Mapping(target = "endPoint", source = "endLocationName")
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "userId", ignore = true)
+    @Mapping(target = "estimatedFare", ignore = true)
+    @Mapping(target = "officialFare", ignore = true)
     Fare toDomain(FareRequest request);
-}```
+}   ```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/mappers/OfferMapper.java`
@@ -1479,40 +2721,36 @@ import java.util.stream.Collectors;
 
 @Mapper(componentModel = "spring")
 public interface OfferMapper {
+
     @Mapping(source = "agreements", target = "interestedDrivers")
     Offer toDomain(OfferEntity entity);
 
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "interestedDrivers", ignore = true)
+    @Mapping(target = "version", ignore = true)
     Offer toDomain(CreateOfferRequest request);
 
     OfferResponse toResponse(Offer domain);
 
-    @Mapping(source = "interestedDrivers", target = "agreements")
+    // Fix: We ignore 'agreements' here because the persistence adapter 
+    // handles the saving of links in the 'offer_driver_linkages' table separately.
+    @Mapping(target = "agreements", ignore = true) 
+    @Mapping(target = "createdBy", ignore = true)
+    @Mapping(target = "createdDate", ignore = true)
+    @Mapping(target = "lastModifiedBy", ignore = true)
+    @Mapping(target = "lastModifiedDate", ignore = true)
     OfferEntity toEntity(Offer domain);
 
+    /**
+     * Helper to map list of entities to list of UUIDs (Entity -> Domain)
+     */
     default List<UUID> mapAgreementsToDriversIds(List<OfferAgreementEntity> agreements) {
-        if (agreements == null || agreements.isEmpty()) return Collections.emptyList();
-
-        return agreements.stream()
-                .map(OfferAgreementEntity::getDriverId)
-                .collect(Collectors.toCollection(ArrayList::new));
-    }
-
-    default List<OfferAgreementEntity> mapDriversIdsToAgreements(List<UUID> driversIds) {
-        if (driversIds == null || driversIds.isEmpty()) {
+        if (agreements == null || agreements.isEmpty()) {
             return Collections.emptyList();
         }
-        /*
-        return driversIds.stream()
-                .map(driverId -> {
-                    OfferAgreementEntity agreement = new OfferAgreementEntity();
-                    agreement.setDriverId(driverId);
-                    return agreement;
-                })
-                .collect(Collectors.toSet());
-
-         */
-
-        return Collections.emptyList();
+        return agreements.stream()
+                .map(OfferAgreementEntity::getDriverId)
+                .collect(Collectors.toList());
     }
 }```
 
@@ -1572,45 +2810,6 @@ public class FareAdapter implements FareClientPort {
 ```
 
 ---
-### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/external/StockAdapter.java`
-```java
-package com.yowyob.rideandgo.infrastructure.adapters.outbound.external;
-
-import com.yowyob.rideandgo.domain.ports.out.StockClientPort;
-import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.StockApiClient;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.cloud.client.circuitbreaker.ReactiveCircuitBreaker;
-import org.springframework.cloud.client.circuitbreaker.ReactiveCircuitBreakerFactory;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Mono;
-
-@Component
-@Slf4j
-@RequiredArgsConstructor
-public class StockAdapter implements StockClientPort {
-
-    private final StockApiClient client;
-    private final ReactiveCircuitBreakerFactory<?, ?> cbFactory;
-
-    @Override
-    public Mono<Boolean> isStockFull(String productName) {
-        ReactiveCircuitBreaker rcb = cbFactory.create("stock-service");
-
-        return rcb.run(
-                client.checkStock(productName).map(StockApiClient.StockResponse::full),
-                throwable -> fallbackStockCheck(productName, throwable)
-        );
-    }
-
-    private Mono<Boolean> fallbackStockCheck(String productName, Throwable t) {
-        log.warn("Circuit Breaker open or Service Down for {}. Error: {}", productName, t.getMessage());
-        // Fallback: if the service is down, consider the stock not full
-        return Mono.just(false);
-    }
-}```
-
----
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/external/client/FareCalculatorClient.java`
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client;
@@ -1629,24 +2828,6 @@ public interface FareCalculatorClient {
     Mono<FareResponse> calculateFare(@RequestBody FareRequest request);
 }
 ```
-
----
-### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/external/client/StockApiClient.java`
-```java
-package com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client;
-
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.service.annotation.GetExchange;
-import org.springframework.web.service.annotation.HttpExchange;
-import reactor.core.publisher.Mono;
-
-@HttpExchange("/api/stock")
-public interface StockApiClient {
-    @GetExchange("/check")
-    Mono<StockResponse> checkStock(@RequestParam("name") String name);
-
-    record StockResponse(boolean full) {}
-}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/messaging/SendNotificationAdapter.java`
@@ -1722,6 +2903,25 @@ public class OfferEventPublisherAdapter implements OfferEventPublisherPort {
 ```
 
 ---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/persistence/entity/PermissionEntity.java`
+```java
+package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity;
+
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Table;
+import java.util.UUID;
+
+@Data @EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor @AllArgsConstructor
+@Table("permissions")
+public class PermissionEntity extends AbstractAuditingEntity {
+    @Id
+    private UUID id;
+    private String name;
+}```
+
+---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/persistence/entity/OfferAgreementEntity.java`
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity;
@@ -1737,10 +2937,11 @@ import org.springframework.data.relational.core.mapping.Table;
 import java.util.UUID;
 
 @EqualsAndHashCode(callSuper = true)
-@Data @NoArgsConstructor
+@Data 
+@NoArgsConstructor
 @AllArgsConstructor
-@Table("ride_and_go_offer_agreement")
-public class OfferAgreementEntity extends AbstractAuditingEntity{
+@Table("offer_driver_linkages") 
+public class OfferAgreementEntity extends AbstractAuditingEntity {
     @Id
     private UUID id;
 
@@ -1749,8 +2950,7 @@ public class OfferAgreementEntity extends AbstractAuditingEntity{
 
     @Column("offer_id")
     private UUID offerId;
-}
-```
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/persistence/entity/OfferEntity.java`
@@ -1764,7 +2964,6 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient;
-import org.springframework.data.annotation.Version;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -1772,20 +2971,21 @@ import java.util.List;
 import java.util.UUID;
 
 @EqualsAndHashCode(callSuper = true)
-@Data @NoArgsConstructor
+@Data 
+@NoArgsConstructor 
 @AllArgsConstructor
-@Table("ride_and_go_offer")
+@Table("offers") 
 public class OfferEntity extends AbstractAuditingEntity {
     @Id
     private UUID id;
 
-    @Column(value = "passenger_id")
+    @Column("passenger_id")
     private UUID passengerId;
 
-    @Column(value = "start_point")
+    @Column("start_point")
     private String startPoint;
 
-    @Column(value = "end_point")
+    @Column("end_point")
     private String endPoint;
 
     private double price;
@@ -1843,23 +3043,26 @@ import org.springframework.data.relational.core.mapping.Table;
 
 import java.util.UUID;
 
-@Data @EqualsAndHashCode(callSuper = true)
-@NoArgsConstructor @AllArgsConstructor
-@Table("ride_and_go_user")
-public class UserEntity extends AbstractAuditingEntity{
+@Data 
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor 
+@AllArgsConstructor
+@Table("users") 
+public class UserEntity extends AbstractAuditingEntity {
     @Id
     private UUID id;
 
     private String name;
     
+    @Column("email_address") 
     private String email;
 
+    @Column("phone_number") 
     private String telephone;
 
     private String password;
 
-    @Column("role_id")
-    private UUID roleId;
+
 }```
 
 ---
@@ -1882,8 +3085,8 @@ import java.util.UUID;
 @EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor
 @AllArgsConstructor
-@Table("ride_and_go_ride")
-public class RideEntity extends AbstractAuditingEntity{
+@Table("rides")
+public class RideEntity extends AbstractAuditingEntity {
     @Id
     private UUID id;
 
@@ -1896,15 +3099,15 @@ public class RideEntity extends AbstractAuditingEntity{
     @Column("passenger_id")
     private UUID passengerId;
 
-    double distance;
+    private double distance;
 
-    int duration;
+    private int duration;
 
-    RideState state;
+    private RideState state;
 
-    int timeReal;
-}
-```
+    @Column("real_time") 
+    private int timeReal;
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/persistence/entity/RoleEntity.java`
@@ -1921,10 +3124,12 @@ import org.springframework.data.relational.core.mapping.Table;
 
 import java.util.UUID;
 
-@Data @EqualsAndHashCode(callSuper = true)
-@NoArgsConstructor @AllArgsConstructor
-@Table("ride_and_go_role")
-public class RoleEntity extends AbstractAuditingEntity{
+@Data 
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor 
+@AllArgsConstructor
+@Table("roles")
+public class RoleEntity extends AbstractAuditingEntity {
     @Id
     private UUID id;
 
@@ -1937,38 +3142,52 @@ public class RoleEntity extends AbstractAuditingEntity{
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence;
 
 import com.yowyob.rideandgo.domain.model.Role;
+import com.yowyob.rideandgo.domain.model.Permission;
 import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.out.RoleRepositoryPort;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.RoleEntity;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository.PermissionR2dbcRepository;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository.RoleR2dbcRepository;
-import com.yowyob.rideandgo.infrastructure.mappers.RoleMapper;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import java.util.stream.Collectors;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class RoleR2dbcAdapter implements RoleRepositoryPort {
 
     private final RoleR2dbcRepository roleRepository;
-    private final RoleMapper roleMapper;
+    private final PermissionR2dbcRepository permissionRepository;
 
     @Override
     public Mono<Role> findByRoleName(RoleType type) {
         return roleRepository.findByType(type)
-                .map(roleMapper::toDomain);
+                .flatMap(this::enrichRole);
     }
 
     @Override
     public Mono<Role> findRoleById(UUID roleId) {
         return roleRepository.findById(roleId)
-                .map(roleMapper::toDomain);
+                .flatMap(this::enrichRole);
     }
-}
-```
+
+    /**
+     * Hydrates a RoleEntity with its associated Permissions.
+     */
+    private Mono<Role> enrichRole(RoleEntity entity) {
+        return permissionRepository.findAllByRoleId(entity.getId())
+                .map(p -> new Permission(p.getId(), p.getName()))
+                .collect(Collectors.toSet())
+                .map(perms -> Role.builder()
+                        .id(entity.getId())
+                        .type(entity.getType())
+                        .permissions(perms)
+                        .build());
+    }
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/persistence/RideR2dbcAdapter.java`
@@ -2044,15 +3263,26 @@ package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.reposi
 
 import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.RoleEntity;
+import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
 public interface RoleR2dbcRepository extends ReactiveCrudRepository<RoleEntity, UUID> {
+    
+    /**
+     * Finds a role entity by its business type (Enum).
+     */
     Mono<RoleEntity> findByType(RoleType type);
-}
-```
+
+    /**
+     * Finds all roles associated with a user through the join table.
+     */
+    @Query("SELECT r.* FROM roles r JOIN user_has_roles uhr ON r.id = uhr.role_id WHERE uhr.user_id = :userId")
+    Flux<RoleEntity> findAllByUserId(UUID userId);
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/persistence/repository/OfferR2dbcRepository.java`
@@ -2074,15 +3304,40 @@ public interface OfferR2dbcRepository extends ReactiveCrudRepository<OfferEntity
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository;
 
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.UserEntity;
+import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux;
 
 import java.util.UUID;
 
 public interface UserR2dbcRepository extends ReactiveCrudRepository<UserEntity, UUID> {
+
+    /**
+     * Finds all users associated with a specific role ID using the join table.
+     */
+    @Query("SELECT u.* FROM users u JOIN user_has_roles uhr ON u.id = uhr.user_id WHERE uhr.role_id = :roleId")
     Flux<UserEntity> findAllByRoleId(UUID roleId);
-}
-```
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/persistence/repository/PermissionR2dbcRepository.java`
+```java
+package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository;
+
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.PermissionEntity;
+import org.springframework.data.r2dbc.repository.Query;
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import reactor.core.publisher.Flux;
+import java.util.UUID;
+
+public interface PermissionR2dbcRepository extends ReactiveCrudRepository<PermissionEntity, UUID> {
+    
+    @Query("SELECT p.* FROM permissions p JOIN role_has_permissions rhp ON p.id = rhp.permission_id WHERE rhp.role_id = :roleId")
+    Flux<PermissionEntity> findAllByRoleId(UUID roleId);
+
+    @Query("SELECT p.* FROM permissions p JOIN user_has_permissions uhp ON p.id = uhp.permission_id WHERE uhp.user_id = :userId")
+    Flux<PermissionEntity> findDirectPermissionsByUserId(UUID userId);
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/persistence/UserR2dbcAdapter.java`
@@ -2090,45 +3345,67 @@ public interface UserR2dbcRepository extends ReactiveCrudRepository<UserEntity, 
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence;
 
 import com.yowyob.rideandgo.domain.model.User;
+import com.yowyob.rideandgo.domain.model.Role;
+import com.yowyob.rideandgo.domain.model.Permission;
 import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.out.UserRepositoryPort;
-import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository.RoleR2dbcRepository;
-import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository.UserR2dbcRepository;
-import com.yowyob.rideandgo.infrastructure.mappers.RoleMapper;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.UserEntity;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository.*;
 import com.yowyob.rideandgo.infrastructure.mappers.UserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
 public class UserR2dbcAdapter implements UserRepositoryPort {
 
     private final UserR2dbcRepository userRepository;
-    private final UserMapper userMapper;
     private final RoleR2dbcRepository roleRepository;
-    private final RoleMapper roleMapper;
+    private final PermissionR2dbcRepository permissionRepository;
+    private final UserMapper userMapper;
+
+    @Override
+    public Mono<User> findUserById(UUID userId) {
+        return userRepository.findById(userId)
+                .flatMap(this::enrichUser);
+    }
+
+  
+
+    @Override
+    public Flux<User> findAll() {
+        return userRepository.findAll()
+                .flatMap(this::enrichUser);
+    }
+
+    @Override
+    public Flux<User> findByRoleName(RoleType type) {
+        return roleRepository.findByType(type)
+                .flatMapMany(role -> userRepository.findAllByRoleId(role.getId()))
+                .flatMap(this::enrichUser);
+    }
 
     @Override
     public Mono<User> save(User user) {
-        return userRepository.save(userMapper.toEntity(user))
-                .flatMap(userEntity -> userMapper.toDomain(userEntity, roleRepository, roleMapper));
+        UserEntity entity = userMapper.toEntity(user);
+        return userRepository.save(entity)
+                .map(saved -> user); 
     }
 
     @Override
     public Mono<Boolean> delete(User user) {
-        return userRepository.deleteById(user.id())
-                .thenReturn(true);
+        return userRepository.deleteById(user.id()).thenReturn(true).onErrorReturn(false);
     }
 
     @Override
     public Mono<Boolean> deleteById(UUID userId) {
-        return userRepository.deleteById(userId)
-                .thenReturn(true);
+        return userRepository.deleteById(userId).thenReturn(true).onErrorReturn(false);
     }
 
     @Override
@@ -2136,33 +3413,41 @@ public class UserR2dbcAdapter implements UserRepositoryPort {
         return userRepository.existsById(user.id());
     }
 
-    @Override
-    public Mono<User> findUserById(UUID userId) {
-        return userRepository.findById(userId)
-                .flatMap(entity -> userMapper.toDomain(entity, roleRepository, roleMapper));
-    }
+    /**
+     * Aggregates Roles and Permissions into a complete Domain User object.
+     * Uses parallel fetching to optimize performance.
+     */
+    private Mono<User> enrichUser(UserEntity entity) {
+        // Fetch Roles and their specific permissions
+        Mono<Set<Role>> rolesMono = roleRepository.findAllByUserId(entity.getId())
+                .flatMap(roleEntity -> 
+                    permissionRepository.findAllByRoleId(roleEntity.getId())
+                        .map(p -> new Permission(p.getId(), p.getName()))
+                        .collect(Collectors.toSet())
+                        .map(perms -> Role.builder()
+                                .id(roleEntity.getId())
+                                .type(roleEntity.getType())
+                                .permissions(perms)
+                                .build())
+                ).collect(Collectors.toSet());
 
-    @Override
-    public Flux<User> findAll() {
-        return userRepository.findAll()
-                .flatMap(entity -> userMapper.toDomain(entity, roleRepository, roleMapper));
-    }
+        // Fetch permissions assigned directly to the user
+        Mono<Set<Permission>> directPermsMono = permissionRepository.findDirectPermissionsByUserId(entity.getId())
+                .map(p -> new Permission(p.getId(), p.getName()))
+                .collect(Collectors.toSet());
 
-    @Override
-    public Flux<User> findByRoleName(RoleType type) {
-        return roleRepository.findByType(type)
-                .flatMapMany(role ->
-                        userRepository.findAllByRoleId(role.getId())
-                                .flatMap(entity -> userMapper.toDomain(entity, roleRepository, roleMapper))
-                );
+        // Combine all reactive streams
+        return Mono.zip(rolesMono, directPermsMono)
+                .map(tuple -> User.builder()
+                        .id(entity.getId())
+                        .name(entity.getName())
+                        .email(entity.getEmail())
+                        .telephone(entity.getTelephone())
+                        .roles(tuple.getT1())
+                        .directPermissions(tuple.getT2())
+                        .build());
     }
-
-    @Override
-    public List<User> findByRoleNameList(RoleType type) {
-        return findByRoleName(type).collectList().block();
-    }
-}
-```
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/persistence/OfferR2dbcAdapter.java`
@@ -2365,7 +3650,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/fares")
-@Tag(name = "Fares", description = "Fare calculation endpoints")
+@Tag(name = "Fares", description = "Trip price estimation")
 public class FareController {
     private final FareCalculatorClient client;
     private final FareMapper mapper;
@@ -2422,7 +3707,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/offer")
-@Tag(name = "Offers", description = "Operations related to offers")
+@Tag(name = "Offers", description = "Matchmaking and Bidding workflow")
 public class OfferController {
     private final CreateOfferUseCase createOfferUseCase;
     private final ResponseToOfferUseCase responseToOfferUseCase;
@@ -2687,6 +3972,8 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Collections;
+import java.util.Set;
 import java.util.UUID;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
@@ -2700,102 +3987,158 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/users")
-@Tag(name = "Users", description = "User management endpoints")
+@Tag(name = "Users", description = "Operations related to User profiles")
 public class UserController {
     private final UserUseCases userUseCases;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final RoleRepositoryPort roleRepository;
 
+    /**
+     * Creates a new user and assigns a primary role.
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create a user", description = "Creates a new user with a role")
+    @Operation(summary = "Create a user", description = "Creates a new user with a specified role type")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "User created", content = @Content(schema = @Schema(implementation = UserResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid input")
+            @ApiResponse(responseCode = "400", description = "Invalid input data")
     })
     public Mono<UserResponse> createUser(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "User creation payload", required = true,
                     content = @Content(schema = @Schema(implementation = CreateUserRequest.class)))
             @RequestBody CreateUserRequest request) {
-        return Mono.just(request)
-                .map(userMapper::toDomain)
-                .flatMap(user ->
-                        roleRepository.findByRoleName(request.getType())
-                                .map(role -> User.builder()
-                                        .id(Utils.generateUUID())
-                                        .name(user.name())
-                                        .email(user.email())
-                                        .telephone(user.telephone())
-                                        .password(passwordEncoder.encode(user.password()))
-                                        .role(role)
-                                        .build())
-                )
-                .flatMap(userUseCases::saveUser)
-                .map(user -> User.builder()
-                        .id(user.id())
-                        .name(user.name())
-                        .email(user.email())
-                        .telephone(user.telephone())
-                        .password(user.password())
-                        .role(Role.builder().id(user.role().id()).type(user.role().type()).build())
-                        .build())
-                .map(userMapper::toResponse);
+        
+        return roleRepository.findByRoleName(request.getType())
+                .flatMap(role -> {
+                    User userToSave = User.builder()
+                            .id(Utils.generateUUID())
+                            .name(request.getName())
+                            .email(request.getEmail())
+                            .telephone(request.getTelephone())
+                            .password(passwordEncoder.encode(request.getPassword()))
+                            .roles(Set.of(role)) // Wrap role in a Set for the new RBAC domain model
+                            .directPermissions(Collections.emptySet()) // Initialize empty direct permissions
+                            .build();
+
+                    return userUseCases.saveUser(userToSave);
+                })
+                .map(savedUser -> {
+                    UserResponse response = userMapper.toResponse(savedUser);
+                    // Map the first role type back to the DTO for the frontend
+                    if (!savedUser.roles().isEmpty()) {
+                        response.setRole(savedUser.roles().iterator().next().type());
+                    }
+                    return response;
+                });
     }
 
+    /**
+     * Retrieves a detailed user profile including roles and permissions.
+     */
     @GetMapping("/{userId}")
-    @Operation(summary = "Get user by id", description = "Retrieve a user by its UUID")
+    @Operation(summary = "Get user by id", description = "Retrieve a user profile by its UUID")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "User found", content = @Content(schema = @Schema(implementation = UserResponse.class))),
             @ApiResponse(responseCode = "404", description = "User not found")
     })
     public Mono<UserResponse> getUserById(
             @Parameter(description = "User identifier", required = true) @PathVariable UUID userId) {
-        log.info("Getting user by id: {}", userId);
+        log.info("Fetching user details for id: {}", userId);
+        
         return userUseCases.getUserById(userId)
                 .map(user -> {
                     UserResponse response = userMapper.toResponse(user);
-                    log.info("User found {}", user);
-                    response.setRole(user.role().type());
-                    log.info("User found: {}", response);
+                    // Set the primary role type in the DTO
+                    if (user.roles() != null && !user.roles().isEmpty()) {
+                        response.setRole(user.roles().iterator().next().type());
+                    }
                     return response;
                 });
     }
 
+    /**
+     * Lists all users, optionally filtered by their primary role.
+     */
     @GetMapping
-    @Operation(summary = "List users", description = "Get all users or filter by role")
+    @Operation(summary = "List users", description = "Get all users or filter by their primary role")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "List of users", content = @Content(schema = @Schema(implementation = UserResponse.class)))
     })
     public Flux<UserResponse> getAllUsers(
             @Parameter(description = "Optional role filter") @RequestParam(required = false) RoleType role) {
-        Flux<UserResponse> users;
-        if (role != null) {
-            users = userUseCases.getUsersByRole(role)
-                    .map(userMapper::toResponse)
-                    .map(user -> UserResponse.builder()
-                            .id(user.getId())
-                            .name(user.getName())
-                            .email(user.getEmail())
-                            .telephone(user.getTelephone())
-                            .role(role)
-                            .build());
-        } else {
-            users = userUseCases.getAllUsers()
-                    .map(userMapper::toResponse);
-        }
-        return users;
+        
+        Flux<User> userFlux = (role != null) ? userUseCases.getUsersByRole(role) : userUseCases.getAllUsers();
+
+        return userFlux.map(user -> {
+            UserResponse response = userMapper.toResponse(user);
+            if (user.roles() != null && !user.roles().isEmpty()) {
+                response.setRole(user.roles().iterator().next().type());
+            }
+            return response;
+        });
     }
 
+    /**
+     * Deletes a user from the system.
+     */
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete user", description = "Delete a user by its UUID")
+    @Operation(summary = "Delete user", description = "Permanently delete a user by its UUID")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "User deleted"),
+            @ApiResponse(responseCode = "200", description = "User successfully deleted"),
             @ApiResponse(responseCode = "404", description = "User not found")
     })
     public Mono<Boolean> deleteById(
             @Parameter(description = "User identifier", required = true) @PathVariable UUID id) {
+        log.info("Deleting user with id: {}", id);
         return userUseCases.deleteUserById(id);
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/inbound/rest/HealthCheckController.java`
+```java
+package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.r2dbc.core.DatabaseClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
+
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/v1/health")
+@RequiredArgsConstructor
+@Tag(name = "Health", description = "System diagnostic and connectivity checks")
+public class HealthCheckController {
+
+    private final DatabaseClient databaseClient;
+
+    /**
+     * Probes the database to ensure the R2DBC connection is active.
+     */
+    @GetMapping("/check-db")
+    @Operation(summary = "Check database connectivity", description = "Executes a simple query to verify the DB link")
+    public Mono<Map<String, Object>> checkDatabase() {
+        return databaseClient.sql("SELECT 1")
+                .map((row, metadata) -> row.get(0))
+                .first()
+                // Explicitly tell Java to treat this as a Map<String, Object>
+                .map(res -> Map.<String, Object>of(
+                        "status", "UP",
+                        "database", "CONNECTED",
+                        "message", "Database is responding correctly"
+                ))
+                .onErrorReturn(Map.of(
+                        "status", "DOWN",
+                        "database", "DISCONNECTED",
+                        "message", "Could not connect to the database"
+                ));
     }
 }```
 
@@ -2805,7 +4148,6 @@ public class UserController {
 package com.yowyob.rideandgo.infrastructure.config;
 
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.FareCalculatorClient;
-import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.StockApiClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -2816,17 +4158,7 @@ import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 @Configuration
 public class WebClientConfig {
 
-    @Bean
-    public StockApiClient stockApiClient(WebClient.Builder builder, 
-                                         @Value("${application.external.stock-service-url}") String url) {
-                                            
-        WebClient webClient = builder.baseUrl(url).build();
-        WebClientAdapter adapter = WebClientAdapter.create(webClient);
-        HttpServiceProxyFactory factory = HttpServiceProxyFactory.builderFor(adapter).build();
-        
-        return factory.createClient(StockApiClient.class);
-    }
-
+  
     @Bean
     public FareCalculatorClient fareCalculatorClient(WebClient.Builder builder,
                                          @Value("${application.external.fare-calculator-url}") String url) {
@@ -2846,18 +4178,74 @@ package com.yowyob.rideandgo.infrastructure.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration
+@EnableWebFluxSecurity
 public class SecurityConfig {
 
+    /**
+     * Configures the security filter chain for WebFlux.
+     * Defines which paths are public and which are secured.
+     */
+    @Bean
+    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+        System.out.println("🛡️ REACTIVE SECURITY CONFIGURATION LOADED");
+
+        return http
+                // Disable CSRF for stateless REST APIs
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                
+                .authorizeExchange(exchanges -> exchanges
+                        // Public endpoints: Monitoring and Health
+                        .pathMatchers("/actuator/**", "/api/v1/health/**").permitAll()
+                        
+                        // Public endpoints: API Documentation (Swagger)
+                        .pathMatchers(
+                                "/v3/api-docs/**", 
+                                "/swagger-ui/**", 
+                                "/swagger-ui.html", 
+                                "/webjars/**"
+                        ).permitAll()
+                        
+                        // All other business endpoints require authentication
+                        .anyExchange().authenticated()
+                )
+                
+                // Disable default login mechanisms
+                .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+                .build();
+    }
+
+    /**
+     * Password encoder used for user credential hashing.
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
-}
-```
+
+    /**
+     * Dummy user details service to prevent Spring from logging 
+     * a generated security password on every startup.
+     */
+    @Bean
+    public MapReactiveUserDetailsService userDetailsService() {
+        UserDetails dummy = User.withUsername("tech_user")
+                .password("{noop}secret")
+                .roles("SYSTEM")
+                .build();
+        return new MapReactiveUserDetailsService(dummy);
+    }
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/config/RedisConfig.java`
@@ -2940,16 +4328,19 @@ public class KafkaConfig {
 package com.yowyob.rideandgo.infrastructure.config;
 
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.r2dbc.core.DatabaseClient;
 import jakarta.annotation.PostConstruct;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.util.stream.Collectors;
 
 @Configuration
+@Profile("local") // Only active in local development
 public class DatabaseInitConfig {
 
     private final DatabaseClient databaseClient;
@@ -2959,25 +4350,55 @@ public class DatabaseInitConfig {
     }
 
     @PostConstruct
-    public void init() throws Exception {
-        ClassPathResource resource = new ClassPathResource("schema.sql");
-        String sql = Files.lines(Paths.get(resource.getURI()))
-                          .collect(Collectors.joining("\n"));
+    public void init() {
+        System.out.println("⚙️ LOCAL ENVIRONMENT: Starting sequential database initialization...");
 
-        String[] statements = sql.split(";");
-
-        Flux.fromArray(statements)
-            .map(String::trim)
-            .filter(s -> !s.isEmpty())
-            .flatMap(s -> databaseClient.sql(s).then())
-            .subscribe(
-                null,
-                err -> System.err.println("Erreur lors de l'init DB : " + err),
-                () -> System.out.println("Base initialisée avec succès")
-            );
+        // 1. Run Schema -> 2. Check if users exist -> 3. Run Seeding if empty
+        executeSqlFile("local/schema.sql")
+                .then(checkIfDataExists())
+                .flatMap(hasData -> {
+                    if (!hasData) {
+                        System.out.println("🌱 Database is empty. Injecting seed data...");
+                        return executeSqlFile("local/data.sql");
+                    }
+                    System.out.println("✅ Database already has data. Skipping seeding.");
+                    return Mono.empty();
+                })
+                .subscribe(
+                        null,
+                        err -> System.err.println("❌ Local DB Init Error: " + err.getMessage()),
+                        () -> System.out.println("🚀 LOCAL DATABASE READY!")
+                );
     }
-}
-```
+
+    /**
+     * Reads a SQL file and executes each statement sequentially using concatMap.
+     */
+    private Mono<Void> executeSqlFile(String filePath) {
+        return Mono.fromCallable(() -> {
+            ClassPathResource resource = new ClassPathResource(filePath);
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(resource.getInputStream()))) {
+                return reader.lines().collect(Collectors.joining("\n"));
+            }
+        })
+        .flatMapMany(sql -> Flux.fromArray(sql.split(";")))
+        .map(String::trim)
+        .filter(s -> !s.isEmpty())
+        .concatMap(s -> databaseClient.sql(s).then()) // Execute in strict sequence
+        .then();
+    }
+
+    /**
+     * Checks if the central 'users' table is populated.
+     */
+    private Mono<Boolean> checkIfDataExists() {
+        return databaseClient.sql("SELECT COUNT(*) FROM users")
+                .map((row, metadata) -> row.get(0, Long.class))
+                .first()
+                .map(count -> count > 0)
+                .onErrorReturn(false); // If table doesn't exist, consider it empty
+    }
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/config/OpenApiConfig.java`
@@ -3082,10 +4503,25 @@ public record Ride(
 ```java
 package com.yowyob.rideandgo.domain.model.enums;
 
+/**
+ * Lifecycle states of a transport Offer as defined in spec.md
+ */
 public enum OfferState {
-    NEW, PENDING, CHOSEN, TERMINATED, CANCELLED
-}
-```
+    /** Initial state, waiting for drivers */
+    PENDING,
+    
+    /** At least one driver applied */
+    BID_RECEIVED,
+    
+    /** Passenger chose a driver */
+    DRIVER_SELECTED,
+    
+    /** Driver confirmed, offer is closed and becomes a Ride */
+    VALIDATED,
+    
+    /** Cancelled or expired */
+    CANCELLED
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/enums/RoleType.java`
@@ -3102,10 +4538,22 @@ public enum RoleType {
 ```java
 package com.yowyob.rideandgo.domain.model.enums;
 
+/**
+ * Lifecycle states of a Trip (Ride) as defined in spec.md
+ */
 public enum RideState {
-    CONFIRMED, CANCELLED, COMPLETED, ONGOING
-}
-```
+    /** Ride initialized, driver approaching passenger */
+    CREATED,
+    
+    /** Passenger picked up, trip in progress */
+    ONGOING,
+    
+    /** Trip finished at destination */
+    COMPLETED,
+    
+    /** Trip interrupted or cancelled */
+    CANCELLED
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/Fare.java`
@@ -3119,8 +4567,9 @@ public record Fare(
         UUID userId,
         String startPoint,
         String endPoint,
-        int estimatedFare,
-        int officialFare) {
+        Double estimatedFare,
+        Double  officialFare
+) {
 }
 ```
 
@@ -3130,14 +4579,24 @@ public record Fare(
 package com.yowyob.rideandgo.domain.model;
 
 import com.yowyob.rideandgo.domain.model.enums.RoleType;
+import java.util.Set;
+import java.util.UUID;
 import lombok.Builder;
 
+@Builder
+public record Role(
+    UUID id, 
+    RoleType type,
+    Set<Permission> permissions
+) {}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/Permission.java`
+```java
+package com.yowyob.rideandgo.domain.model;
 import java.util.UUID;
 
-@Builder
-public record Role(UUID id, RoleType type) {
-}
-```
+public record Permission(UUID id, String name) {}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/User.java`
@@ -3145,18 +4604,19 @@ public record Role(UUID id, RoleType type) {
 package com.yowyob.rideandgo.domain.model;
 
 import lombok.Builder;
-
+import java.util.Set;
 import java.util.UUID;
 
 @Builder
 public record User(
-        UUID id,
-        String name,
-        String email,
-        String telephone,
-        String password,
-        Role role) {
-}```
+    UUID id,
+    String name,
+    String email,
+    String telephone,
+    String password,
+    Set<Role> roles,
+    Set<Permission> directPermissions
+) {}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/Offer.java`
@@ -3355,7 +4815,6 @@ public interface UserRepositoryPort {
 
     Flux<User> findAll();
 
-    List<User> findByRoleNameList(RoleType type);
 }```
 
 ---
@@ -3519,7 +4978,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.util.*;
 
@@ -3529,7 +4987,6 @@ import java.util.*;
 public class OfferService implements CreateOfferUseCase, ResponseToOfferUseCase, AcceptedOfferUseCase {
     private final OfferCachePort cache;
     private final OfferRepositoryPort repository;
-    private final OfferEventPublisherPort eventPublisher;
     private final UserRepositoryPort userRepositoryPort;
     private final SendNotificationPort sendNotificationPort;
     private final RideRepositoryPort rideRepositoryPort;
@@ -3537,108 +4994,108 @@ public class OfferService implements CreateOfferUseCase, ResponseToOfferUseCase,
     @Value("${application.kafka.notification-service.template.new-offer-id}")
     private int templateCreateOfferId;
 
+    /**
+     * UC-01: Creates a new offer and notifies all available drivers via Kafka/Email.
+     */
     @Override
     public Mono<Offer> createOffer(Offer request, UUID passengerId) {
-        Offer offer = new Offer(
-                Utils.generateUUID(),
-                passengerId,
-                request.startPoint(),
-                request.endPoint(),
-                request.price(),
-                OfferState.NEW,
-                new ArrayList<>(),
-                null
-        );
-
-        Map<String, Object> data = new HashMap<>();
-        data.put("startPoint", offer.startPoint());
-        data.put("endPoint", offer.endPoint());
-        data.put("price", offer.price());
+        Offer offer = Offer.builder()
+                .id(Utils.generateUUID())
+                .passengerId(passengerId)
+                .startPoint(request.startPoint())
+                .endPoint(request.endPoint())
+                .price(request.price())
+                .state(OfferState.PENDING) // Initial state according to spec
+                .interestedDrivers(new ArrayList<>())
+                .build();
 
         return repository.save(offer)
-                .publishOn(Schedulers.boundedElastic())
-                .map(savedOffer -> {
-                    log.info("Offer created: {}", offer);
-                    cache.saveInCache(savedOffer).subscribe();
+                .flatMap(savedOffer -> 
+                    // Fetch all driver emails from the central database
+                    userRepositoryPort.findByRoleName(RoleType.DRIVER)
+                        .map(User::email)
+                        .collectList()
+                        .flatMap(driverEmails -> {
+                            SendNotificationRequest notification = SendNotificationRequest.builder()
+                                    .notificationType(NotificationType.EMAIL)
+                                    .templateId(templateCreateOfferId)
+                                    .to(driverEmails)
+                                    .data(Map.of("price", offer.price(), "from", offer.startPoint(), "to", offer.endPoint()))
+                                    .build();
 
-                    List<String> drivers = userRepositoryPort.findByRoleNameList(RoleType.DRIVER)
-                            .stream().map(User::email).toList();
-                    SendNotificationRequest notification = SendNotificationRequest.builder()
-                            .notificationType(NotificationType.EMAIL)
-                            .templateId(templateCreateOfferId)
-                            .to(drivers)
-                            .data(data)
-                            .build();
-
-                    sendNotificationPort.sendNotification(notification).subscribe();
-                    //eventPublisher.publishOfferCreatedEvent(savedOffer).subscribe();
-                    return savedOffer;
-                });
+                            // Parallel: Notify and Cache
+                            return Mono.zip(
+                                sendNotificationPort.sendNotification(notification),
+                                cache.saveInCache(savedOffer)
+                            ).thenReturn(savedOffer);
+                        })
+                )
+                .doOnSuccess(o -> log.info("Offer successfully created: {}", o.id()));
     }
 
+    /**
+     * UC-02 Part 1: Allows a driver to apply for an offer (Manifest interest).
+     */
     @Override
     public Mono<Offer> responseToOffer(UUID offerId, UUID driverId) {
-        log.info("Response to offer {} by driver {}", offerId, driverId);
-        return cache.findOfferById(offerId)
-                .switchIfEmpty(repository.findById(offerId))
+        log.info("Driver {} applying for offer {}", driverId, offerId);
+        
+        return repository.findById(offerId)
                 .flatMap(offer -> userRepositoryPort.findUserById(driverId)
-                        .flatMap(driver -> {
-                            if (!driver.role().type().equals(RoleType.DRIVER)) {
-                                log.error("User {} is not driver", driverId);
-                                return Mono.error(new UserIsNotDriverException("User " + driverId + " is not driver. Only driver can accept offer."));
+                        .flatMap(user -> {
+                            // Check if the user has the DRIVER role in the new Set-based model
+                            boolean isDriver = user.roles().stream()
+                                    .anyMatch(role -> role.type() == RoleType.DRIVER);
+
+                            if (!isDriver) {
+                                return Mono.error(new UserIsNotDriverException("User " + driverId + " is not authorized to drive."));
                             }
-                            log.info("Driver {} is interested in offer {}, offer found {}", driverId, offerId, offer);
-                            List<UUID> interestedDrivers = new ArrayList<>(offer.interestedDrivers());
-                            interestedDrivers.add(driverId);
 
-                            Offer updatedOffer = offer.withInterestedDriversAndState(interestedDrivers, OfferState.CHOSEN);
+                            List<UUID> driverIds = new ArrayList<>(offer.interestedDrivers());
+                            if (!driverIds.contains(driverId)) {
+                                driverIds.add(driverId);
+                            }
 
-                            log.info("Offer {} updated: {}", offerId, updatedOffer);
-                            return repository.save(updatedOffer)
-                                    .doOnSuccess(cache::saveInCache);
+                            Offer updated = offer.withInterestedDriversAndState(driverIds, OfferState.BID_RECEIVED);
+                            
+                            return repository.save(updated)
+                                    .flatMap(s -> cache.saveInCache(s).thenReturn(s));
                         })
                 );
     }
 
+    /**
+     * UC-02 Part 2: Passenger selects a driver, offer is validated and becomes a Ride.
+     */
     @Override
     public Mono<Ride> acceptedOffer(UUID offerId, UUID passengerId, UUID driverId) {
-        return cache.findOfferById(offerId)
-                .switchIfEmpty(repository.findById(offerId))
+        return repository.findById(offerId)
                 .flatMap(offer -> {
-                    log.info("Offer {} found: {}", offerId, offer);
-                    if (!offer.state().equals(OfferState.CHOSEN) && !offer.state().equals(OfferState.PENDING)) {
-                        return Mono.error(new OfferStatutNotMatchException("Offer " + offerId + " is not in CHOSEN or PENDING state."));
+                    // Business rules validation
+                    if (offer.state() != OfferState.BID_RECEIVED && offer.state() != OfferState.DRIVER_SELECTED) {
+                        return Mono.error(new OfferStatutNotMatchException("Offer must be in BID_RECEIVED state to be validated."));
                     }
-
                     if (!offer.interestedDrivers().contains(driverId)) {
-                        return Mono.error(new IllegalArgumentException("Driver " + driverId + " is not interested in offer " + offerId + "."));
+                        return Mono.error(new IllegalArgumentException("Driver has not applied to this offer."));
                     }
 
-                    if (!offer.passengerId().equals(passengerId)) {
-                        return Mono.error(new IllegalArgumentException("Passenger " + passengerId + " is not the owner of offer " + offerId + "."));
-                    }
-
-
-                    Offer newOffer = offer.withState(OfferState.TERMINATED);
-
-                    log.info("updated offer: {}", newOffer);
-
-                    return repository.save(newOffer);
+                    // Move offer to final state
+                    Offer validatedOffer = offer.withState(OfferState.VALIDATED);
+                    return repository.save(validatedOffer);
                 })
-                .flatMap(savedOffer -> {
+                .flatMap(offer -> {
+                    // Create the Trip context (Section 6 of spec.md)
                     Ride ride = Ride.builder()
                             .id(Utils.generateUUID())
-                            .offerId(savedOffer.id())
+                            .offerId(offer.id())
                             .passengerId(passengerId)
                             .driverId(driverId)
-                            //.distance(savedOffer.di)
-                            //.duration(savedOffer.)
-                            .state(RideState.CONFIRMED)
-                            .timeReal(0)
+                            .state(RideState.CREATED) // Initial trip state
                             .build();
 
                     return rideRepositoryPort.save(ride);
-                });
+                })
+                .doOnSuccess(r -> log.info("Trip successfully created for offer {}", offerId));
     }
 }```
 
@@ -3652,14 +5109,12 @@ import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.in.UserUseCases;
 import com.yowyob.rideandgo.domain.ports.out.UserRepositoryPort;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService implements UserUseCases {
@@ -3940,12 +5395,6 @@ Une fois l'application lancée, la documentation est accessible ici :
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.7.3</version> <!-- Utilisez la version stable la plus récente -->
-        </dependency>
-
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
         <dependency>
@@ -4007,6 +5456,18 @@ Une fois l'application lancée, la documentation est accessible ici :
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
             <version>2.5.0</version>
+        </dependency>
+        <!-- SPRING SECURITY REACTIVE -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- SECURITY TESTING -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

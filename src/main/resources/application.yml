@@ -4,16 +4,17 @@ server:
 spring:
   application:
     name: ride-and-go
-
+  profiles:
+    active: local
   docker:
     compose:
       enabled: false
 
   # POSTGRESQL (R2DBC)
   r2dbc:
-    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:payment_db}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:password}
+    url: r2dbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:yowyob_db}
+    username: ${DB_USERNAME:fleet_admin}
+    password: ${DB_PASSWORD:fleet_password}
     pool:
       enabled: true
       initial-size: 1

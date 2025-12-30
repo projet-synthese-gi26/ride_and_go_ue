@@ -32,6 +32,8 @@ public class UserR2dbcAdapter implements UserRepositoryPort {
                 .flatMap(this::enrichUser);
     }
 
+  
+
     @Override
     public Flux<User> findAll() {
         return userRepository.findAll()

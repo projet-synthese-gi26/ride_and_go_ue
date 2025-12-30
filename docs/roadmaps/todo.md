@@ -12,15 +12,15 @@
     - [x] Mettre à jour les entités Java (`UserEntity`, `RoleEntity`, etc.) avec les bonnes annotations `@Table`.
     - [x] Valider la cohérence des types UUID pour toutes les clés primaires et étrangères.
 
-- [ ] **1.3 : Sécurité Réactive & Documentation (Security/Swagger)**
-    - [ ] Implémentation de `SecurityConfig` : Configuration WebFlux réactive (Stateless, protection des routes, désactivation du mot de passe par défaut).
-    - [ ] Autorisation des routes Swagger et HealthCheck dans la chaîne de filtres.
-    - [ ] Organisation du Swagger UI par tags métier (Auth, Fares, Offers, Trips) selon les spécifications.
+- [x] **1.3 : Sécurité Réactive & Documentation (Security/Swagger)**
+    - [x] Implémentation de `SecurityConfig` : Configuration WebFlux réactive (Stateless, protection des routes, désactivation du mot de passe par défaut).
+    - [x] Autorisation des routes Swagger et HealthCheck dans la chaîne de filtres.
+    - [x] Organisation du Swagger UI par tags métier (Auth, Fares, Offers, Trips) selon les spécifications.
 
-- [ ] **1.4 : Automatisation & Seeding (Données de test)**
-    - [ ] Configurer `DatabaseInitConfig` pour une exécution séquentielle (Schema -> Check -> Data).
-    - [ ] Préparer `src/main/resources/local/data.sql` avec les rôles (`PASSENGER`, `DRIVER`) et des utilisateurs de test Ride & Go.
-    - [ ] **Validation finale** : Démarrage complet de l'application et vérification des 100+ utilisateurs via Swagger.
+- [x] **1.4 : Automatisation & Seeding (Données de test)**
+    - [x] Configurer `DatabaseInitConfig` pour une exécution séquentielle (Schema -> Check -> Data).
+    - [x] Préparer `src/main/resources/local/data.sql` avec les rôles (`PASSENGER`, `DRIVER`) et des utilisateurs de test Ride & Go.
+    - [x] **Validation finale** : Démarrage complet de l'application et vérification des 100+ utilisateurs via Swagger.
 - [ ] **Tâche 2 :** Gestion de l'Authentification (auth fake,Liaison TraMaSys & Profils).
 - [ ] **Tâche 3 :** Gestion des Offres (Flux Marketplace : Estimation -> Publication -> Bidding -> Sélection).
 - [ ] **Tâche 4 :** Gestion des Courses (Cycle de vie : Création -> Démarrage -> Fin).

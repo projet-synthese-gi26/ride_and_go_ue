@@ -26,7 +26,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/offer")
-@Tag(name = "Offers", description = "Operations related to offers")
+@Tag(name = "Offers", description = "Matchmaking and Bidding workflow")
 public class OfferController {
     private final CreateOfferUseCase createOfferUseCase;
     private final ResponseToOfferUseCase responseToOfferUseCase;

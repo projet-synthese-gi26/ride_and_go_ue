@@ -32,7 +32,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/users")
-@Tag(name = "Users", description = "User management endpoints")
+@Tag(name = "Users", description = "Operations related to User profiles")
 public class UserController {
     private final UserUseCases userUseCases;
     private final UserMapper userMapper;
