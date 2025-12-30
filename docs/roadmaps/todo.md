@@ -41,27 +41,27 @@
     - [x] **3.1 : Stratégie d'Estimation (Fares - Stateless)**
         - [x] Créer `FakeFareAdapter` et `RemoteFareAdapter`.
         - [x] Configurer `FareConfig` (Switch application.fare.mode).
-    - [ ] **3.2 : Infrastructure & Cache (Redis & SQL)**
-        - [ ] Implémenter `LocationCachePort` dans `RedisAdapter` (TTL 5 min).
-        - [ ] Configurer le Repository SQL pour `offer_driver_linkages`.
-    - [ ] **3.3 : Modèles de Domaine & Ports**
-        - [ ] Créer le record `Bid` (driverId, name, eta, latitude, longitude, rating).
-        - [ ] Mettre à jour `Offer` pour inclure une `List<Bid>`.
-    - [ ] **3.4 : Services de Calcul & Tracking**
-        - [ ] Implémenter `EtaCalculatorService` (Logique dynamique via Redis).
-        - [ ] Implémenter `UpdateLocationUseCase` (Tracking acteur via JWT).
-    - [ ] **3.5 : Logique Métier Marketplace (Actions & États)**
-        - [ ] `CreateOfferUseCase` : Publication (PENDING).
-        - [ ] `GetAvailableOffersUseCase` : Liste des offres pour les chauffeurs.
-        - [ ] `ResponseToOfferUseCase` (Apply) : Inscription du postulant en SQL.
-        - [ ] `GetOfferBidsUseCase` : Agrégation réactive (SQL + Redis + ETA).
-        - [ ] `SelectDriverUseCase` : Validation du choix passager (Passage à DRIVER_SELECTED).
-    - [ ] **3.6 : API REST & Mapping**
-        - [ ] `POST /api/v1/fares/estimate` (Consultation).
-        - [ ] `POST /api/v1/location` (Tracking acteur).
-        - [ ] `GET /api/v1/offers/available` (Discovery chauffeur).
-        - [ ] `GET /api/v1/offers/{id}/bids` (Consultation passager).
-        - [ ] `PATCH /api/v1/offers/{id}/select-driver` (Action de sélection).
+    - [x] **3.2 : Infrastructure & Cache (Redis & SQL)**
+        - [x] Implémenter `LocationCachePort` dans `RedisAdapter` (TTL 5 min).
+        - [x] Configurer le Repository SQL pour `offer_driver_linkages`.
+    - [x] **3.3 : Modèles de Domaine & Ports**
+        - [x] Créer le record `Bid` (driverId, name, eta, latitude, longitude, rating).
+        - [x] Mettre à jour `Offer` pour inclure une `List<Bid>`.
+    - [x] **3.4 : Services de Calcul & Tracking**
+        - [x] Implémenter `EtaCalculatorService` (Logique dynamique via Redis).
+        - [x] Implémenter `UpdateLocationUseCase` (Tracking acteur via JWT).
+    - [x] **3.5 : Logique Métier Marketplace (Actions & États)**
+        - [x] `CreateOfferUseCase` : Publication (PENDING).
+        - [x] `GetAvailableOffersUseCase` : Liste des offres pour les chauffeurs.
+        - [x] `ResponseToOfferUseCase` (Apply) : Inscription du postulant en SQL.
+        - [x] `GetOfferBidsUseCase` : Agrégation réactive (SQL + Redis + ETA).
+        - [x] `SelectDriverUseCase` : Validation du choix passager (Passage à DRIVER_SELECTED).
+    - [x] **3.6 : API REST & Mapping**
+        - [x] `POST /api/v1/fares/estimate` (Consultation).
+        - [x] `POST /api/v1/location` (Tracking acteur).
+        - [x] `GET /api/v1/offers/available` (Discovery chauffeur).
+        - [x] `GET /api/v1/offers/{id}/bids` (Consultation passager).
+        - [x] `PATCH /api/v1/offers/{id}/select-driver` (Action de sélection).
 
 - [ ] **Tâche 4 :** Gestion des Courses (Cycle de vie : Création -> Démarrage -> Fin).
 - [ ] **Tâche 5 :** Gestion du GPS (Moteur de tracking & Polling de position).

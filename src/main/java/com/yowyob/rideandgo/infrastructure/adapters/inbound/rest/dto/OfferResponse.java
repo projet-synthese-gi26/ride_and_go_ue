@@ -1,6 +1,8 @@
 package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto;
 
+import com.yowyob.rideandgo.domain.model.Bid;
 import com.yowyob.rideandgo.domain.model.enums.OfferState;
+import com.yowyob.rideandgo.domain.model.Bid;
 
 import java.util.List;
 import java.util.UUID;
@@ -12,5 +14,5 @@ public record OfferResponse(
         String endPoint,
         double price,
         OfferState state,
-        List<UUID> interestedDrivers
+        List<Bid> bids 
 ) {}

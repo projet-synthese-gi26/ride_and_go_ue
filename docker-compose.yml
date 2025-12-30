@@ -1,0 +1,41 @@
+services:
+  # 1. Base de données PostgreSQL
+  postgres:
+    image: postgres:16
+    container_name: ride-go-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: yowyob_db
+      POSTGRES_USER: fleet_admin
+      POSTGRES_PASSWORD: fleet_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. Cache Redis pour le tracking GPS
+  redis:
+    image: redis:alpine
+    container_name: ride-go-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass password
+
+  # 3. Kafka (Redpanda) pour les notifications
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:latest
+    container_name: ride-go-kafka
+    ports:
+      - "9092:9092"
+    command:
+      - redpanda start
+      - --overprovisioned
+      - --smp 1
+      - --memory 1G
+      - --reserve-memory 0M
+      - --node-id 0
+      - --check=false
+      - --kafka-addr plaintext://0.0.0.0:29092,external://0.0.0.0:9092
+      - --advertise-kafka-addr plaintext://redpanda:29092,external://localhost:9092
+
+volumes:
+  postgres_data:

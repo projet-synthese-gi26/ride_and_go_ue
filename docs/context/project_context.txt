@@ -1,10 +1,11 @@
 # Contexte du Projet : Fleet & Geofence API
-Généré le : Tue 30 Dec 2025 03:44:40 AM WAT
+Généré le : Tue 30 Dec 2025 02:57:39 PM WAT
 Framework : Spring Boot WebFlux (Reactive)
 
 ## 1. Arborescence du Projet
 ```
 .
+├── docker-compose.yml
 ├── Dockerfile
 ├── docs
 │   ├── context
@@ -13,8 +14,9 @@ Framework : Spring Boot WebFlux (Reactive)
 │   │   └── master_pair_programmer.md
 │   ├── roadmaps
 │   │   └── todo.md
-│   └── specs
-│       └── spec.md
+│   ├── specs
+│   │   └── spec.md
+│   └── test.md
 ├── .gitattributes
 ├── .github
 │   └── workflows
@@ -34,7 +36,9 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               ├── application
     │   │               │   ├── service
     │   │               │   │   ├── AuthService.java
+    │   │               │   │   ├── EtaCalculatorService.java
     │   │               │   │   ├── FareService.java
+    │   │               │   │   ├── LocationService.java
     │   │               │   │   ├── OfferService.java
     │   │               │   │   └── UserService.java
     │   │               │   └── utils
@@ -47,6 +51,7 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   │   ├── TokenNotFoundException.java
     │   │               │   │   └── UserIsNotDriverException.java
     │   │               │   ├── model
+    │   │               │   │   ├── Bid.java
     │   │               │   │   ├── enums
     │   │               │   │   │   ├── OfferState.java
     │   │               │   │   │   ├── RideState.java
@@ -62,13 +67,17 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │       │   ├── AcceptedOfferUseCase.java
     │   │               │       │   ├── AuthUseCase.java
     │   │               │       │   ├── CreateOfferUseCase.java
+    │   │               │       │   ├── GetAvailableOffersUseCase.java
     │   │               │       │   ├── PutFareInCacheUseCase.java
     │   │               │       │   ├── ResponseToOfferUseCase.java
+    │   │               │       │   ├── SelectDriverUseCase.java
+    │   │               │       │   ├── UpdateLocationUseCase.java
     │   │               │       │   └── UserUseCases.java
     │   │               │       └── out
     │   │               │           ├── AuthPort.java
     │   │               │           ├── FareCachePort.java
     │   │               │           ├── FareClientPort.java
+    │   │               │           ├── LocationCachePort.java
     │   │               │           ├── OfferCachePort.java
     │   │               │           ├── OfferEventPublisherPort.java
     │   │               │           ├── OfferRepositoryPort.java
@@ -98,6 +107,7 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   │   │       ├── FareController.java
     │   │               │   │   │       ├── GlobalExceptionHandler.java
     │   │               │   │   │       ├── HealthCheckController.java
+    │   │               │   │   │       ├── LocationController.java
     │   │               │   │   │       ├── OfferController.java
     │   │               │   │   │       └── UserController.java
     │   │               │   │   └── outbound
@@ -108,8 +118,9 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   │       │   │   ├── AuthApiClient.java
     │   │               │   │       │   │   └── FareCalculatorClient.java
     │   │               │   │       │   ├── FakeAuthAdapter.java
-    │   │               │   │       │   ├── FareAdapter.java
-    │   │               │   │       │   └── RemoteAuthAdapter.java
+    │   │               │   │       │   ├── FakeFareAdapter.java
+    │   │               │   │       │   ├── RemoteAuthAdapter.java
+    │   │               │   │       │   └── RemoteFareAdapter.java
     │   │               │   │       ├── messaging
     │   │               │   │       │   ├── OfferEventPublisherAdapter.java
     │   │               │   │       │   └── SendNotificationAdapter.java
@@ -136,8 +147,10 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   ├── config
     │   │               │   │   ├── AuthConfig.java
     │   │               │   │   ├── DatabaseInitConfig.java
+    │   │               │   │   ├── FareConfig.java
     │   │               │   │   ├── KafkaConfig.java
     │   │               │   │   ├── OpenApiConfig.java
+    │   │               │   │   ├── R2dbcConfig.java
     │   │               │   │   ├── RedisConfig.java
     │   │               │   │   ├── SecurityConfig.java
     │   │               │   │   └── WebClientConfig.java
@@ -165,7 +178,7 @@ Framework : Spring Boot WebFlux (Reactive)
                     └── reactive_hexagonal
                         └── ReactiveHexagonalApplicationTests.java
 
-47 directories, 112 files
+47 directories, 125 files
 ```
 ## 2. Contenu des Fichiers
 
@@ -1012,10 +1025,80 @@ showToast(error.message)
     - [x] **2.4 : API REST & Documentation**
         - [x] Finaliser `AuthController` avec les endpoints de Login et Register.
         - [x] **Validation Swagger** : Scénario "Login réel sur TraMaSys -> Récupération du JWT -> Accès au HealthCheck protégé".
-- [ ] **Tâche 3 :** Gestion des Offres (Flux Marketplace : Estimation -> Publication -> Bidding -> Sélection).
+
+- [ ] **Tâche 3 : Gestion des Offres (Flux Marketplace Complet)**
+    - [x] **3.1 : Stratégie d'Estimation (Fares - Stateless)**
+        - [x] Créer `FakeFareAdapter` et `RemoteFareAdapter`.
+        - [x] Configurer `FareConfig` (Switch application.fare.mode).
+    - [x] **3.2 : Infrastructure & Cache (Redis & SQL)**
+        - [x] Implémenter `LocationCachePort` dans `RedisAdapter` (TTL 5 min).
+        - [x] Configurer le Repository SQL pour `offer_driver_linkages`.
+    - [x] **3.3 : Modèles de Domaine & Ports**
+        - [x] Créer le record `Bid` (driverId, name, eta, latitude, longitude, rating).
+        - [x] Mettre à jour `Offer` pour inclure une `List<Bid>`.
+    - [x] **3.4 : Services de Calcul & Tracking**
+        - [x] Implémenter `EtaCalculatorService` (Logique dynamique via Redis).
+        - [x] Implémenter `UpdateLocationUseCase` (Tracking acteur via JWT).
+    - [x] **3.5 : Logique Métier Marketplace (Actions & États)**
+        - [x] `CreateOfferUseCase` : Publication (PENDING).
+        - [x] `GetAvailableOffersUseCase` : Liste des offres pour les chauffeurs.
+        - [x] `ResponseToOfferUseCase` (Apply) : Inscription du postulant en SQL.
+        - [x] `GetOfferBidsUseCase` : Agrégation réactive (SQL + Redis + ETA).
+        - [x] `SelectDriverUseCase` : Validation du choix passager (Passage à DRIVER_SELECTED).
+    - [x] **3.6 : API REST & Mapping**
+        - [x] `POST /api/v1/fares/estimate` (Consultation).
+        - [x] `POST /api/v1/location` (Tracking acteur).
+        - [x] `GET /api/v1/offers/available` (Discovery chauffeur).
+        - [x] `GET /api/v1/offers/{id}/bids` (Consultation passager).
+        - [x] `PATCH /api/v1/offers/{id}/select-driver` (Action de sélection).
+
 - [ ] **Tâche 4 :** Gestion des Courses (Cycle de vie : Création -> Démarrage -> Fin).
 - [ ] **Tâche 5 :** Gestion du GPS (Moteur de tracking & Polling de position).
 - [ ] **Tâche 6 :** Services Périphériques & Notation (Calculs réels, Reviews).
+```
+
+---
+### Fichier : `./docs/test.md`
+```md
+### Protocole de Test "1 Client + 2 Chauffeurs"
+
+Suis ces étapes dans l'ordre exact :
+
+#### 1. Préparation du terrain (GPS)
+Il faut que les chauffeurs "existent" dans Redis pour que l'ETA puisse être calculé plus tard.
+*   **Action** : Clique sur **Authorize** et saisis `driver-1-token`.
+*   **Action** : Appelle `POST /api/v1/location` avec :
+    ```json
+    { "latitude": 3.8666, "longitude": 11.5166 }
+    ```
+*   **Action** : Change le token dans Authorize pour `driver-2-token`.
+*   **Action** : Appelle `POST /api/v1/location` avec :
+    ```json
+    { "latitude": 3.8444, "longitude": 11.5000 }
+    ```
+
+#### 2. Publication de l'Offre
+*   **Action** : Change le token pour `client-token`.
+*   **Action** : Appelle `POST /api/v1/offers`.
+    *   *Note* : Utilise l'UUID `7f13909e-7170-4f91-872e-333333333333` pour le `passengerId` dans le body pour être raccord avec le token.
+    *   **Récupère l'ID de l'offre** créé dans la réponse.
+
+#### 3. Bidding (Les chauffeurs postulent)
+*   **Action** : Reprends le token `driver-1-token`.
+*   **Action** : Appelle `POST /api/v1/offers/{id}/apply` (avec l'ID de l'offre et l'UUID driver `a1b2c3d4-e5f6-4a5b-8c9d-111111111111`).
+*   **Action** : Fais de même avec le token et l'UUID du chauffeur 2 (`a1b2c3d4-e5f6-4a5b-8c9d-222222222222`).
+
+#### 4. Consultation et Sélection (Le moment de vérité)
+*   **Action** : Reprends le token `client-token`.
+*   **Action** : Appelle `GET /api/v1/offers/{id}/bids`.
+    *   **Vérification** : Tu devrais voir une liste de 2 `bids` avec les noms des chauffeurs (issus de Postgres), leurs coordonnées (issues de Redis) et un ETA (issu du service random).
+*   **Action** : Appelle `PATCH /api/v1/offers/{id}/select-driver` avec l'ID d'un des chauffeurs.
+
+---
+
+### Points de vigilance (Debug)
+*   Si le `POST /offers` échoue avec une erreur de clé étrangère (FK), vérifie que l'UUID du passager existe bien dans ta table `customers`.
+*   Si le `GET /bids` renvoie des coordonnées `0.0`, c'est que le TTL de 5 minutes de Redis a expiré ou que le token n'était pas le bon lors du `POST /location`.
 ```
 
 ---
@@ -2398,7 +2481,7 @@ spring:
   data:
     redis:
       host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:7000}
+      port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:password}
       cluster:
         enabled: false
@@ -2419,11 +2502,12 @@ spring:
 
 # CUSTOM CONFIG 
 application:
-  external:
-    fare-calculator-url: https://fare-calculator-service.pynfi.com
   auth:
-    mode: remote # 'fake' pour ton dev local, 'remote' pour le serveur réel
+    mode: fake # 'fake' pour ton dev local, 'remote' pour le serveur réel
     url: https://auth-service.pynfi.com
+  fare:
+    mode: fake # 'fake' pour ton dev local, 'remote' pour le serveur réel
+    url: https://fare-calculator-service.pynfi.com
 
   kafka:
     topics:
@@ -2531,20 +2615,30 @@ spring:
 
 # CUSTOM BUSINESS SERVICES CONFIGURATION
 application:
-  external:
-    # URL of the Fleet & Vehicle technical service
-    vehicle-service-url: https://vehicule-service.pynfi.com
-    # URL of the Fare calculation engine
-    fare-calculator-url: https://fare-calculator-service.pynfi.com
-    
   auth:
-    mode: remote # Switch to real TraMaSys authentication
+    mode: fake # 'fake' pour ton dev local, 'remote' pour le serveur réel
     url: https://auth-service.pynfi.com
+  fare:
+    mode: fake # 'fake' pour ton dev local, 'remote' pour le serveur réel
+    url: https://fare-calculator-service.pynfi.com
 
   kafka:
     topics:
-      offer-created: offer-created-topic
       notification-service-create-topic: notification-create-topic
+      offer-created: offer-created-topic
+      offer-send: notification-send-topic
+    notification-registration:
+      name: "Ride and Go"
+      email:
+        host: ${SMTP_HOST:smtp.gmail.com}
+        port: ${SMTP_PORT:587}
+        username: ${SMTP_USERNAME}
+        password: ${SMTP_PASSWORD}
+    notification-service:
+      token: token-topic
+      template:
+        new-offer-id: 1001
+        accepted-offer-id: 1002
 
 # MONITORING & HEALTH CHECK (ACTUATOR)
 management:
@@ -2573,7 +2667,8 @@ resilience4j:
       auth-service:
         failureRateThreshold: 50
         waitDurationInOpenState: 5s
-        slidingWindowSize: 5```
+        slidingWindowSize: 5
+```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/RideAndGoApplication.java`
@@ -2739,103 +2834,31 @@ package com.yowyob.rideandgo.infrastructure.mappers;
 import com.yowyob.rideandgo.domain.model.Offer;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.CreateOfferRequest;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.OfferResponse;
-import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.OfferAgreementEntity;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.OfferEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
 
-import java.util.*;
-import java.util.stream.Collectors;
-
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface OfferMapper {
 
-    @Mapping(source = "agreements", target = "interestedDrivers")
+    @Mapping(target = "bids", ignore = true)
     Offer toDomain(OfferEntity entity);
 
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "interestedDrivers", ignore = true)
+    @Mapping(target = "bids", ignore = true)
     @Mapping(target = "version", ignore = true)
     Offer toDomain(CreateOfferRequest request);
 
     OfferResponse toResponse(Offer domain);
 
-    // Fix: We ignore 'agreements' here because the persistence adapter 
-    // handles the saving of links in the 'offer_driver_linkages' table separately.
     @Mapping(target = "agreements", ignore = true) 
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "createdDate", ignore = true)
     @Mapping(target = "lastModifiedBy", ignore = true)
     @Mapping(target = "lastModifiedDate", ignore = true)
     OfferEntity toEntity(Offer domain);
-
-    /**
-     * Helper to map list of entities to list of UUIDs (Entity -> Domain)
-     */
-    default List<UUID> mapAgreementsToDriversIds(List<OfferAgreementEntity> agreements) {
-        if (agreements == null || agreements.isEmpty()) {
-            return Collections.emptyList();
-        }
-        return agreements.stream()
-                .map(OfferAgreementEntity::getDriverId)
-                .collect(Collectors.toList());
-    }
 }```
-
----
-### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/external/FareAdapter.java`
-```java
-package com.yowyob.rideandgo.infrastructure.adapters.outbound.external;
-
-import com.yowyob.rideandgo.application.utils.Utils;
-import com.yowyob.rideandgo.domain.ports.out.FareClientPort;
-import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FareRequest;
-import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FareResponse;
-import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.FareCalculatorClient;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.cloud.client.circuitbreaker.ReactiveCircuitBreaker;
-import org.springframework.cloud.client.circuitbreaker.ReactiveCircuitBreakerFactory;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Mono;
-
-import java.util.concurrent.ThreadLocalRandom;
-
-@Component
-@Slf4j
-@RequiredArgsConstructor
-public class FareAdapter implements FareClientPort {
-    private final FareCalculatorClient client;
-    private final ReactiveCircuitBreakerFactory<?, ?> cbFactory;
-
-    @Override
-    public Mono<FareResponse> caclculateFare(FareRequest request) {
-        ReactiveCircuitBreaker rcb = cbFactory.create("fare-calculator-service");
-
-        return rcb.run(
-                client.calculateFare(request),
-                throwable -> fallbackFareCheck(request, throwable)
-        );
-    }
-
-    private Mono<FareResponse> fallbackFareCheck(FareRequest request, Throwable throwable) {
-        log.warn("Circuit Breaker open or Service Down for {}. Error: {}", request, throwable.getMessage());
-
-        return Mono.just(createRandomFareResponse());
-    }
-
-    private FareResponse createRandomFareResponse() {
-        ThreadLocalRandom random = ThreadLocalRandom.current();
-        int distance = random.nextInt(1_000, 50_001);
-        int duration = random.nextInt(300, 3_601);
-        String currency = "EUR";
-        String fareId = Utils.generateUUID().toString();
-        boolean success = true;
-
-        return new FareResponse(distance, duration, currency, fareId, success);
-    }
-}
-```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/external/FakeAuthAdapter.java`
@@ -2869,6 +2892,87 @@ public class FakeAuthAdapter implements AuthPort {
     @Override
     public Mono<Void> forgotPassword(String email) {
         return Mono.empty();
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/external/FakeFareAdapter.java`
+```java
+package com.yowyob.rideandgo.infrastructure.adapters.outbound.external;
+
+import com.yowyob.rideandgo.domain.ports.out.FareClientPort;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FareRequest;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FareResponse;
+import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Mono;
+
+import java.util.concurrent.ThreadLocalRandom;
+
+@Slf4j
+public class FakeFareAdapter implements FareClientPort {
+
+    private static final double MINIMUM_CAMEROON_FARE = 350.0;
+
+    @Override
+    public Mono<FareResponse> caclculateFare(FareRequest request) {
+        log.info("🛠 MODE FAKE FARE : Calculation for {} to {}", request.startLocationName(), request.endLocationName());
+        
+        // Simulating random distance between 1km and 10km
+        double distanceKm = ThreadLocalRandom.current().nextDouble(1.0, 10.0);
+        
+        // Logic: 250 base + 150 per km
+        double calculatedFare = 250.0 + (distanceKm * 150.0);
+        
+        // Apply Cameroon floor price (350 XAF)
+        double officialFare = Math.max(calculatedFare, MINIMUM_CAMEROON_FARE);
+        
+        // Estimate is slightly lower for the passenger proposal
+        double estimatedFare = Math.max(officialFare * 0.9, MINIMUM_CAMEROON_FARE);
+
+        return Mono.just(new FareResponse(
+                estimatedFare,
+                officialFare,
+                request.startLocationName(),
+                request.endLocationName(),
+                false // Dynamic calculation, not from cache
+        ));
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/external/RemoteFareAdapter.java`
+```java
+package com.yowyob.rideandgo.infrastructure.adapters.outbound.external;
+
+import com.yowyob.rideandgo.domain.ports.out.FareClientPort;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FareRequest;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FareResponse;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.FareCalculatorClient;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cloud.client.circuitbreaker.ReactiveCircuitBreaker;
+import org.springframework.cloud.client.circuitbreaker.ReactiveCircuitBreakerFactory;
+import reactor.core.publisher.Mono;
+
+@Slf4j
+@RequiredArgsConstructor
+public class RemoteFareAdapter implements FareClientPort {
+    private final FareCalculatorClient client;
+    private final ReactiveCircuitBreakerFactory<?, ?> cbFactory;
+    private final FareClientPort fallbackAdapter;
+
+    @Override
+    public Mono<FareResponse> caclculateFare(FareRequest request) {
+        log.info("🌐 MODE REMOTE FARE : Calling external API for {} to {}", request.startLocationName(), request.endLocationName());
+        ReactiveCircuitBreaker rcb = cbFactory.create("fare-calculator-service");
+
+        return rcb.run(
+                client.calculateFare(request),
+                throwable -> {
+                    log.warn("🚨 External Fare Service failed, using fallback: {}", throwable.getMessage());
+                    return fallbackAdapter.caclculateFare(request);
+                }
+        );
     }
 }```
 
@@ -3134,6 +3238,7 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -3145,7 +3250,8 @@ import java.util.UUID;
 @NoArgsConstructor 
 @AllArgsConstructor
 @Table("offers") 
-public class OfferEntity extends AbstractAuditingEntity {
+public class OfferEntity extends AbstractAuditingEntity implements Persistable<UUID> {
+    
     @Id
     private UUID id;
 
@@ -3164,6 +3270,26 @@ public class OfferEntity extends AbstractAuditingEntity {
 
     @Transient
     private List<OfferAgreementEntity> agreements;
+
+    @Transient
+    private boolean newEntity = false; // Flag interne
+
+    @Override
+    @Transient
+    public boolean isNew() {
+        return this.newEntity || id == null;
+    }
+
+    // Le setter que l'Adapter utilise
+    public void setNewEntity(boolean isNew) {
+        this.newEntity = isNew;
+    }
+
+    @Transient
+    @Override
+    public Long getVersion() {
+        return super.getVersion();
+    }
 }```
 
 ---
@@ -3407,11 +3533,17 @@ import reactor.core.publisher.Mono;
 import java.util.UUID;
 
 public interface OfferAgreementR2dbcRepository extends ReactiveCrudRepository<OfferAgreementEntity, UUID> {
+    
+    /**
+     * Checks if a driver has already applied to a specific offer.
+     */
     Mono<OfferAgreementEntity> findByOfferIdAndDriverId(UUID offerId, UUID driverId);
 
+    /**
+     * Lists all applications for a given offer.
+     */
     Flux<OfferAgreementEntity> findByOfferId(UUID offerId);
-}
-```
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/persistence/repository/RideR2dbcRepository.java`
@@ -3625,6 +3757,7 @@ public class UserR2dbcAdapter implements UserRepositoryPort {
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence;
 
 import com.yowyob.rideandgo.application.utils.Utils;
+import com.yowyob.rideandgo.domain.model.Bid;
 import com.yowyob.rideandgo.domain.model.Offer;
 import com.yowyob.rideandgo.domain.ports.out.OfferRepositoryPort;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.OfferAgreementEntity;
@@ -3639,8 +3772,6 @@ import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -3656,62 +3787,76 @@ public class OfferR2dbcAdapter implements OfferRepositoryPort {
     @Override
     @Transactional
     public Mono<Offer> save(Offer offer) {
-        log.info("Saving offer: {}", offer);
         OfferEntity entity = offerMapper.toEntity(offer);
-
-        return offerRepository.save(entity)
-                .flatMap(savedOfferEntity -> {
-                    if (offer.interestedDrivers() == null || offer.interestedDrivers().isEmpty()) {
-                        return Mono.just(savedOfferEntity);
+        
+        return offerRepository.existsById(offer.id())
+                .flatMap(exists -> {
+                    if (!exists) entity.setNewEntity(true); 
+                    return offerRepository.save(entity);
+                })
+                .flatMap(savedEntity -> {
+                    if (offer.bids() == null || offer.bids().isEmpty()) {
+                        return Mono.just(savedEntity);
                     }
 
-                    return Flux.fromIterable(offer.interestedDrivers())
-                            .flatMap(driverId -> offerAgreementRepository
-                                    .findByOfferIdAndDriverId(savedOfferEntity.getId(), driverId)
-                                    .switchIfEmpty(Mono.defer(() -> {
-                                        OfferAgreementEntity newAgreement = new OfferAgreementEntity(
-                                                Utils.generateUUID(),
-                                                driverId,
-                                                savedOfferEntity.getId()
-                                        );
-                                        return offerAgreementRepository.save(newAgreement);
-                                    })))
+                    return Flux.fromIterable(offer.bids())
+                            .flatMap(bid -> offerAgreementRepository
+                                    .findByOfferIdAndDriverId(savedEntity.getId(), bid.driverId())
+                                    .switchIfEmpty(Mono.defer(() -> offerAgreementRepository.save(
+                                            new OfferAgreementEntity(Utils.generateUUID(), bid.driverId(), savedEntity.getId())
+                                    ))))
                             .collectList()
                             .map(agreements -> {
-                                savedOfferEntity.setAgreements(agreements);
-                                return savedOfferEntity;
+                                savedEntity.setAgreements(agreements);
+                                return savedEntity;
                             });
                 })
-                .map(offerMapper::toDomain);
+                .map(this::mapToDomainManual);
+    }
+
+    @Override
+    public Mono<Offer> findById(UUID offerId) {
+        return offerRepository.findById(offerId)
+                .flatMap(this::enrichOfferWithAgreements)
+                .map(this::mapToDomainManual);
+    }
+
+    @Override
+    public Flux<Offer> findAll() {
+        return offerRepository.findAll()
+                .flatMap(this::enrichOfferWithAgreements)
+                .map(this::mapToDomainManual);
+    }
+
+    private Mono<OfferEntity> enrichOfferWithAgreements(OfferEntity entity) {
+        return offerAgreementRepository.findByOfferId(entity.getId())
+                .collectList()
+                .map(agreements -> {
+                    entity.setAgreements(agreements);
+                    return entity;
+                });
+    }
+
+    private Offer mapToDomainManual(OfferEntity entity) {
+        Offer domain = offerMapper.toDomain(entity);
+        if (entity.getAgreements() != null) {
+            return domain.withBids(entity.getAgreements().stream()
+                    .map(a -> Bid.builder().driverId(a.getDriverId()).build())
+                    .collect(Collectors.toList()));
+        }
+        return domain;
     }
 
     @Override
     public Mono<Boolean> delete(Offer offer) {
-        return offerRepository.delete(offerMapper.toEntity(offer))
-                .thenReturn(true)
-                .onErrorReturn(false);
+        return offerRepository.delete(offerMapper.toEntity(offer)).thenReturn(true).onErrorReturn(false);
     }
 
     @Override
     public Mono<Boolean> exists(Offer offer) {
         return offerRepository.existsById(offer.id());
     }
-
-    @Override
-    public Mono<Offer> findById(UUID offerId) {
-        return offerRepository.findById(offerId)
-                .flatMap(entity -> {
-                    return offerAgreementRepository.findByOfferId(offerId)
-                            .collectList()
-                            .map(agreements -> {
-                                entity.setAgreements(agreements);
-                                return entity;
-                            });
-                })
-                .map(offerMapper::toDomain);
-    }
-}
-```
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/cache/RedisAdapter.java`
@@ -3723,38 +3868,79 @@ import com.yowyob.rideandgo.domain.model.Offer;
 import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.domain.ports.out.FareCachePort;
 import com.yowyob.rideandgo.domain.ports.out.OfferCachePort;
-
 import com.yowyob.rideandgo.domain.ports.out.UserCachePort;
+import com.yowyob.rideandgo.domain.ports.out.LocationCachePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+
 import java.time.Duration;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class RedisAdapter implements  OfferCachePort, UserCachePort, FareCachePort {
+public class RedisAdapter implements OfferCachePort, UserCachePort, FareCachePort, LocationCachePort {
+    
     private final ReactiveRedisTemplate<String, Object> redisTemplate;
+    
+    private static final String LOCATION_KEY_PREFIX = "location:";
+    private static final Duration LOCATION_TTL = Duration.ofMinutes(5);
 
- 
+    // --- LocationCachePort Implementation ---
+
+    @Override
+    public Mono<Boolean> saveLocation(UUID actorId, Double latitude, Double longitude) {
+        String key = LOCATION_KEY_PREFIX + actorId.toString();
+        // Using a Map for simple JSON serialization in Redis
+        Map<String, Double> coords = Map.of(
+            "lat", latitude, 
+            "lon", longitude
+        );
+        
+        return redisTemplate.opsForValue()
+                .set(key, coords, LOCATION_TTL)
+                .doOnSuccess(success -> log.debug("Location cached for actor {} (success: {})", actorId, success))
+                .onErrorResume(e -> {
+                    log.error("Failed to cache location for actor {}", actorId, e);
+                    return Mono.just(false);
+                });
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Mono<Location> getLocation(UUID actorId) {
+        String key = LOCATION_KEY_PREFIX + actorId.toString();
+        return redisTemplate.opsForValue()
+                .get(key)
+                .map(obj -> {
+                    Map<String, Double> coords = (Map<String, Double>) obj;
+                    return new Location(coords.get("lat"), coords.get("lon"));
+                })
+                .doOnError(e -> log.error("Error retrieving location for actor {}", actorId, e))
+                .onErrorResume(e -> Mono.empty());
+    }
+
+    // --- OfferCachePort Implementation ---
 
     @Override
     public Mono<Boolean> saveInCache(Offer offer) {
         return redisTemplate.opsForValue()
-                .set("offer:"+ offer.id(), offer, Duration.ofMinutes(15));
+                .set("offer:" + offer.id(), offer, Duration.ofMinutes(15));
     }
 
     @Override
     public Mono<Offer> findOfferById(UUID offerId) {
-        log.info("findOfferById: {}", offerId);
         return redisTemplate.opsForValue()
                 .get("offer:" + offerId)
                 .cast(Offer.class)
                 .onErrorResume(e -> Mono.empty());
     }
+
+    // --- UserCachePort Implementation ---
 
     @Override
     public Mono<Boolean> saveInCache(User user) {
@@ -3768,6 +3954,8 @@ public class RedisAdapter implements  OfferCachePort, UserCachePort, FareCachePo
                 .get("user:" + userId)
                 .cast(User.class);
     }
+
+    // --- FareCachePort Implementation ---
 
     @Override
     public Mono<Boolean> saveInCache(Fare fare) {
@@ -3798,11 +3986,15 @@ public class kafkaAdapter {
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
 
-import com.yowyob.rideandgo.domain.ports.in.PutFareInCacheUseCase;
+import com.yowyob.rideandgo.domain.ports.out.FareClientPort;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FareRequest;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FareResponse;
-import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.FareCalculatorClient;
-import com.yowyob.rideandgo.infrastructure.mappers.FareMapper;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -3810,131 +4002,87 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/fares")
-@Tag(name = "Fares", description = "Trip price estimation")
+@Tag(name = "Fare-Calculator", description = "Trip price estimation (Stateless)")
 public class FareController {
-    private final FareCalculatorClient client;
-    private final FareMapper mapper;
-    private final PutFareInCacheUseCase putFareInCacheUseCase;
 
-    @PostMapping
-    @Operation(summary = "Calculate fare", description = "Calculate fare and optionally cache the result")
+    private final FareClientPort fareClientPort;
+
+    @PostMapping("/estimate")
+    @Operation(summary = "Calculate fare estimation", description = "Returns suggested price. No data persistence.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Fare calculated", content = @Content(schema = @Schema(implementation = FareResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request")
+            @ApiResponse(responseCode = "200", description = "Estimation successful", 
+                        content = @Content(schema = @Schema(implementation = FareResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid request parameters")
     })
-    public Mono<FareResponse> calculateFare(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Fare calculation request", required = true,
-                    content = @Content(schema = @Schema(implementation = FareRequest.class)))
-            @RequestBody FareRequest request) {
-        return client.calculateFare(request)
-                .map(mapper::toDomain)
-                .flatMap(fare -> putFareInCacheUseCase.putFareInCache(fare)
-                        .map(isCached -> mapper.toResponse(fare, isCached))
-                        .onErrorReturn(mapper.toResponse(fare, false))
-                );
+    public Mono<FareResponse> estimateFare(@RequestBody FareRequest request) {
+        return fareClientPort.caclculateFare(request);
     }
-}
-```
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/inbound/rest/OfferController.java`
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.yowyob.rideandgo.domain.model.Offer;
-import com.yowyob.rideandgo.domain.ports.in.AcceptedOfferUseCase;
-import com.yowyob.rideandgo.domain.ports.in.CreateOfferUseCase;
-import com.yowyob.rideandgo.domain.ports.in.ResponseToOfferUseCase;
+import com.yowyob.rideandgo.domain.ports.in.*;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.CreateOfferRequest;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.OfferResponse;
-import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.RideResponse;
 import com.yowyob.rideandgo.infrastructure.mappers.OfferMapper;
-import com.yowyob.rideandgo.infrastructure.mappers.RideMapper;
+import com.yowyob.rideandgo.application.service.OfferService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/offer")
-@Tag(name = "Offers", description = "Matchmaking and Bidding workflow")
+@RequestMapping("/api/v1/offers")
+@Tag(name = "Offer-Controller", description = "Matchmaking workflow")
 public class OfferController {
+    
     private final CreateOfferUseCase createOfferUseCase;
+    private final GetAvailableOffersUseCase getAvailableOffersUseCase;
     private final ResponseToOfferUseCase responseToOfferUseCase;
-    private final AcceptedOfferUseCase acceptedOfferUseCase;
+    private final SelectDriverUseCase selectDriverUseCase;
+    private final OfferService offerService; 
     private final OfferMapper mapper;
-    private final RideMapper rideMapper;
-    private final ObjectMapper objectMapper;
 
     @PostMapping
-    @Operation(summary = "Create an offer", description = "Create a new offer for a given passenger")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Offer created", content = @Content(schema = @Schema(implementation = OfferResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request")
-    })
-    public Mono<OfferResponse> createOffer(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Offer creation payload",
-                    required = true,
-                    content = @Content(schema = @Schema(implementation = CreateOfferRequest.class)))
-            @RequestBody CreateOfferRequest request) {
-        Offer offer = mapper.toDomain(request);
-        return createOfferUseCase.createOffer(offer, request.passengerId())
+    @Operation(summary = "Publish an offer (Passenger)")
+    public Mono<OfferResponse> createOffer(@RequestBody CreateOfferRequest request) {
+        return createOfferUseCase.createOffer(mapper.toDomain(request), request.passengerId())
                 .map(mapper::toResponse);
     }
 
-    @PutMapping
-    @Operation(summary = "Respond to an offer", description = "Driver responds to an existing offer")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Offer updated", content = @Content(schema = @Schema(implementation = OfferResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Offer not found")
-    })
-    public Mono<OfferResponse> responseToOffer(
-            @Parameter(description = "Offer identifier", required = true) @RequestParam UUID offerId,
-            @Parameter(description = "Driver identifier", required = true) @RequestParam UUID driverId) {
-        return responseToOfferUseCase.responseToOffer(offerId, driverId)
-                .map(this::convertToOffer)
-                .map(mapper::toResponse);
+    @GetMapping("/available")
+    @Operation(summary = "List pending offers (Driver)")
+    public Flux<OfferResponse> getAvailable() {
+        return getAvailableOffersUseCase.getAvailableOffers().map(mapper::toResponse);
     }
 
-    @PostMapping("/validate-offer")
-    @Operation(summary = "Accept an offer", description = "Accept an offer to create a ride")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Ride created", content = @Content(schema = @Schema(implementation = RideResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Offer or users not found")
-    })
-    public Mono<RideResponse> acceptOffer(
-            @Parameter(description = "Offer identifier", required = true) @RequestParam UUID offerId,
-            @Parameter(description = "Passenger identifier", required = true) @RequestParam UUID passengerId,
-            @Parameter(description = "Driver identifier", required = true) @RequestParam UUID driverId) {
-        return acceptedOfferUseCase.acceptedOffer(offerId, passengerId, driverId)
-                .map(rideMapper::toResponse);
+    @PostMapping("/{id}/apply")
+    @Operation(summary = "Apply to an offer (Driver)")
+    public Mono<OfferResponse> apply(@PathVariable UUID id, @RequestParam UUID driverId) {
+        return responseToOfferUseCase.responseToOffer(id, driverId).map(mapper::toResponse);
     }
 
-    private Offer convertToOffer(Object instance) {
-        if (instance instanceof Offer offer) {
-            return offer;
-        }
-        return objectMapper.convertValue(instance, Offer.class);
+    @GetMapping("/{id}/bids")
+    @Operation(summary = "Review enriched bidders (Passenger)", description = "Shows GPS and ETA for each applicant")
+    public Mono<OfferResponse> getBids(@PathVariable UUID id) {
+        return offerService.getOfferWithEnrichedBids(id).map(mapper::toResponse);
+    }
+
+    @PatchMapping("/{id}/select-driver")
+    @Operation(summary = "Confirm driver selection (Passenger)")
+    public Mono<OfferResponse> select(@PathVariable UUID id, @RequestParam UUID driverId) {
+        return selectDriverUseCase.selectDriver(id, driverId).map(mapper::toResponse);
     }
 }```
 
@@ -4129,7 +4277,9 @@ public class UserResponse {
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto;
 
+import com.yowyob.rideandgo.domain.model.Bid;
 import com.yowyob.rideandgo.domain.model.enums.OfferState;
+import com.yowyob.rideandgo.domain.model.Bid;
 
 import java.util.List;
 import java.util.UUID;
@@ -4141,7 +4291,7 @@ public record OfferResponse(
         String endPoint,
         double price,
         OfferState state,
-        List<UUID> interestedDrivers
+        List<Bid> bids 
 ) {}
 ```
 
@@ -4313,6 +4463,35 @@ public class UserController {
 }```
 
 ---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/inbound/rest/LocationController.java`
+```java
+package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
+
+import com.yowyob.rideandgo.domain.ports.in.UpdateLocationUseCase;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
+
+@RestController
+@RequestMapping("/api/v1/location")
+@RequiredArgsConstructor
+@Tag(name = "GPS-Tracking", description = "Real-time location updates")
+public class LocationController {
+
+    private final UpdateLocationUseCase updateLocationUseCase;
+
+    @PostMapping
+    @Operation(summary = "Update current location", description = "Updates the actor's coordinates in Redis. ID is extracted from JWT.")
+    public Mono<Boolean> updateLocation(@RequestBody LocationRequest request) {
+        return updateLocationUseCase.updateCurrentLocation(request.latitude(), request.longitude());
+    }
+
+    public record LocationRequest(Double latitude, Double longitude) {}
+}```
+
+---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/inbound/rest/HealthCheckController.java`
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
@@ -4445,6 +4624,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.http.HttpStatus;
 import reactor.core.publisher.Mono;
 
@@ -4455,6 +4636,11 @@ public class SecurityConfig {
 
     private final JwtAuthenticationManager authenticationManager;
     private final SecurityContextRepository securityContextRepository;
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
@@ -4471,6 +4657,8 @@ public class SecurityConfig {
                 .authorizeExchange(exchanges -> exchanges
                         // Public routes
                         .pathMatchers("/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/webjars/**").permitAll()
+                        // Public Healthcheck (for dev convenience)
+                        .pathMatchers("/api/v1/health/**").permitAll()
                         // Protected business routes
                         .anyExchange().authenticated()
                 )
@@ -4552,6 +4740,86 @@ public class KafkaConfig {
     }
 }
 ```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/config/R2dbcConfig.java`
+```java
+package com.yowyob.rideandgo.infrastructure.config;
+
+import com.yowyob.rideandgo.domain.model.enums.OfferState;
+import com.yowyob.rideandgo.domain.model.enums.RideState;
+import io.r2dbc.postgresql.codec.EnumCodec;
+import org.springframework.boot.autoconfigure.r2dbc.ConnectionFactoryCustomizer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class R2dbcConfig {
+
+    /**
+     * Configures the PostgreSQL driver to recognize custom ENUM types.
+     * The ConnectionFactoryCustomizer comes from Spring Boot Autoconfigure.
+     */
+    @Bean
+    public ConnectionFactoryCustomizer postgresCustomizer() {
+        return (builder) -> {
+            builder.codecRegistrar(EnumCodec.builder()
+                    // Link Java OfferState to Postgres type 'offer_state_enum'
+                    .withEnum("offer_state_enum", OfferState.class)
+                    // Link Java RideState to Postgres type 'ride_state_enum'
+                    .withEnum("ride_state_enum", RideState.class)
+                    .build());
+        };
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/config/FareConfig.java`
+```java
+package com.yowyob.rideandgo.infrastructure.config;
+
+import com.yowyob.rideandgo.domain.ports.out.FareClientPort;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.FakeFareAdapter;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.RemoteFareAdapter;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.FareCalculatorClient;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.cloud.client.circuitbreaker.ReactiveCircuitBreakerFactory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+
+@Configuration
+public class FareConfig {
+
+    /**
+     * Always available as a candidate for fallback.
+     */
+    @Bean
+    public FareClientPort fakeFareAdapter() {
+        return new FakeFareAdapter();
+    }
+
+    /**
+     * Active only when mode is 'remote'.
+     */
+    @Bean
+    @Primary
+    @ConditionalOnProperty(name = "application.fare.mode", havingValue = "remote")
+    public FareClientPort remoteFareAdapter(FareCalculatorClient client, 
+                                           ReactiveCircuitBreakerFactory<?, ?> cbFactory) {
+        return new RemoteFareAdapter(client, cbFactory, fakeFareAdapter());
+    }
+
+    /**
+     * Active only when mode is 'fake'.
+     */
+    @Bean
+    @Primary
+    @ConditionalOnProperty(name = "application.fare.mode", havingValue = "fake", matchIfMissing = true)
+    public FareClientPort onlyFakeFareAdapter() {
+        return fakeFareAdapter();
+    }
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/config/DatabaseInitConfig.java`
@@ -4739,24 +5007,42 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+
 import java.util.List;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationManager implements ReactiveAuthenticationManager {
 
+    // Simulation de tokens liés à des UUIDs réels de ta base (issus du seeding data.sql)
+    private static final Map<String, String> STATIC_TOKENS = Map.of(
+        "client-token", "7f13909e-7170-4f91-872e-333333333333", // Un UUID de customer
+        "driver-1-token", "a1b2c3d4-e5f6-4a5b-8c9d-111111111111", // Un UUID de driver
+        "driver-2-token", "a1b2c3d4-e5f6-4a5b-8c9d-222222222222"  // Un autre UUID de driver
+    );
+
     @Override
     public Mono<Authentication> authenticate(Authentication authentication) {
         String authToken = authentication.getCredentials().toString();
         
-        // For now, we accept any non-empty token (Fake logic for development)
-        if (authToken != null && !authToken.isEmpty()) {
+        // Si le token est connu, on retourne l'UUID correspondant comme "Name"
+        if (STATIC_TOKENS.containsKey(authToken)) {
+            String userId = STATIC_TOKENS.get(authToken);
             return Mono.just(new UsernamePasswordAuthenticationToken(
-                    "authenticated_user", 
+                    userId, 
                     null, 
-                    List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                    List.of(new SimpleGrantedAuthority("ROLE"))
             ));
         }
+
+        // Fallback pour ne pas bloquer les autres tests
+        if (authToken != null && !authToken.isEmpty()) {
+            return Mono.just(new UsernamePasswordAuthenticationToken(
+                    authToken, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+            ));
+        }
+        
         return Mono.empty();
     }
 }```
@@ -4949,6 +5235,29 @@ public record User(
 ) {}```
 
 ---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/Bid.java`
+```java
+package com.yowyob.rideandgo.domain.model;
+
+import lombok.Builder;
+import java.util.UUID;
+
+/**
+ * Domain model representing a driver's application to an offer.
+ * This is a transient object, computed on-the-fly by aggregating
+ * SQL bidder data, Redis location data, and ETA calculation.
+ */
+@Builder
+public record Bid(
+    UUID driverId,
+    String driverName,
+    Integer eta,              // Estimated Time of Arrival in minutes (computed)
+    Double latitude,          // Last known latitude from Redis
+    Double longitude,         // Last known longitude from Redis
+    Double rating             // Average driver rating
+) {}```
+
+---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/Offer.java`
 ```java
 package com.yowyob.rideandgo.domain.model;
@@ -4956,6 +5265,7 @@ package com.yowyob.rideandgo.domain.model;
 import com.yowyob.rideandgo.domain.model.enums.OfferState;
 import lombok.Builder;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -4967,19 +5277,23 @@ public record Offer(
         String endPoint,
         double price,
         OfferState state,
-        List<UUID> interestedDrivers,
+        List<Bid> bids, 
         Long version) {
 
-    public Offer withInterestedDriversAndState(List<UUID> interestedDrivers, OfferState state) {
-        return new Offer(this.id, this.passengerId, this.startPoint, this.endPoint, this.price, state, interestedDrivers, this.version);
-    }
-
-    public Offer withInterestedDrivers(List<UUID> interestedDrivers) {
-        return new Offer(this.id, this.passengerId, this.startPoint, this.endPoint, this.price, this.state, interestedDrivers, this.version);
+    public Offer withBids(List<Bid> bids) {
+        return new Offer(this.id, this.passengerId, this.startPoint, this.endPoint, this.price, this.state, bids, this.version);
     }
 
     public Offer withState(OfferState state) {
-        return new Offer(this.id, this.passengerId, this.startPoint, this.endPoint, this.price, state, this.interestedDrivers, this.version);
+        return new Offer(this.id, this.passengerId, this.startPoint, this.endPoint, this.price, state, this.bids, this.version);
+    }
+
+    /**
+     * Helper to check if a driver has already applied
+     */
+    public boolean hasDriverApplied(UUID driverId) {
+        if (bids == null) return false;
+        return bids.stream().anyMatch(b -> b.driverId().equals(driverId));
     }
 }```
 
@@ -5032,6 +5346,26 @@ public interface UserUseCases {
 }```
 
 ---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/in/UpdateLocationUseCase.java`
+```java
+package com.yowyob.rideandgo.domain.ports.in;
+
+import reactor.core.publisher.Mono;
+
+/**
+ * Input port for real-time location updates.
+ */
+public interface UpdateLocationUseCase {
+    /**
+     * Updates the GPS coordinates of the current authenticated actor.
+     * @param latitude Double
+     * @param longitude Double
+     * @return Mono<Boolean> true if success
+     */
+    Mono<Boolean> updateCurrentLocation(Double latitude, Double longitude);
+}```
+
+---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/in/ResponseToOfferUseCase.java`
 ```java
 package com.yowyob.rideandgo.domain.ports.in;
@@ -5055,6 +5389,32 @@ import reactor.core.publisher.Mono;
 
 public interface PutFareInCacheUseCase {
     Mono<Boolean> putFareInCache(Fare fare);
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/in/SelectDriverUseCase.java`
+```java
+
+// SelectDriverUseCase.java
+package com.yowyob.rideandgo.domain.ports.in;
+import com.yowyob.rideandgo.domain.model.Offer;
+import java.util.UUID;
+import reactor.core.publisher.Mono;
+
+public interface SelectDriverUseCase {
+    Mono<Offer> selectDriver(UUID offerId, UUID driverId);
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/in/GetAvailableOffersUseCase.java`
+```java
+// GetAvailableOffersUseCase.java
+package com.yowyob.rideandgo.domain.ports.in;
+import com.yowyob.rideandgo.domain.model.Offer;
+import reactor.core.publisher.Flux;
+
+public interface GetAvailableOffersUseCase {
+    Flux<Offer> getAvailableOffers(); // Offers in PENDING state
 }```
 
 ---
@@ -5109,18 +5469,16 @@ public interface FareCachePort {
 package com.yowyob.rideandgo.domain.ports.out;
 
 import com.yowyob.rideandgo.domain.model.Offer;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
 import java.util.UUID;
 
 public interface OfferRepositoryPort {
     Mono<Offer> save(Offer offer);
-
     Mono<Boolean> delete(Offer offer);
-
     Mono<Boolean> exists(Offer offer);
-
     Mono<Offer> findById(UUID offerId);
+    Flux<Offer> findAll(); 
 }```
 
 ---
@@ -5187,6 +5545,34 @@ public interface UserCachePort {
     Mono<User> findUserById(UUID userId);
 }
 ```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/LocationCachePort.java`
+```java
+package com.yowyob.rideandgo.domain.ports.out;
+
+import reactor.core.publisher.Mono;
+import java.util.UUID;
+
+public interface LocationCachePort {
+    /**
+     * Saves the live location of an actor (Driver or Passenger).
+     * @param actorId The ID of the BusinessActor
+     * @param latitude GPS Latitude
+     * @param longitude GPS Longitude
+     */
+    Mono<Boolean> saveLocation(UUID actorId, Double latitude, Double longitude);
+
+    /**
+     * Retrieves the last known location from cache.
+     */
+    Mono<Location> getLocation(UUID actorId);
+
+    /**
+     * Internal domain record for coordinates
+     */
+    record Location(Double latitude, Double longitude) {}
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/OfferCachePort.java`
@@ -5348,15 +5734,14 @@ package com.yowyob.rideandgo.application.service;
 import com.yowyob.rideandgo.application.utils.Utils;
 import com.yowyob.rideandgo.domain.exception.OfferStatutNotMatchException;
 import com.yowyob.rideandgo.domain.exception.UserIsNotDriverException;
+import com.yowyob.rideandgo.domain.model.Bid;
 import com.yowyob.rideandgo.domain.model.Offer;
 import com.yowyob.rideandgo.domain.model.Ride;
 import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.domain.model.enums.OfferState;
 import com.yowyob.rideandgo.domain.model.enums.RideState;
 import com.yowyob.rideandgo.domain.model.enums.RoleType;
-import com.yowyob.rideandgo.domain.ports.in.AcceptedOfferUseCase;
-import com.yowyob.rideandgo.domain.ports.in.CreateOfferUseCase;
-import com.yowyob.rideandgo.domain.ports.in.ResponseToOfferUseCase;
+import com.yowyob.rideandgo.domain.ports.in.*;
 import com.yowyob.rideandgo.domain.ports.out.*;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.NotificationType;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.SendNotificationRequest;
@@ -5364,6 +5749,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.*;
@@ -5371,18 +5757,26 @@ import java.util.*;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class OfferService implements CreateOfferUseCase, ResponseToOfferUseCase, AcceptedOfferUseCase {
+public class OfferService implements 
+    CreateOfferUseCase, 
+    ResponseToOfferUseCase, 
+    AcceptedOfferUseCase,
+    GetAvailableOffersUseCase,
+    SelectDriverUseCase {
+
     private final OfferCachePort cache;
     private final OfferRepositoryPort repository;
     private final UserRepositoryPort userRepositoryPort;
     private final SendNotificationPort sendNotificationPort;
     private final RideRepositoryPort rideRepositoryPort;
+    private final LocationCachePort locationCachePort;
+    private final EtaCalculatorService etaCalculatorService;
 
     @Value("${application.kafka.notification-service.template.new-offer-id}")
     private int templateCreateOfferId;
 
     /**
-     * UC-01: Creates a new offer and notifies all available drivers via Kafka/Email.
+     * UC-01: Create offer and notify drivers via Kafka
      */
     @Override
     public Mono<Offer> createOffer(Offer request, UUID passengerId) {
@@ -5392,13 +5786,12 @@ public class OfferService implements CreateOfferUseCase, ResponseToOfferUseCase,
                 .startPoint(request.startPoint())
                 .endPoint(request.endPoint())
                 .price(request.price())
-                .state(OfferState.PENDING) // Initial state according to spec
-                .interestedDrivers(new ArrayList<>())
+                .state(OfferState.PENDING)
+                .bids(new ArrayList<>())
                 .build();
 
         return repository.save(offer)
                 .flatMap(savedOffer -> 
-                    // Fetch all driver emails from the central database
                     userRepositoryPort.findByRoleName(RoleType.DRIVER)
                         .map(User::email)
                         .collectList()
@@ -5410,40 +5803,48 @@ public class OfferService implements CreateOfferUseCase, ResponseToOfferUseCase,
                                     .data(Map.of("price", offer.price(), "from", offer.startPoint(), "to", offer.endPoint()))
                                     .build();
 
-                            // Parallel: Notify and Cache
                             return Mono.zip(
                                 sendNotificationPort.sendNotification(notification),
                                 cache.saveInCache(savedOffer)
                             ).thenReturn(savedOffer);
                         })
                 )
-                .doOnSuccess(o -> log.info("Offer successfully created: {}", o.id()));
+                .doOnSuccess(o -> log.info("Offer created and drivers notified: {}", o.id()));
     }
 
     /**
-     * UC-02 Part 1: Allows a driver to apply for an offer (Manifest interest).
+     * UC: Discovery - List offers for drivers
+     */
+    @Override
+    public Flux<Offer> getAvailableOffers() {
+        // En vrai on filtrerait par geo-zone. Ici on filtre par état.
+        return repository.findAll()
+                .filter(o -> o.state() == OfferState.PENDING || o.state() == OfferState.BID_RECEIVED);
+    }
+
+    /**
+     * UC-02: Driver applies to an offer
      */
     @Override
     public Mono<Offer> responseToOffer(UUID offerId, UUID driverId) {
-        log.info("Driver {} applying for offer {}", driverId, offerId);
-        
         return repository.findById(offerId)
                 .flatMap(offer -> userRepositoryPort.findUserById(driverId)
                         .flatMap(user -> {
-                            // Check if the user has the DRIVER role in the new Set-based model
                             boolean isDriver = user.roles().stream()
                                     .anyMatch(role -> role.type() == RoleType.DRIVER);
 
                             if (!isDriver) {
-                                return Mono.error(new UserIsNotDriverException("User " + driverId + " is not authorized to drive."));
+                                return Mono.error(new UserIsNotDriverException("User is not a driver."));
                             }
 
-                            List<UUID> driverIds = new ArrayList<>(offer.interestedDrivers());
-                            if (!driverIds.contains(driverId)) {
-                                driverIds.add(driverId);
+                            if (offer.hasDriverApplied(driverId)) {
+                                return Mono.just(offer);
                             }
 
-                            Offer updated = offer.withInterestedDriversAndState(driverIds, OfferState.BID_RECEIVED);
+                            List<Bid> currentBids = new ArrayList<>(offer.bids());
+                            currentBids.add(Bid.builder().driverId(driverId).build());
+
+                            Offer updated = offer.withBids(currentBids).withState(OfferState.BID_RECEIVED);
                             
                             return repository.save(updated)
                                     .flatMap(s -> cache.saveInCache(s).thenReturn(s));
@@ -5452,37 +5853,75 @@ public class OfferService implements CreateOfferUseCase, ResponseToOfferUseCase,
     }
 
     /**
-     * UC-02 Part 2: Passenger selects a driver, offer is validated and becomes a Ride.
+     * SPECIAL: Dynamic Enrichment (Calculates GPS + ETA on the fly)
+     */
+    public Mono<Offer> getOfferWithEnrichedBids(UUID offerId) {
+        return repository.findById(offerId)
+                .flatMap(offer -> {
+                    if (offer.bids().isEmpty()) return Mono.just(offer);
+
+                    return Flux.fromIterable(offer.bids())
+                            .flatMap(bid -> Mono.zip(
+                                    userRepositoryPort.findUserById(bid.driverId()),
+                                    locationCachePort.getLocation(bid.driverId())
+                                        .defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0))
+                            ).flatMap(tuple -> {
+                                User user = tuple.getT1();
+                                LocationCachePort.Location loc = tuple.getT2();
+                                
+                                return etaCalculatorService.calculateEta(loc.latitude(), loc.longitude(), 0.0, 0.0)
+                                        .map(eta -> Bid.builder()
+                                                .driverId(user.id())
+                                                .driverName(user.name())
+                                                .rating(4.8) // Mock rating
+                                                .latitude(loc.latitude())
+                                                .longitude(loc.longitude())
+                                                .eta(eta)
+                                                .build());
+                            }))
+                            .collectList()
+                            .map(offer::withBids);
+                });
+    }
+
+    /**
+     * UC: Passenger selects a specific driver
+     */
+    @Override
+    public Mono<Offer> selectDriver(UUID offerId, UUID driverId) {
+        return repository.findById(offerId)
+                .flatMap(offer -> {
+                    if (!offer.hasDriverApplied(driverId)) {
+                        return Mono.error(new IllegalArgumentException("Driver has not applied."));
+                    }
+                    return repository.save(offer.withState(OfferState.DRIVER_SELECTED));
+                });
+    }
+
+    /**
+     * UC-03: Offer validation and Ride creation
      */
     @Override
     public Mono<Ride> acceptedOffer(UUID offerId, UUID passengerId, UUID driverId) {
         return repository.findById(offerId)
                 .flatMap(offer -> {
-                    // Business rules validation
                     if (offer.state() != OfferState.BID_RECEIVED && offer.state() != OfferState.DRIVER_SELECTED) {
-                        return Mono.error(new OfferStatutNotMatchException("Offer must be in BID_RECEIVED state to be validated."));
+                        return Mono.error(new OfferStatutNotMatchException("Offer state doesn't allow validation."));
                     }
-                    if (!offer.interestedDrivers().contains(driverId)) {
-                        return Mono.error(new IllegalArgumentException("Driver has not applied to this offer."));
-                    }
-
-                    // Move offer to final state
-                    Offer validatedOffer = offer.withState(OfferState.VALIDATED);
-                    return repository.save(validatedOffer);
+                    return repository.save(offer.withState(OfferState.VALIDATED));
                 })
                 .flatMap(offer -> {
-                    // Create the Trip context (Section 6 of spec.md)
                     Ride ride = Ride.builder()
                             .id(Utils.generateUUID())
                             .offerId(offer.id())
                             .passengerId(passengerId)
                             .driverId(driverId)
-                            .state(RideState.CREATED) // Initial trip state
+                            .state(RideState.CREATED)
                             .build();
 
                     return rideRepositoryPort.save(ride);
                 })
-                .doOnSuccess(r -> log.info("Trip successfully created for offer {}", offerId));
+                .doOnSuccess(r -> log.info("Ride context created: {}", r.id()));
     }
 }```
 
@@ -5568,6 +6007,47 @@ public class AuthService implements AuthUseCase {
 }```
 
 ---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/application/service/LocationService.java`
+```java
+package com.yowyob.rideandgo.application.service;
+
+import com.yowyob.rideandgo.domain.ports.in.UpdateLocationUseCase;
+import com.yowyob.rideandgo.domain.ports.out.LocationCachePort;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class LocationService implements UpdateLocationUseCase {
+
+    private final LocationCachePort locationCachePort;
+
+    @Override
+    public Mono<Boolean> updateCurrentLocation(Double latitude, Double longitude) {
+        return ReactiveSecurityContextHolder.getContext()
+                .map(SecurityContext::getAuthentication)
+                .flatMap(auth -> {
+                    String userIdStr = auth.getName(); // Extracted from JWT
+                    try {
+                        UUID userId = UUID.fromString(userIdStr);
+                        return locationCachePort.saveLocation(userId, latitude, longitude);
+                    } catch (IllegalArgumentException e) {
+                        log.error("Security Context principal is not a valid UUID: {}", userIdStr);
+                        return Mono.just(false);
+                    }
+                })
+                .switchIfEmpty(Mono.error(new RuntimeException("No security context found for location update")));
+    }
+}```
+
+---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/application/service/FareService.java`
 ```java
 package com.yowyob.rideandgo.application.service;
@@ -5594,6 +6074,28 @@ public class FareService implements PutFareInCacheUseCase {
 }```
 
 ---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/application/service/EtaCalculatorService.java`
+```java
+package com.yowyob.rideandgo.application.service;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+import java.util.concurrent.ThreadLocalRandom;
+
+@Slf4j
+@Service
+public class EtaCalculatorService {
+
+    /**
+     * Logic: Random value between 3 and 12 minutes for MVP.
+     */
+    public Mono<Integer> calculateEta(Double startLat, Double startLon, Double endLat, Double endLon) {
+        return Mono.fromCallable(() -> ThreadLocalRandom.current().nextInt(3, 13));
+    }
+}```
+
+---
 ### Fichier : `./.mvn/wrapper/maven-wrapper.properties`
 ```properties
 wrapperVersion=3.3.4
@@ -5604,156 +6106,51 @@ distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-mav
 ---
 ### Fichier : `./Readme.md`
 ```md
-# Template Hexagonal Reactive - com.yowyob
+# 🚗 Ride & Go API - Guide de démarrage rapide
 
-Ce projet est le **socle standard** pour le développement de microservices backend chez **com.yowyob**. Il fournit une structure clé en main respectant les principes de l'**Architecture Hexagonale** sur une stack technologique entièrement **Réactive** (Non-bloquante).
-
-## 📘 À propos de ce Template
-
-### Objectif
-L'objectif de ce repository n'est pas d'être un simple "Hello World", mais de fournir un **exemple complet et réaliste** d'un microservice de production. Il a été réalisé pour standardiser nos développements, assurer la cohérence du code entre les équipes et faciliter la maintenance.
-
-### Scénario d'implémentation (Comment il a été réalisé)
-Pour démontrer les capacités du template, nous avons implémenté un cas d'usage fonctionnel complet : **"La création d'un produit"**.
-
-Ce scénario a été choisi car il traverse toutes les couches techniques nécessaires dans un vrai système distribué :
-
-1.  **Entrée API** : Réception d'une requête POST (Layer REST).
-2.  **Validation Métier** : Appel à un service externe (Stock Service) pour vérifier la capacité via HTTP.
-3.  **Persistance** : Sauvegarde des données dans PostgreSQL (R2DBC).
-4.  **Performance** : Mise en cache du résultat dans Redis.
-5.  **Communication Asynchrone** : Publication d'un événement "ProductCreated" dans Kafka.
-6.  **Résilience** : Gestion des pannes du service externe via un Circuit Breaker.
-
-Ce flux permet aux développeurs de voir concrètement comment enchaîner ces opérations de manière réactive (Reactor/Mono/Flux) tout en gardant le cœur du métier pur.
-
----
+Ce guide permet de configurer l'environnement de développement complet (Postgres, Redis, Kafka) en local.
 
 ## 📋 Prérequis
-
 - **Java 21**
-- **Maven 3.8+**
-- **Docker** (Optionel)
+- **Docker & Docker Compose**
 
-## 🏗 Architecture du Projet
-
-L'architecture est divisée en trois couches distinctes pour isoler la logique métier des technologies.
-
-### 1. Domain (`src/main/java/com/yowyob/template/domain`)
-C'est le cœur du métier. **Aucune dépendance Spring** ne doit se trouver ici (sauf exception rare).
-- **`model/`** : Les objets métiers (Records Java).
-- **`ports/in/`** : Les interfaces (Use Cases) définissant ce que l'application *peut faire* (ex: `CreateProductUseCase`).
-- **`ports/out/`** : Les interfaces définissant ce dont l'application *a besoin* (ex: Repository, Client API, Bus d'événements).
-- **`exception/`** : Exceptions métier.
-
-### 2. Application (`src/main/java/com/yowyob/template/application`)
-L'orchestrateur.
-- Implémente les interfaces `ports/in`.
-- Utilise les interfaces `ports/out`.
-- Contient la logique des flux (Flows reactor).
-
-### 3. Infrastructure (`src/main/java/com/yowyob/template/infrastructure`)
-Tout ce qui est technique. C'est ici qu'on implémente Spring, les bases de données, etc.
-- **`adapters/inbound/`** : Ce qui *entre* dans l'app (Controlleurs REST, Listeners Kafka).
-- **`adapters/outbound/`** : Ce qui *sort* ou stocke (Implémentation R2DBC, Client WebClient, Redis, Kafka Producer).
-- **`config/`** : Configuration Spring (Beans, Security, Serializers).
-- **`mappers/`** : Conversion entre les DTOs, les Entités et le Domaine (MapStruct).
-
-
-## ⚙️ Configuration et URLs Externes
-
-La configuration est centralisée dans `src/main/resources/application.yml`.
-
-### Comment définir l'URL d'un Microservice externe ?
-
-Pour appeler un autre service (ex: Stock Service), nous utilisons `WebClient` configuré via une interface déclarative (Http Interface Client).
-
-1. **Définir l'URL dans le YAML** :
-   Dans `application.yml` (ou `prod.application.yml`), localisez la section `application.external` :
-   ```yaml
-   application:
-     external:
-       stock-service-url: http://168.119.122.86:8081
-   ```
-
-2. **Injection dans le Client** :
-   Dans `WebClientConfig.java`, cette valeur est injectée via `@Value("${application.external.stock-service-url}")` et passée au builder du client HTTP.
-
-3. **Utilisation** :
-   L'adaptateur (`StockAdapter`) utilise l'interface `StockApiClient` sans se soucier de l'URL.
-
-### Configuration Infrastructure (DB, Redis, Kafka)
-
-Les accès aux services de données sont définis dans les fichiers YAML.
-- **Profil par défaut (`application.yml`)** : Configuré pour le développement (Redis standalone).
-- **Profil Prod (`prod.application.yml`)** : Configuré pour la production (Redis Cluster, IPs statiques).
-
----
-
-## 🚀 Comment Lancer l'Application
-
-### 1. En local (Développement)
-
-Assurez-vous que vos services (Postgres, Kafka, Redis) sont accessibles aux adresses définies dans `application.yml`.
-
+## 🚀 Étape 1 : Lancer l'infrastructure
+Depuis la racine du projet :
 ```bash
-mvn clean install
-mvn spring-boot:run
+docker-compose up -d
 ```
+Ceci démarre :
+- **Postgres** (Port 5432) : Stockage des utilisateurs et offres.
+- **Redis** (Port 6379) : Tracking GPS temps réel (Mot de passe: `password`).
+- **Redpanda/Kafka** (Port 9092) : Système de notifications.
 
-### 2. Via Docker
-
-Pour construire l'image et lancer un conteneur :
-
-```bash
-# Construire l'image
-docker build -t reactive-hexagonal .
-
-# Lancer (en pointant vers le profil prod par exemple)
-docker run -p 8080:8080 -e SPRING_PROFILES_ACTIVE=prod reactive-hexagonal
-```
-
----
-
-## 🛠 Guide du Développeur : Comment ajouter une fonctionnalité ?
-
-Si vous devez ajouter une fonctionnalité (ex: "Supprimer un produit"), suivez cet ordre strict :
-
-1.  **Domain (Port In)** : Créez l'interface `DeleteProductUseCase` dans `domain/ports/in`.
-2.  **Domain (Port Out)** : Si besoin d'accès DB, créez/maj `ProductRepositoryPort` dans `domain/ports/out`.
-3.  **Application** : Implémentez le UseCase dans `ProductService` (ou un nouveau service `DeleteProductService`).
-4.  **Infrastructure (Out)** : Implémentez la méthode de suppression dans `PostgresR2dbcAdapter`.
-5.  **Infrastructure (In)** : Ajoutez l'endpoint `DELETE` dans `ProductController`.
-
-### Résilience (Circuit Breaker)
-
-Les appels externes sont protégés par Resilience4j.
-Pour modifier les seuils (ex: passer à 10s d'attente), modifiez la section `resilience4j` dans le fichier YAML.
-
+## ⚙️ Étape 2 : Configuration de l'application
+Assurez-vous que le profil `local` est activé dans `src/main/resources/application.yml` :
 ```yaml
-resilience4j:
-  circuitbreaker:
-    instances:
-      stock-service:
-        failureRateThreshold: 50 # Ouvre le circuit si 50% d'échecs
+spring:
+  profiles:
+    active: local
 ```
 
----
+## 🛠️ Étape 3 : Lancer le projet
+```bash
+./mvnw clean spring-boot:run
+```
+Le système va automatiquement :
+1. Créer le schéma central (Postgres).
+2. Injecter **100 utilisateurs de test** (5 Admins, 30 Chauffeurs, 65 Passagers).
 
-## ✅ Vérifications avant commit
+## ✅ Étape 4 : Tester le flux Marketplace
+1. **Swagger UI** : [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+2. **Identités de test (Tokens statiques)** :
+   - Client : `Bearer client-token`
+   - Chauffeur 1 : `Bearer driver-1-token`
+   - Chauffeur 2 : `Bearer driver-2-token`
 
-- [ ] Les DTOs (Infrastructure) sont séparés des Objets du Domaine (Domain).
-- [ ] Aucune annotation Spring (`@Service`, `@Component`) dans le package `domain`.
-- [ ] Les tests unitaires couvrent la couche Application.
-
-## 📚 Documentation de l'API (Swagger UI)
-
-Le projet intègre **OpenAPI 3** (via Springdoc) pour documenter et tester les endpoints automatiquement.
-
-Une fois l'application lancée, la documentation est accessible ici :
-
-- **Interface Visuelle (Swagger UI)** : [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
-- **Définition JSON (OpenAPI)** : [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)```
+## 🐳 Utilitaires Docker
+- Stopper l'infra : `docker-compose stop`
+- Tout supprimer (volumes inclus) : `docker-compose down -v`
+```
 
 ---
 ### Fichier : `./pom.xml`
@@ -5810,7 +6207,7 @@ Une fois l'application lancée, la documentation est accessible ici :
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>r2dbc-postgresql</artifactId>
-            <scope>runtime</scope>
+            <!-- <scope>runtime</scope> -->
         </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>
@@ -6072,3 +6469,48 @@ jobs:
             echo "Deployment successful & container healthy!"
           EOF
 ```
+
+---
+### Fichier : `./docker-compose.yml`
+```yaml
+services:
+  # 1. Base de données PostgreSQL
+  postgres:
+    image: postgres:16
+    container_name: ride-go-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: yowyob_db
+      POSTGRES_USER: fleet_admin
+      POSTGRES_PASSWORD: fleet_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. Cache Redis pour le tracking GPS
+  redis:
+    image: redis:alpine
+    container_name: ride-go-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass password
+
+  # 3. Kafka (Redpanda) pour les notifications
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:latest
+    container_name: ride-go-kafka
+    ports:
+      - "9092:9092"
+    command:
+      - redpanda start
+      - --overprovisioned
+      - --smp 1
+      - --memory 1G
+      - --reserve-memory 0M
+      - --node-id 0
+      - --check=false
+      - --kafka-addr plaintext://0.0.0.0:29092,external://0.0.0.0:9092
+      - --advertise-kafka-addr plaintext://redpanda:29092,external://localhost:9092
+
+volumes:
+  postgres_data:```

@@ -1,6 +1,7 @@
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence;
 
 import com.yowyob.rideandgo.application.utils.Utils;
+import com.yowyob.rideandgo.domain.model.Bid;
 import com.yowyob.rideandgo.domain.model.Offer;
 import com.yowyob.rideandgo.domain.ports.out.OfferRepositoryPort;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.OfferAgreementEntity;
@@ -15,8 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -32,58 +31,73 @@ public class OfferR2dbcAdapter implements OfferRepositoryPort {
     @Override
     @Transactional
     public Mono<Offer> save(Offer offer) {
-        log.info("Saving offer: {}", offer);
         OfferEntity entity = offerMapper.toEntity(offer);
-
-        return offerRepository.save(entity)
-                .flatMap(savedOfferEntity -> {
-                    if (offer.interestedDrivers() == null || offer.interestedDrivers().isEmpty()) {
-                        return Mono.just(savedOfferEntity);
+        
+        return offerRepository.existsById(offer.id())
+                .flatMap(exists -> {
+                    if (!exists) entity.setNewEntity(true); 
+                    return offerRepository.save(entity);
+                })
+                .flatMap(savedEntity -> {
+                    if (offer.bids() == null || offer.bids().isEmpty()) {
+                        return Mono.just(savedEntity);
                     }
 
-                    return Flux.fromIterable(offer.interestedDrivers())
-                            .flatMap(driverId -> offerAgreementRepository
-                                    .findByOfferIdAndDriverId(savedOfferEntity.getId(), driverId)
-                                    .switchIfEmpty(Mono.defer(() -> {
-                                        OfferAgreementEntity newAgreement = new OfferAgreementEntity(
-                                                Utils.generateUUID(),
-                                                driverId,
-                                                savedOfferEntity.getId()
-                                        );
-                                        return offerAgreementRepository.save(newAgreement);
-                                    })))
+                    return Flux.fromIterable(offer.bids())
+                            .flatMap(bid -> offerAgreementRepository
+                                    .findByOfferIdAndDriverId(savedEntity.getId(), bid.driverId())
+                                    .switchIfEmpty(Mono.defer(() -> offerAgreementRepository.save(
+                                            new OfferAgreementEntity(Utils.generateUUID(), bid.driverId(), savedEntity.getId())
+                                    ))))
                             .collectList()
                             .map(agreements -> {
-                                savedOfferEntity.setAgreements(agreements);
-                                return savedOfferEntity;
+                                savedEntity.setAgreements(agreements);
+                                return savedEntity;
                             });
                 })
-                .map(offerMapper::toDomain);
-    }
-
-    @Override
-    public Mono<Boolean> delete(Offer offer) {
-        return offerRepository.delete(offerMapper.toEntity(offer))
-                .thenReturn(true)
-                .onErrorReturn(false);
-    }
-
-    @Override
-    public Mono<Boolean> exists(Offer offer) {
-        return offerRepository.existsById(offer.id());
+                .map(this::mapToDomainManual);
     }
 
     @Override
     public Mono<Offer> findById(UUID offerId) {
         return offerRepository.findById(offerId)
-                .flatMap(entity -> {
-                    return offerAgreementRepository.findByOfferId(offerId)
-                            .collectList()
-                            .map(agreements -> {
-                                entity.setAgreements(agreements);
-                                return entity;
-                            });
-                })
-                .map(offerMapper::toDomain);
+                .flatMap(this::enrichOfferWithAgreements)
+                .map(this::mapToDomainManual);
+    }
+
+    @Override
+    public Flux<Offer> findAll() {
+        return offerRepository.findAll()
+                .flatMap(this::enrichOfferWithAgreements)
+                .map(this::mapToDomainManual);
+    }
+
+    private Mono<OfferEntity> enrichOfferWithAgreements(OfferEntity entity) {
+        return offerAgreementRepository.findByOfferId(entity.getId())
+                .collectList()
+                .map(agreements -> {
+                    entity.setAgreements(agreements);
+                    return entity;
+                });
+    }
+
+    private Offer mapToDomainManual(OfferEntity entity) {
+        Offer domain = offerMapper.toDomain(entity);
+        if (entity.getAgreements() != null) {
+            return domain.withBids(entity.getAgreements().stream()
+                    .map(a -> Bid.builder().driverId(a.getDriverId()).build())
+                    .collect(Collectors.toList()));
+        }
+        return domain;
+    }
+
+    @Override
+    public Mono<Boolean> delete(Offer offer) {
+        return offerRepository.delete(offerMapper.toEntity(offer)).thenReturn(true).onErrorReturn(false);
+    }
+
+    @Override
+    public Mono<Boolean> exists(Offer offer) {
+        return offerRepository.existsById(offer.id());
     }
 }
