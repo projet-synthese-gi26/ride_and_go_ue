@@ -36,7 +36,33 @@
     - [x] **2.4 : API REST & Documentation**
         - [x] Finaliser `AuthController` avec les endpoints de Login et Register.
         - [x] **Validation Swagger** : Scénario "Login réel sur TraMaSys -> Récupération du JWT -> Accès au HealthCheck protégé".
-- [ ] **Tâche 3 :** Gestion des Offres (Flux Marketplace : Estimation -> Publication -> Bidding -> Sélection).
+
+- [ ] **Tâche 3 : Gestion des Offres (Flux Marketplace Complet)**
+    - [x] **3.1 : Stratégie d'Estimation (Fares - Stateless)**
+        - [x] Créer `FakeFareAdapter` et `RemoteFareAdapter`.
+        - [x] Configurer `FareConfig` (Switch application.fare.mode).
+    - [ ] **3.2 : Infrastructure & Cache (Redis & SQL)**
+        - [ ] Implémenter `LocationCachePort` dans `RedisAdapter` (TTL 5 min).
+        - [ ] Configurer le Repository SQL pour `offer_driver_linkages`.
+    - [ ] **3.3 : Modèles de Domaine & Ports**
+        - [ ] Créer le record `Bid` (driverId, name, eta, latitude, longitude, rating).
+        - [ ] Mettre à jour `Offer` pour inclure une `List<Bid>`.
+    - [ ] **3.4 : Services de Calcul & Tracking**
+        - [ ] Implémenter `EtaCalculatorService` (Logique dynamique via Redis).
+        - [ ] Implémenter `UpdateLocationUseCase` (Tracking acteur via JWT).
+    - [ ] **3.5 : Logique Métier Marketplace (Actions & États)**
+        - [ ] `CreateOfferUseCase` : Publication (PENDING).
+        - [ ] `GetAvailableOffersUseCase` : Liste des offres pour les chauffeurs.
+        - [ ] `ResponseToOfferUseCase` (Apply) : Inscription du postulant en SQL.
+        - [ ] `GetOfferBidsUseCase` : Agrégation réactive (SQL + Redis + ETA).
+        - [ ] `SelectDriverUseCase` : Validation du choix passager (Passage à DRIVER_SELECTED).
+    - [ ] **3.6 : API REST & Mapping**
+        - [ ] `POST /api/v1/fares/estimate` (Consultation).
+        - [ ] `POST /api/v1/location` (Tracking acteur).
+        - [ ] `GET /api/v1/offers/available` (Discovery chauffeur).
+        - [ ] `GET /api/v1/offers/{id}/bids` (Consultation passager).
+        - [ ] `PATCH /api/v1/offers/{id}/select-driver` (Action de sélection).
+
 - [ ] **Tâche 4 :** Gestion des Courses (Cycle de vie : Création -> Démarrage -> Fin).
 - [ ] **Tâche 5 :** Gestion du GPS (Moteur de tracking & Polling de position).
 - [ ] **Tâche 6 :** Services Périphériques & Notation (Calculs réels, Reviews).
