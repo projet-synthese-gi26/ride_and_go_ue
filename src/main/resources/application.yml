@@ -55,6 +55,9 @@ spring:
 application:
   external:
     fare-calculator-url: https://fare-calculator-service.pynfi.com
+  auth:
+    mode: fake # 'fake' pour ton dev local, 'remote' pour le serveur réel
+    url: https://auth-service.pynfi.com
 
   kafka:
     topics:

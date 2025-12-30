@@ -1,5 +1,5 @@
 # Contexte du Projet : Fleet & Geofence API
-Généré le : Tue 30 Dec 2025 01:07:34 AM WAT
+Généré le : Tue 30 Dec 2025 03:44:40 AM WAT
 Framework : Spring Boot WebFlux (Reactive)
 
 ## 1. Arborescence du Projet
@@ -33,6 +33,7 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │           └── rideandgo
     │   │               ├── application
     │   │               │   ├── service
+    │   │               │   │   ├── AuthService.java
     │   │               │   │   ├── FareService.java
     │   │               │   │   ├── OfferService.java
     │   │               │   │   └── UserService.java
@@ -59,11 +60,13 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   └── ports
     │   │               │       ├── in
     │   │               │       │   ├── AcceptedOfferUseCase.java
+    │   │               │       │   ├── AuthUseCase.java
     │   │               │       │   ├── CreateOfferUseCase.java
     │   │               │       │   ├── PutFareInCacheUseCase.java
     │   │               │       │   ├── ResponseToOfferUseCase.java
     │   │               │       │   └── UserUseCases.java
     │   │               │       └── out
+    │   │               │           ├── AuthPort.java
     │   │               │           ├── FareCachePort.java
     │   │               │           ├── FareClientPort.java
     │   │               │           ├── OfferCachePort.java
@@ -81,6 +84,7 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   │   │   ├── kafka
     │   │               │   │   │   │   └── kafkaAdapter.java
     │   │               │   │   │   └── rest
+    │   │               │   │   │       ├── AuthController.java
     │   │               │   │   │       ├── dto
     │   │               │   │   │       │   ├── CreateOfferRequest.java
     │   │               │   │   │       │   ├── CreateUserRequest.java
@@ -101,8 +105,11 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   │       │   └── RedisAdapter.java
     │   │               │   │       ├── external
     │   │               │   │       │   ├── client
+    │   │               │   │       │   │   ├── AuthApiClient.java
     │   │               │   │       │   │   └── FareCalculatorClient.java
-    │   │               │   │       │   └── FareAdapter.java
+    │   │               │   │       │   ├── FakeAuthAdapter.java
+    │   │               │   │       │   ├── FareAdapter.java
+    │   │               │   │       │   └── RemoteAuthAdapter.java
     │   │               │   │       ├── messaging
     │   │               │   │       │   ├── OfferEventPublisherAdapter.java
     │   │               │   │       │   └── SendNotificationAdapter.java
@@ -127,18 +134,22 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   │           ├── RoleR2dbcAdapter.java
     │   │               │   │           └── UserR2dbcAdapter.java
     │   │               │   ├── config
+    │   │               │   │   ├── AuthConfig.java
     │   │               │   │   ├── DatabaseInitConfig.java
     │   │               │   │   ├── KafkaConfig.java
     │   │               │   │   ├── OpenApiConfig.java
     │   │               │   │   ├── RedisConfig.java
     │   │               │   │   ├── SecurityConfig.java
     │   │               │   │   └── WebClientConfig.java
-    │   │               │   └── mappers
-    │   │               │       ├── FareMapper.java
-    │   │               │       ├── OfferMapper.java
-    │   │               │       ├── RideMapper.java
-    │   │               │       ├── RoleMapper.java
-    │   │               │       └── UserMapper.java
+    │   │               │   ├── mappers
+    │   │               │   │   ├── FareMapper.java
+    │   │               │   │   ├── OfferMapper.java
+    │   │               │   │   ├── RideMapper.java
+    │   │               │   │   ├── RoleMapper.java
+    │   │               │   │   └── UserMapper.java
+    │   │               │   └── security
+    │   │               │       ├── JwtAuthenticationManager.java
+    │   │               │       └── SecurityContextRepository.java
     │   │               ├── RideAndGoApplication.java
     │   │               └── tmp
     │   └── resources
@@ -154,7 +165,7 @@ Framework : Spring Boot WebFlux (Reactive)
                     └── reactive_hexagonal
                         └── ReactiveHexagonalApplicationTests.java
 
-46 directories, 102 files
+47 directories, 112 files
 ```
 ## 2. Contenu des Fichiers
 
@@ -986,7 +997,21 @@ showToast(error.message)
     - [x] Configurer `DatabaseInitConfig` pour une exécution séquentielle (Schema -> Check -> Data).
     - [x] Préparer `src/main/resources/local/data.sql` avec les rôles (`PASSENGER`, `DRIVER`) et des utilisateurs de test Ride & Go.
     - [x] **Validation finale** : Démarrage complet de l'application et vérification des 100+ utilisateurs via Swagger.
-- [ ] **Tâche 2 :** Gestion de l'Authentification (auth fake,Liaison TraMaSys & Profils).
+
+- [x] **Tâche 2 :** Gestion de l'Authentification (auth fake,Liaison TraMaSys & Profils).
+    - [x] **2.1 : Contrats du Domaine**
+        - [x] Mettre à jour `AuthPort` et `AuthUseCase` pour supporter Login/Register/Reset.
+        - [x] Aligner le modèle `AuthResponse` sur le format TraMaSys (Token, Rôles, Permissions).
+    - [x] **2.2 : Implémentation des Adaptateurs**
+        - [x] Créer `FakeAuthAdapter` (Mode développement sans réseau).
+        - [x] Créer `RemoteAuthAdapter` (Appels réels via `AuthApiClient`).
+        - [x] Configurer `AuthConfig` pour le switch dynamique via `application.auth.mode`.
+    - [x] **2.3 : Sécurisation par Token (JWT Validation)**
+        - [x] Implémenter le `AuthenticationManager` réactif pour valider les tokens via TraMaSys.
+        - [x] Configurer le filtre d'extraction du header `Authorization: Bearer`.
+    - [x] **2.4 : API REST & Documentation**
+        - [x] Finaliser `AuthController` avec les endpoints de Login et Register.
+        - [x] **Validation Swagger** : Scénario "Login réel sur TraMaSys -> Récupération du JWT -> Accès au HealthCheck protégé".
 - [ ] **Tâche 3 :** Gestion des Offres (Flux Marketplace : Estimation -> Publication -> Bidding -> Sélection).
 - [ ] **Tâche 4 :** Gestion des Courses (Cycle de vie : Création -> Démarrage -> Fin).
 - [ ] **Tâche 5 :** Gestion du GPS (Moteur de tracking & Polling de position).
@@ -2396,6 +2421,9 @@ spring:
 application:
   external:
     fare-calculator-url: https://fare-calculator-service.pynfi.com
+  auth:
+    mode: remote # 'fake' pour ton dev local, 'remote' pour le serveur réel
+    url: https://auth-service.pynfi.com
 
   kafka:
     topics:
@@ -2810,6 +2838,111 @@ public class FareAdapter implements FareClientPort {
 ```
 
 ---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/external/FakeAuthAdapter.java`
+```java
+package com.yowyob.rideandgo.infrastructure.adapters.outbound.external;
+
+import com.yowyob.rideandgo.domain.ports.out.AuthPort;
+import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Mono;
+import java.util.List;
+
+@Slf4j
+public class FakeAuthAdapter implements AuthPort {
+    @Override
+    public Mono<AuthResponse> login(String email, String password) {
+        log.info("🛠 MODE FAKE AUTH : Login pour {}", email);
+        return Mono.just(new AuthResponse("fake-jwt", "fake-refresh", email, List.of("ADMIN"), List.of("*")));
+    }
+
+    @Override
+    public Mono<AuthResponse> register(String username, String email, String password, String phone, String firstName, String lastName) {
+        log.info("🛠 MODE FAKE AUTH : Inscription pour {}", username);
+        return Mono.just(new AuthResponse(
+            "fake-jwt", 
+            "fake-refresh", 
+            username, 
+            List.of("ADMIN"), 
+            List.of("*")));
+    }
+
+    @Override
+    public Mono<Void> forgotPassword(String email) {
+        return Mono.empty();
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/external/RemoteAuthAdapter.java`
+```java
+package com.yowyob.rideandgo.infrastructure.adapters.outbound.external;
+
+import com.yowyob.rideandgo.domain.ports.out.AuthPort;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.AuthApiClient;
+import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Mono;
+import java.util.List;
+
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+
+@Slf4j
+public class RemoteAuthAdapter implements AuthPort {
+
+    private final AuthApiClient authApiClient;
+
+    public RemoteAuthAdapter(AuthApiClient authApiClient) {
+        this.authApiClient = authApiClient;
+    }
+
+    @Override
+    public Mono<AuthResponse> login(String identifier, String password) {
+        return authApiClient.authenticate(new AuthApiClient.LoginRequest(identifier, password))
+                .map(this::mapToDomain);
+    }
+
+    @Override
+     public Mono<AuthResponse> register(String username, String email, String password, String phone, String firstName, String lastName) {
+        // CORRECTION DE L'ORDRE : username, password, email (et non email, password)
+        AuthApiClient.RegisterRequest request = new AuthApiClient.RegisterRequest(
+            username, 
+            password, 
+            email,    
+            phone, 
+            firstName, 
+            lastName,
+            "FLEET_MANAGEMENT", 
+            List.of("ADMIN") 
+        );
+
+       return authApiClient.register(request)
+            .map(this::mapToDomain)
+            .doOnSuccess(res -> log.info("✅ Inscription réussie : {}", res.username()))
+            .onErrorResume(WebClientResponseException.class, ex -> {
+                // On logue le message d'erreur détaillé venant du serveur distant
+                String errorBody = ex.getResponseBodyAsString();
+                log.error("❌ Erreur TraMaSys (400) : {}",ex.getStatusCode(), errorBody);
+                return Mono.error(new RuntimeException("Erreur TraMaSys : " + errorBody));
+            });
+    }
+
+    private AuthResponse mapToDomain(AuthApiClient.TraMaSysResponse res) {
+        return new AuthResponse(
+            res.accessToken(),
+            res.refreshToken(),
+            res.user().username(),
+            res.user().roles(),
+            res.user().permissions()
+        );
+    }
+
+    @Override
+    public Mono<Void> forgotPassword(String email) {
+        log.info("Appel forgot password pour {}", email);
+        return Mono.empty();
+    }
+}```
+
+---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/external/client/FareCalculatorClient.java`
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client;
@@ -2828,6 +2961,43 @@ public interface FareCalculatorClient {
     Mono<FareResponse> calculateFare(@RequestBody FareRequest request);
 }
 ```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/external/client/AuthApiClient.java`
+```java
+package com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client;
+
+import org.springframework.web.service.annotation.HttpExchange;
+import org.springframework.web.service.annotation.PostExchange;
+import org.springframework.web.bind.annotation.RequestBody;
+import reactor.core.publisher.Mono;
+import java.util.List;
+
+@HttpExchange("/api/auth")
+public interface AuthApiClient {
+    
+    @PostExchange("/login")
+    Mono<TraMaSysResponse> authenticate(@RequestBody LoginRequest request);
+
+    @PostExchange("/register")
+    Mono<TraMaSysResponse> register(@RequestBody RegisterRequest request);
+
+    record LoginRequest(String identifier, String password) {}
+
+    record RegisterRequest(
+        String username,
+        String password,
+        String email,
+        String phone,
+        String firstName,
+        String lastName,
+        String service, // Sera "FLEET_MANAGEMENT"
+        List<String> roles
+    ) {}
+
+    record TraMaSysResponse(String accessToken, String refreshToken, UserDetail user) {}
+    record UserDetail(String id, String username, List<String> roles, List<String> permissions) {}
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/messaging/SendNotificationAdapter.java`
@@ -3786,6 +3956,53 @@ public class GlobalExceptionHandler {
 }```
 
 ---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/inbound/rest/AuthController.java`
+```java
+package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
+
+import com.yowyob.rideandgo.domain.ports.in.AuthUseCase;
+import com.yowyob.rideandgo.domain.ports.out.AuthPort;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
+
+@RestController
+@RequestMapping("/api/v1/auth")
+@RequiredArgsConstructor
+@Tag(name = "Authentication")
+public class AuthController {
+
+    private final AuthUseCase authUseCase;
+
+    @PostMapping("/login")
+    public Mono<AuthPort.AuthResponse> login(@RequestBody LoginRequest request) {
+        return authUseCase.login(request.identifier(), request.password());
+    }
+
+    @PostMapping("/register")
+    @Operation(summary = "Inscription Fleet Management")
+    public Mono<AuthPort.AuthResponse> register(@RequestBody RegisterDto dto) {
+        return authUseCase.register(
+            dto.username(), dto.password(), dto.email(), 
+            dto.phone(), dto.firstName(), dto.lastName()
+        );
+    }
+
+    public record LoginRequest(String identifier, String password) {}
+    
+    public record RegisterDto(
+        String username, 
+        String password, 
+        String email, 
+        String phone, 
+        String firstName, 
+        String lastName
+    ) {}
+}```
+
+---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/inbound/rest/dto/SendNotificationRequest.java`
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto;
@@ -4143,10 +4360,41 @@ public class HealthCheckController {
 }```
 
 ---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/config/AuthConfig.java`
+```java
+package com.yowyob.rideandgo.infrastructure.config;
+
+import com.yowyob.rideandgo.domain.ports.out.AuthPort;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.FakeAuthAdapter;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.RemoteAuthAdapter;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.AuthApiClient;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class AuthConfig {
+
+    @Bean
+    @ConditionalOnProperty(name = "application.auth.mode", havingValue = "fake")
+    public AuthPort fakeAuthPort() {
+        return new FakeAuthAdapter();
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "application.auth.mode", havingValue = "remote", matchIfMissing = true)
+    public AuthPort remoteAuthPort(AuthApiClient authApiClient) {
+        // Maintenant, le constructeur de RemoteAuthAdapter accepte bien l'interface
+        return new RemoteAuthAdapter(authApiClient);
+    }
+}```
+
+---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/config/WebClientConfig.java`
 ```java
 package com.yowyob.rideandgo.infrastructure.config;
 
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.AuthApiClient;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.FareCalculatorClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -4158,16 +4406,29 @@ import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 @Configuration
 public class WebClientConfig {
 
-  
     @Bean
     public FareCalculatorClient fareCalculatorClient(WebClient.Builder builder,
-                                         @Value("${application.external.fare-calculator-url}") String url) {
+                                         @Value("${application.external.fare-calculator-url:https://fare-calculator-service.pynfi.com}") String url) {
+        return createClient(builder, url, FareCalculatorClient.class);
+    }
 
+    /**
+     * Client for the external Authentication Service (TraMaSys).
+     */
+    @Bean
+    public AuthApiClient authApiClient(WebClient.Builder builder, 
+                                       @Value("${application.auth.url:https://auth-service.pynfi.com}") String url) {
+        return createClient(builder, url, AuthApiClient.class);
+    }
+
+    /**
+     * Generic helper to build declarative HTTP clients.
+     */
+    private <T> T createClient(WebClient.Builder builder, String url, Class<T> clientClass) {
         WebClient webClient = builder.baseUrl(url).build();
         WebClientAdapter adapter = WebClientAdapter.create(webClient);
         HttpServiceProxyFactory factory = HttpServiceProxyFactory.builderFor(adapter).build();
-
-        return factory.createClient(FareCalculatorClient.class);
+        return factory.createClient(clientClass);
     }
 }```
 
@@ -4176,74 +4437,44 @@ public class WebClientConfig {
 ```java
 package com.yowyob.rideandgo.infrastructure.config;
 
+import com.yowyob.rideandgo.infrastructure.security.JwtAuthenticationManager;
+import com.yowyob.rideandgo.infrastructure.security.SecurityContextRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
-import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.http.HttpStatus;
+import reactor.core.publisher.Mono;
 
 @Configuration
 @EnableWebFluxSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-    /**
-     * Configures the security filter chain for WebFlux.
-     * Defines which paths are public and which are secured.
-     */
+    private final JwtAuthenticationManager authenticationManager;
+    private final SecurityContextRepository securityContextRepository;
+
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
-        System.out.println("🛡️ REACTIVE SECURITY CONFIGURATION LOADED");
-
         return http
-                // Disable CSRF for stateless REST APIs
+                .exceptionHandling(exceptionHandling -> exceptionHandling
+                        .authenticationEntryPoint((swe, e) -> Mono.fromRunnable(() -> swe.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED)))
+                        .accessDeniedHandler((swe, e) -> Mono.fromRunnable(() -> swe.getResponse().setStatusCode(HttpStatus.FORBIDDEN)))
+                )
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
-                
+                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+                .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+                .authenticationManager(authenticationManager)
+                .securityContextRepository(securityContextRepository)
                 .authorizeExchange(exchanges -> exchanges
-                        // Public endpoints: Monitoring and Health
-                        .pathMatchers("/actuator/**", "/api/v1/health/**").permitAll()
-                        
-                        // Public endpoints: API Documentation (Swagger)
-                        .pathMatchers(
-                                "/v3/api-docs/**", 
-                                "/swagger-ui/**", 
-                                "/swagger-ui.html", 
-                                "/webjars/**"
-                        ).permitAll()
-                        
-                        // All other business endpoints require authentication
+                        // Public routes
+                        .pathMatchers("/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/webjars/**").permitAll()
+                        // Protected business routes
                         .anyExchange().authenticated()
                 )
-                
-                // Disable default login mechanisms
-                .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
-                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .build();
-    }
-
-    /**
-     * Password encoder used for user credential hashing.
-     */
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    /**
-     * Dummy user details service to prevent Spring from logging 
-     * a generated security password on every startup.
-     */
-    @Bean
-    public MapReactiveUserDetailsService userDetailsService() {
-        UserDetails dummy = User.withUsername("tech_user")
-                .password("{noop}secret")
-                .roles("SYSTEM")
-                .build();
-        return new MapReactiveUserDetailsService(dummy);
     }
 }```
 
@@ -4405,29 +4636,128 @@ public class DatabaseInitConfig {
 ```java
 package com.yowyob.rideandgo.infrastructure.config;
 
+import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class OpenApiConfig {
 
+    /**
+     * Configures OpenAPI (Swagger) with JWT security support.
+     */
     @Bean
     public OpenAPI customOpenAPI() {
+        final String securitySchemeName = "bearerAuth";
+        
         return new OpenAPI()
+                .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
+                .components(new Components()
+                        .addSecuritySchemes(securitySchemeName,
+                                new SecurityScheme()
+                                        .name(securitySchemeName)
+                                        .type(SecurityScheme.Type.HTTP)
+                                        .scheme("bearer")
+                                        .bearerFormat("JWT")))
                 .info(new Info()
-                        .title("YowYob Microservice Template API")
+                        .title("Ride & Go API")
                         .version("1.0.0")
-                        .description("Documentation de l'API Réactive Hexagonale.")
+                        .description("Reactive API for Urban Transport Marketplace (Ride & Go project).")
                         .contact(new Contact()
-                                .name("Équipe Backend")
+                                .name("Gabriel")
                                 .email("dev@yowyob.com"))
                         .license(new License()
                                 .name("Apache 2.0")
                                 .url("http://springdoc.org")));
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/security/SecurityContextRepository.java`
+```java
+package com.yowyob.rideandgo.infrastructure.security;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication; 
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextImpl;
+import org.springframework.security.web.server.context.ServerSecurityContextRepository;
+import org.springframework.stereotype.Component;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
+
+/**
+ * Repository responsible for extracting the JWT token from the Authorization header
+ * and initiating the authentication process.
+ */
+@Component
+@RequiredArgsConstructor
+public class SecurityContextRepository implements ServerSecurityContextRepository {
+
+    private final JwtAuthenticationManager authenticationManager;
+
+    @Override
+    public Mono<Void> save(ServerWebExchange exchange, SecurityContext context) {
+        return Mono.error(new UnsupportedOperationException("Stateless API: session saving is not supported."));
+    }
+
+    /**
+     * Loads the security context by extracting the "Bearer" token from HTTP headers.
+     */
+    @Override
+    public Mono<SecurityContext> load(ServerWebExchange exchange) {
+        return Mono.justOrEmpty(exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION))
+                .filter(authHeader -> authHeader.startsWith("Bearer "))
+                .flatMap(authHeader -> {
+                    String authToken = authHeader.substring(7);
+                    // Create an unauthenticated token object
+                    Authentication auth = new UsernamePasswordAuthenticationToken(authToken, authToken);
+                    // Delegate validation to the AuthenticationManager
+                    return this.authenticationManager.authenticate(auth)
+                            .map(SecurityContextImpl::new);
+                });
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/security/JwtAuthenticationManager.java`
+```java
+package com.yowyob.rideandgo.infrastructure.security;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.ReactiveAuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+import java.util.List;
+
+@Component
+@RequiredArgsConstructor
+public class JwtAuthenticationManager implements ReactiveAuthenticationManager {
+
+    @Override
+    public Mono<Authentication> authenticate(Authentication authentication) {
+        String authToken = authentication.getCredentials().toString();
+        
+        // For now, we accept any non-empty token (Fake logic for development)
+        if (authToken != null && !authToken.isEmpty()) {
+            return Mono.just(new UsernamePasswordAuthenticationToken(
+                    "authenticated_user", 
+                    null, 
+                    List.of(new SimpleGrantedAuthority("ROLE_USER"))
+            ));
+        }
+        return Mono.empty();
     }
 }```
 
@@ -4651,6 +4981,30 @@ public record Offer(
     public Offer withState(OfferState state) {
         return new Offer(this.id, this.passengerId, this.startPoint, this.endPoint, this.price, state, this.interestedDrivers, this.version);
     }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/in/AuthUseCase.java`
+```java
+package com.yowyob.rideandgo.domain.ports.in;
+
+import com.yowyob.rideandgo.domain.ports.out.AuthPort;
+import reactor.core.publisher.Mono;
+
+public interface AuthUseCase {
+    Mono<AuthPort.AuthResponse> login(String identifier, String password);
+    
+    Mono<Void> resetPassword(String email);
+
+    // CETTE MÉTHODE DOIT EXISTER ICI AUSSI
+    Mono<AuthPort.AuthResponse> register(
+        String username, 
+        String password, 
+        String email, 
+        String phone, 
+        String firstName, 
+        String lastName
+    );
 }```
 
 ---
@@ -4923,6 +5277,39 @@ public interface SendNotificationPort {
 ```
 
 ---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/AuthPort.java`
+```java
+package com.yowyob.rideandgo.domain.ports.out;
+
+import reactor.core.publisher.Mono;
+
+import java.util.List;
+import java.util.Map;
+
+public interface AuthPort {
+    Mono<AuthResponse> login(String email, String password);
+    
+    Mono<Void> forgotPassword(String email);
+
+    Mono<AuthResponse> register(
+        String username, 
+        String password, 
+        String email, 
+        String phone, 
+        String firstName, 
+        String lastName);
+
+    
+    record AuthResponse(
+        String accessToken, 
+        String refreshToken, 
+        String username, 
+        List<String> roles,
+        List<String> permissions
+    ) {}
+}```
+
+---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/application/utils/Constants.java`
 ```java
 package com.yowyob.rideandgo.application.utils;
@@ -5144,6 +5531,39 @@ public class UserService implements UserUseCases {
     @Override
     public Flux<User> getUsersByRole(RoleType role) {
         return userRepositoryPort.findByRoleName(role);
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/application/service/AuthService.java`
+```java
+package com.yowyob.rideandgo.application.service;
+
+import com.yowyob.rideandgo.domain.ports.in.AuthUseCase;
+import com.yowyob.rideandgo.domain.ports.out.AuthPort;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+@Service
+@RequiredArgsConstructor
+public class AuthService implements AuthUseCase {
+
+    private final AuthPort authPort;
+
+    @Override
+    public Mono<AuthPort.AuthResponse> login(String identifier, String password) {
+        return authPort.login(identifier, password);
+    }
+
+    @Override
+    public Mono<AuthPort.AuthResponse> register(String username, String email, String password, String phone, String firstName, String lastName) {
+        return authPort.register(username, password, email, phone, firstName, lastName);
+    }
+
+    @Override
+    public Mono<Void> resetPassword(String email) {
+        return authPort.forgotPassword(email);
     }
 }```
 

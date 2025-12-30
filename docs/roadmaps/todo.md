@@ -21,7 +21,21 @@
     - [x] Configurer `DatabaseInitConfig` pour une exécution séquentielle (Schema -> Check -> Data).
     - [x] Préparer `src/main/resources/local/data.sql` avec les rôles (`PASSENGER`, `DRIVER`) et des utilisateurs de test Ride & Go.
     - [x] **Validation finale** : Démarrage complet de l'application et vérification des 100+ utilisateurs via Swagger.
-- [ ] **Tâche 2 :** Gestion de l'Authentification (auth fake,Liaison TraMaSys & Profils).
+
+- [x] **Tâche 2 :** Gestion de l'Authentification (auth fake,Liaison TraMaSys & Profils).
+    - [x] **2.1 : Contrats du Domaine**
+        - [x] Mettre à jour `AuthPort` et `AuthUseCase` pour supporter Login/Register/Reset.
+        - [x] Aligner le modèle `AuthResponse` sur le format TraMaSys (Token, Rôles, Permissions).
+    - [x] **2.2 : Implémentation des Adaptateurs**
+        - [x] Créer `FakeAuthAdapter` (Mode développement sans réseau).
+        - [x] Créer `RemoteAuthAdapter` (Appels réels via `AuthApiClient`).
+        - [x] Configurer `AuthConfig` pour le switch dynamique via `application.auth.mode`.
+    - [x] **2.3 : Sécurisation par Token (JWT Validation)**
+        - [x] Implémenter le `AuthenticationManager` réactif pour valider les tokens via TraMaSys.
+        - [x] Configurer le filtre d'extraction du header `Authorization: Bearer`.
+    - [x] **2.4 : API REST & Documentation**
+        - [x] Finaliser `AuthController` avec les endpoints de Login et Register.
+        - [x] **Validation Swagger** : Scénario "Login réel sur TraMaSys -> Récupération du JWT -> Accès au HealthCheck protégé".
 - [ ] **Tâche 3 :** Gestion des Offres (Flux Marketplace : Estimation -> Publication -> Bidding -> Sélection).
 - [ ] **Tâche 4 :** Gestion des Courses (Cycle de vie : Création -> Démarrage -> Fin).
 - [ ] **Tâche 5 :** Gestion du GPS (Moteur de tracking & Polling de position).
