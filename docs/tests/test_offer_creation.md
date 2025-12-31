@@ -18,7 +18,13 @@ Il faut que les chauffeurs "existent" dans Redis pour que l'ETA puisse être cal
 #### 2. Publication de l'Offre
 *   **Action** : Change le token pour `client-token`.
 *   **Action** : Appelle `POST /api/v1/offers`.
-    *   *Note* : Utilise l'UUID `7f13909e-7170-4f91-872e-333333333333` pour le `passengerId` dans le body pour être raccord avec le token.
+    *   *Note* : Utilise le json `{
+  "passengerId": "7f13909e-7170-4f91-872e-333333333333",
+  "startPoint": "Bastos",
+  "endPoint": "Poste Centrale",
+  "price": 2500,
+  "state": "PENDING"
+}` dans le body pour être raccord avec le token.
     *   **Récupère l'ID de l'offre** créé dans la réponse.
 
 #### 3. Bidding (Les chauffeurs postulent)

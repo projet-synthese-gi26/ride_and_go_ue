@@ -42,7 +42,7 @@ public class UserR2dbcAdapter implements UserRepositoryPort {
 
     @Override
     public Flux<User> findByRoleName(RoleType type) {
-        return roleRepository.findByType(type)
+        return roleRepository.findByName(type)
                 .flatMapMany(role -> userRepository.findAllByRoleId(role.getId()))
                 .flatMap(this::enrichUser);
     }
@@ -82,7 +82,7 @@ public class UserR2dbcAdapter implements UserRepositoryPort {
                         .collect(Collectors.toSet())
                         .map(perms -> Role.builder()
                                 .id(roleEntity.getId())
-                                .type(roleEntity.getType())
+                                .type(roleEntity.getName())
                                 .permissions(perms)
                                 .build())
                 ).collect(Collectors.toSet());

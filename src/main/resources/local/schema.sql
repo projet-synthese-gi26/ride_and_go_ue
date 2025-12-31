@@ -104,11 +104,18 @@ CREATE TYPE vehicle_type_enum AS ENUM (
 );
 
 CREATE TYPE offer_state_enum AS ENUM (
-  'NEW', 'PENDING', 'CHOSEN', 'TERMINATED', 'CANCELED'
+  'PENDING', 
+  'BID_RECEIVED', 
+  'DRIVER_SELECTED', 
+  'VALIDATED', 
+  'CANCELLED'
 );
 
 CREATE TYPE ride_state_enum AS ENUM (
-  'CONFIRMED', 'ONGOING', 'COMPLETED', 'CANCELED'
+  'CREATED', 
+  'ONGOING', 
+  'COMPLETED', 
+  'CANCELLED'
 );
 
 CREATE TYPE event_type_enum AS ENUM (
@@ -134,6 +141,16 @@ CREATE TYPE type_enum AS ENUM (
 CREATE TYPE reaction_type_enum AS ENUM (
   'LIKE', 'LOVE', 'HAHA', 'WOW', 'SAD', 'ANGRY'
 );
+
+
+-- =====================================================
+-- FIX: IMPLICIT CASTS (MANDATORY FOR R2DBC)
+-- =====================================================
+-- Cela permet à Spring d'envoyer "PENDING" (String) et à Postgres de le comprendre comme un Enum
+CREATE CAST (character varying as offer_state_enum) WITH INOUT AS IMPLICIT;
+CREATE CAST (character varying as ride_state_enum) WITH INOUT AS IMPLICIT;
+CREATE CAST (character varying as role_type_enum) WITH INOUT AS IMPLICIT;
+CREATE CAST (character varying as vehicle_type_enum) WITH INOUT AS IMPLICIT;
 
 -- =====================================================
 -- CORE TABLES
@@ -507,7 +524,7 @@ CREATE TABLE offers (
   start_point TEXT,
   end_point TEXT,
   price NUMERIC,
-  state offer_state_enum DEFAULT 'NEW',
+  state offer_state_enum DEFAULT 'PENDING',
   ids_interested_drivers TEXT,
 
   created_at TIMESTAMP DEFAULT now(),
@@ -523,7 +540,7 @@ CREATE TABLE rides (
   distance NUMERIC,
   time_estimation NUMERIC,
   real_time NUMERIC,
-  state ride_state_enum DEFAULT 'CONFIRMED',
+  state ride_state_enum DEFAULT 'CREATED',
 
   created_at TIMESTAMP DEFAULT now(),
   updated_at TIMESTAMP DEFAULT now()
@@ -656,12 +673,15 @@ CREATE TABLE geofence_events (
 );
 
 CREATE TABLE offer_driver_linkages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), -- La seule Clé Primaire
   offer_id UUID REFERENCES offers(id) ON DELETE CASCADE,
   driver_id UUID REFERENCES drivers(id) ON DELETE CASCADE,
-  PRIMARY KEY (offer_id, driver_id),
 
   created_at TIMESTAMP DEFAULT now(),
-  updated_at TIMESTAMP DEFAULT now()
+  updated_at TIMESTAMP DEFAULT now(),
+
+  -- Règle métier transformée en contrainte d'unicité
+  CONSTRAINT uk_offer_driver UNIQUE (offer_id, driver_id) 
 );
 
 -- =====================================================

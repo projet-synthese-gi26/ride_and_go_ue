@@ -29,7 +29,8 @@ Pour chaque tâche demandée, tu dois obligatoirement suivre ces étapes :
 ### 📂 Contexte
 Le code source complet est disponible dans le fichier `project_context.txt`.
 La roadmap est suivie dans `todo.md`.
- les sepcifications sont dans ke fichier spec.md
+ les sepcifications sont dans le fichier spec.md
 
- je te fiurnis en entree le cahier de charges du proejt(spec.md) et l'etat actuel du contexte. les servcies a integrer seront pour le moement auth et farecalculator qui viennee nt d'api externes mais le application.yaml pour gerrer des fakedatas quand le service distant est indisponible. par exemple a partir d'une cle mode. commencons par la todo. liste juste les etapges grandes sosu forme de checkboxes
+ je te fournis en entree le cahier de charges du proejt(spec.md) et l'etat actuel du contexte. les servcies a integrer seront pour le moment auth et farecalculator qui viennent d'api externes mais le application.yml pour gerrer des fake datas quand le service distant est indisponible. par exemple a partir d'une cle mode.
 
+ acteuelement,on debogue les routes des offres via le swagger.je te fpurnis l'erreru on resoud ca et on continuera d'vancer dans la todo

@@ -8,11 +8,10 @@ import org.springframework.data.relational.core.mapping.Table;
 import java.util.UUID;
 
 @Data 
-@EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor 
 @AllArgsConstructor
 @Table("users") 
-public class UserEntity extends AbstractAuditingEntity {
+public class UserEntity { // Plus d'héritage
     @Id
     private UUID id;
 
@@ -24,7 +23,7 @@ public class UserEntity extends AbstractAuditingEntity {
     @Column("phone_number") 
     private String telephone;
 
-    private String password;
-
-
+    // Note: Le mot de passe n'est pas dans le schéma SQL 'users' fourni
+    // Je le garde ici pour que ça compile, mais attention au runtime si la colonne manque.
+    private String password; 
 }

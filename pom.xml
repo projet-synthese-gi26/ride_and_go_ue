@@ -34,29 +34,32 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
         <dependency>
-	    <groupId>org.springframework.boot</groupId>
-             <artifactId>spring-boot-starter-actuator</artifactId>
-	</dependency>
-	<dependency>
-	     <groupId>io.micrometer</groupId>
-	     <artifactId>micrometer-registry-prometheus</artifactId>
-	</dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
 
         <!-- DATA (R2DBC & REDIS) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-r2dbc</artifactId>
         </dependency>
+        
+        <!-- CORRECTION CRITIQUE : Enlever le scope runtime pour r2dbc-postgresql -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>r2dbc-postgresql</artifactId>
-            <!-- <scope>runtime</scope> -->
         </dependency>
+        
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
+        
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
@@ -117,6 +120,7 @@
             <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
             <version>2.5.0</version>
         </dependency>
+        
         <!-- SPRING SECURITY REACTIVE -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

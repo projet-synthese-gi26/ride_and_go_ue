@@ -3,23 +3,24 @@ package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity
 import com.yowyob.rideandgo.domain.model.enums.OfferState;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-@EqualsAndHashCode(callSuper = true)
 @Data 
 @NoArgsConstructor 
 @AllArgsConstructor
 @Table("offers") 
-public class OfferEntity extends AbstractAuditingEntity implements Persistable<UUID> {
+public class OfferEntity implements Persistable<UUID> {
     
     @Id
     private UUID id;
@@ -35,13 +36,22 @@ public class OfferEntity extends AbstractAuditingEntity implements Persistable<U
 
     private double price;
 
+    @Column("state")
     private OfferState state;
+
+    @CreatedDate
+    @Column("created_at")
+    private LocalDateTime createdDate;
+
+    @LastModifiedDate
+    @Column("updated_at")
+    private LocalDateTime lastModifiedDate;
 
     @Transient
     private List<OfferAgreementEntity> agreements;
 
     @Transient
-    private boolean newEntity = false; // Flag interne
+    private boolean newEntity = false;
 
     @Override
     @Transient
@@ -49,14 +59,7 @@ public class OfferEntity extends AbstractAuditingEntity implements Persistable<U
         return this.newEntity || id == null;
     }
 
-    // Le setter que l'Adapter utilise
     public void setNewEntity(boolean isNew) {
         this.newEntity = isNew;
-    }
-
-    @Transient
-    @Override
-    public Long getVersion() {
-        return super.getVersion();
     }
 }

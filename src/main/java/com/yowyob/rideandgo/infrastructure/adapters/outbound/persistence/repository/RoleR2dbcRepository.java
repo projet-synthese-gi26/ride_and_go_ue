@@ -11,14 +11,10 @@ import java.util.UUID;
 
 public interface RoleR2dbcRepository extends ReactiveCrudRepository<RoleEntity, UUID> {
     
-    /**
-     * Finds a role entity by its business type (Enum).
-     */
-    Mono<RoleEntity> findByType(RoleType type);
+    // ✅ CORRECTION : findByType -> findByName
+    // Spring Data générera : "WHERE name = $1"
+    Mono<RoleEntity> findByName(RoleType name);
 
-    /**
-     * Finds all roles associated with a user through the join table.
-     */
     @Query("SELECT r.* FROM roles r JOIN user_has_roles uhr ON r.id = uhr.role_id WHERE uhr.user_id = :userId")
     Flux<RoleEntity> findAllByUserId(UUID userId);
 }

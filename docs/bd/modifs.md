@@ -1,0 +1,4 @@
+-cretaion de la tabble user_has_rpermissions
+-modification des enums offers et ride
+-ajout du mappig de conversion des enums
+-modification de offer_driver_linkages

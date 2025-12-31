@@ -10,12 +10,9 @@ import org.mapstruct.ReportingPolicy;
 public interface RoleMapper {
 
     @Mapping(target = "permissions", ignore = true)
+    @Mapping(target = "type", source = "name") // IMPORTANT: Entity.name -> Domain.type
     Role toDomain(RoleEntity entity);
 
-    @Mapping(target = "createdBy", ignore = true)
-    @Mapping(target = "createdDate", ignore = true)
-    @Mapping(target = "lastModifiedBy", ignore = true)
-    @Mapping(target = "lastModifiedDate", ignore = true)
-    @Mapping(target = "version", ignore = true)
+    @Mapping(target = "name", source = "type") // IMPORTANT: Domain.type -> Entity.name
     RoleEntity toEntity(Role domain);
 }

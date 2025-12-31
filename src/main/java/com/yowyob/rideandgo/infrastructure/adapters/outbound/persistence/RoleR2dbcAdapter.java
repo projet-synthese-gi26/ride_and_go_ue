@@ -23,7 +23,8 @@ public class RoleR2dbcAdapter implements RoleRepositoryPort {
 
     @Override
     public Mono<Role> findByRoleName(RoleType type) {
-        return roleRepository.findByType(type)
+        // ✅ CORRECTION : Appel de findByName
+        return roleRepository.findByName(type)
                 .flatMap(this::enrichRole);
     }
 
@@ -33,16 +34,14 @@ public class RoleR2dbcAdapter implements RoleRepositoryPort {
                 .flatMap(this::enrichRole);
     }
 
-    /**
-     * Hydrates a RoleEntity with its associated Permissions.
-     */
     private Mono<Role> enrichRole(RoleEntity entity) {
         return permissionRepository.findAllByRoleId(entity.getId())
                 .map(p -> new Permission(p.getId(), p.getName()))
                 .collect(Collectors.toSet())
                 .map(perms -> Role.builder()
                         .id(entity.getId())
-                        .type(entity.getType())
+                        // ✅ CORRECTION : entity.getType() -> entity.getName()
+                        .type(entity.getName()) 
                         .permissions(perms)
                         .build());
     }

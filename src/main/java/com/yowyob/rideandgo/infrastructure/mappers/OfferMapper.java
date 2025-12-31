@@ -12,6 +12,7 @@ import org.mapstruct.ReportingPolicy;
 public interface OfferMapper {
 
     @Mapping(target = "bids", ignore = true)
+    @Mapping(target = "version", ignore = true) // Le domaine a une version, mais pas l'entité SQL
     Offer toDomain(OfferEntity entity);
 
     @Mapping(target = "id", ignore = true)
@@ -22,9 +23,5 @@ public interface OfferMapper {
     OfferResponse toResponse(Offer domain);
 
     @Mapping(target = "agreements", ignore = true) 
-    @Mapping(target = "createdBy", ignore = true)
-    @Mapping(target = "createdDate", ignore = true)
-    @Mapping(target = "lastModifiedBy", ignore = true)
-    @Mapping(target = "lastModifiedDate", ignore = true)
     OfferEntity toEntity(Offer domain);
 }

@@ -62,7 +62,9 @@
         - [x] `GET /api/v1/offers/available` (Discovery chauffeur).
         - [x] `GET /api/v1/offers/{id}/bids` (Consultation passager).
         - [x] `PATCH /api/v1/offers/{id}/select-driver` (Action de sélection).
+    - [x] **3.7 : test swagger d'un flux complet 1 client et 2 chauffeurs**
 
 - [ ] **Tâche 4 :** Gestion des Courses (Cycle de vie : Création -> Démarrage -> Fin).
 - [ ] **Tâche 5 :** Gestion du GPS (Moteur de tracking & Polling de position).
 - [ ] **Tâche 6 :** Services Périphériques & Notation (Calculs réels, Reviews).
+- [ ] **Tache 7:** gestions des users
