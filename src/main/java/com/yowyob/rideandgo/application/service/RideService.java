@@ -23,18 +23,33 @@ public class RideService implements UpdateRideStatusUseCase {
         return rideRepository.findRideById(rideId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Ride not found with id: " + rideId)))
                 .flatMap(ride -> {
-                    // 1. Security Check
-                    if (!ride.driverId().equals(actorId)) {
-                        return Mono.error(new IllegalStateException("Access Denied: You are not the driver of this ride."));
+                    boolean isDriver = ride.driverId().equals(actorId);
+                    boolean isPassenger = ride.passengerId().equals(actorId);
+
+                    // 1. Vérification de Sécurité (Qui es-tu ?)
+                    if (!isDriver && !isPassenger) {
+                        return Mono.error(new IllegalStateException("Access Denied: You are not involved in this ride."));
                     }
 
-                    // 2. State Machine Logic
+                    // 2. Règles Métier pour le PASSAGER
+                    if (isPassenger) {
+                        // Le passager ne peut QUE annuler
+                        if (newStatus != RideState.CANCELLED) {
+                            return Mono.error(new IllegalStateException("Passenger is not allowed to change status to " + newStatus));
+                        }
+                        // Le passager ne peut annuler QUE si la course n'a pas démarré
+                        if (ride.state() != RideState.CREATED) {
+                            return Mono.error(new IllegalStateException("Too late to cancel. The ride has already started or finished."));
+                        }
+                    }
+
+                    // 3. Règles Métier pour la Machine à États (Valable pour Driver & Passenger)
                     if (!isValidTransition(ride.state(), newStatus)) {
                         return Mono.error(new IllegalStateException(
                                 String.format("Invalid transition from %s to %s", ride.state(), newStatus)));
                     }
 
-                    // 3. Apply Update
+                    // 4. Application de la mise à jour
                     Ride updatedRide = new Ride(
                             ride.id(),
                             ride.offerId(),
@@ -48,12 +63,9 @@ public class RideService implements UpdateRideStatusUseCase {
 
                     return rideRepository.save(updatedRide);
                 })
-                .doOnSuccess(r -> log.info("Ride {} status updated to {}", r.id(), r.state()));
+                .doOnSuccess(r -> log.info("Ride {} status updated to {} by actor {}", r.id(), r.state(), actorId));
     }
 
-    /**
-     * Nouvelle méthode pour le scénario de test E2E (Chauffeur récupère sa course)
-     */
     public Mono<Ride> getCurrentRideForDriver(UUID driverId) {
         return rideRepository.findCurrentRideByDriverId(driverId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("No active ride found for this driver")));
@@ -64,7 +76,7 @@ public class RideService implements UpdateRideStatusUseCase {
         return switch (current) {
             case CREATED -> target == RideState.ONGOING || target == RideState.CANCELLED;
             case ONGOING -> target == RideState.COMPLETED || target == RideState.CANCELLED;
-            case COMPLETED, CANCELLED -> false;
+            case COMPLETED, CANCELLED -> false; // États finaux
         };
     }
 }

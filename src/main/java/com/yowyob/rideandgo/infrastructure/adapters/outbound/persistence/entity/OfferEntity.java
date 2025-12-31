@@ -28,6 +28,9 @@ public class OfferEntity implements Persistable<UUID> {
     @Column("passenger_id")
     private UUID passengerId;
 
+    @Column("selected_driver_id") 
+    private UUID selectedDriverId;
+
     @Column("start_point")
     private String startPoint;
 

@@ -1,9 +1,9 @@
 # 📱 Guide de Test E2E : Scénario Multi-Clients
 
 **Prérequis** : Ouvre 3 onglets/fenêtres de ton navigateur avec Swagger.
-1.  **Fenêtre A** : Passager (Client)
-2.  **Fenêtre B** : Chauffeur 1 (Eto'o - Douala)
-3.  **Fenêtre C** : Chauffeur 2 (Aboubakar - Yaoundé)
+1.  **Fenêtre A** : Passager (Client) `uID`:`7f13909e-7170-4f91-872e-333333333333`
+2.  **Fenêtre B** : Chauffeur 1 (Eto'o - Douala) `UID`:`a1b2c3d4-e5f6-4a5b-8c9d-111111111111`
+3.  **Fenêtre C** : Chauffeur 2 (Aboubakar - Yaoundé) `UUID`:`a1b2c3d4-e5f6-4a5b-8c9d-222222222222`
 
 ---
 

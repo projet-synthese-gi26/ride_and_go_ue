@@ -12,14 +12,16 @@ import org.mapstruct.ReportingPolicy;
 public interface OfferMapper {
 
     @Mapping(target = "bids", ignore = true)
-    @Mapping(target = "version", ignore = true) // Le domaine a une version, mais pas l'entité SQL
+    @Mapping(target = "version", ignore = true) 
     Offer toDomain(OfferEntity entity);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "bids", ignore = true)
     @Mapping(target = "version", ignore = true)
+    @Mapping(target = "selectedDriverId", ignore = true) // Pas de driver à la création
     Offer toDomain(CreateOfferRequest request);
 
+    // MapStruct mappera automatiquement selectedDriverId -> selectedDriverId
     OfferResponse toResponse(Offer domain);
 
     @Mapping(target = "agreements", ignore = true) 

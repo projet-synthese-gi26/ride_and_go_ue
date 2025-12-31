@@ -520,6 +520,7 @@ CREATE TABLE drivers (
 CREATE TABLE offers (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   passenger_id UUID REFERENCES customers(id) ON DELETE CASCADE,
+  selected_driver_id UUID REFERENCES drivers(id) ON DELETE SET NULL,
 
   start_point TEXT,
   end_point TEXT,

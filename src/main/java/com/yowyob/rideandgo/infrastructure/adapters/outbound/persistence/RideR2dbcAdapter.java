@@ -6,12 +6,14 @@ import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository.RideR2dbcRepository;
 import com.yowyob.rideandgo.infrastructure.mappers.RideMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class RideR2dbcAdapter implements RideRepositoryPort {
@@ -19,28 +21,25 @@ public class RideR2dbcAdapter implements RideRepositoryPort {
     private final RideR2dbcRepository repository;
     private final RideMapper mapper;
 
-    /**
-     * Sauvegarde une course (Ride).
-     * Gère explicitement la distinction INSERT / UPDATE pour éviter l'erreur
-     * "Row with Id does not exist" quand l'ID est pré-généré par le domaine.
-     */
     @Override
     @Transactional
     public Mono<Ride> save(Ride ride) {
         RideEntity entity = mapper.toEntity(ride);
 
-        // 1. On vérifie si la course existe déjà en base
-        return repository.existsById(ride.id())
-                .flatMap(exists -> {
-                    if (!exists) {
-                        // 2. Si elle n'existe pas, on force le flag 'newEntity' à true
-                        // Cela indique à l'entité (qui implémente Persistable) de dire à Spring Data : "Fais un INSERT !"
-                        entity.setNewEntity(true);
-                    }
-                    // 3. Sinon (exists = true), le flag reste false, Spring Data fera un UPDATE
-                    return repository.save(entity);
-                })
-                .map(mapper::toDomain);
+        // OPTIMISATION : Comme l'ID est généré par le domaine (Service), 
+        // on sait que c'est une création. On force le flag 'newEntity' à true immédiatement.
+        // Cela évite l'appel inutile à 'existsById' et garantit le retour de l'objet.
+        if (ride.state() == com.yowyob.rideandgo.domain.model.enums.RideState.CREATED) {
+             entity.setNewEntity(true); // Force INSERT SQL
+        } else {
+             entity.setNewEntity(false); // Force UPDATE SQL
+        }
+
+        return repository.save(entity)
+                .map(mapper::toDomain)
+                // Sécurité : si save retourne empty (ne devrait pas arriver sur un insert réussi), 
+                // on log l'erreur pour comprendre.
+                .switchIfEmpty(Mono.error(new RuntimeException("Erreur critique : La sauvegarde de la course a retourné vide.")));
     }
 
     @Override

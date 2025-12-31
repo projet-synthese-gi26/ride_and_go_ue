@@ -10,6 +10,7 @@ import java.util.UUID;
 public record OfferResponse(
         UUID id,
         UUID passengerId,
+        UUID selectedDriverId,
         String startPoint,
         String endPoint,
         double price,
