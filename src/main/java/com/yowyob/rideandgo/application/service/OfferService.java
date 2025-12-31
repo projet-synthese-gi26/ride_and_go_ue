@@ -3,26 +3,21 @@ package com.yowyob.rideandgo.application.service;
 import com.yowyob.rideandgo.application.utils.Utils;
 import com.yowyob.rideandgo.domain.exception.OfferNotFoundException;
 import com.yowyob.rideandgo.domain.exception.OfferStatutNotMatchException;
-import com.yowyob.rideandgo.domain.exception.UserIsNotDriverException;
 import com.yowyob.rideandgo.domain.model.Bid;
 import com.yowyob.rideandgo.domain.model.Offer;
 import com.yowyob.rideandgo.domain.model.Ride;
-import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.domain.model.enums.OfferState;
 import com.yowyob.rideandgo.domain.model.enums.RideState;
-import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.in.*;
 import com.yowyob.rideandgo.domain.ports.out.*;
-import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.NotificationType;
-import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.SendNotificationRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 @Service
@@ -37,13 +32,19 @@ public class OfferService implements
     private final OfferCachePort cache;
     private final OfferRepositoryPort repository;
     private final UserRepositoryPort userRepositoryPort;
-    private final SendNotificationPort sendNotificationPort;
+    private final SendNotificationPort sendNotificationPort; // Gardé pour cohérence d'injection
     private final RideRepositoryPort rideRepositoryPort;
     private final LocationCachePort locationCachePort;
     private final EtaCalculatorService etaCalculatorService;
 
-    @Value("${application.kafka.notification-service.template.new-offer-id}")
-    private int templateCreateOfferId;
+    // --- DATA DEMO POUR LE FRONTEND (Temporaire) ---
+    private record DemoVehicle(String model, String color, String plate, String image) {}
+    
+    private static final List<DemoVehicle> FAKE_FLEET = List.of(
+        new DemoVehicle("Toyota Yaris", "Grise", "LT-882-AF", "https://randomuser.me/api/portraits/men/32.jpg"), 
+        new DemoVehicle("Hyundai Elantra", "Blanche", "CE-102-ZZ", "https://randomuser.me/api/portraits/men/45.jpg"), 
+        new DemoVehicle("Peugeot 301", "Noire", "LT-440-GG", "https://randomuser.me/api/portraits/men/22.jpg")    
+    );
 
     // --- 1. PUBLICATION ---
     @Override
@@ -76,11 +77,13 @@ public class OfferService implements
         return repository.findById(offerId)
                 .flatMap(offer -> userRepositoryPort.findUserById(driverId)
                         .flatMap(user -> {
+                            // Vérifie si déjà postulé pour éviter doublons logiques (même si géré par repo)
                             if (offer.hasDriverApplied(driverId)) return Mono.just(offer);
                             
                             List<Bid> currentBids = new ArrayList<>(offer.bids());
                             currentBids.add(Bid.builder().driverId(driverId).build());
                             
+                            // On passe en BID_RECEIVED si c'était PENDING
                             return repository.save(offer.withBids(currentBids).withState(OfferState.BID_RECEIVED))
                                     .flatMap(s -> cache.saveInCache(s).thenReturn(s));
                         }));
@@ -96,7 +99,6 @@ public class OfferService implements
                         return Mono.error(new IllegalArgumentException("Driver has not applied."));
                     }
                     
-                    // MISE A JOUR CRITIQUE : On stocke l'ID du chauffeur sélectionné
                     Offer updated = offer.withDriverSelected(driverId);
                     
                     return repository.save(updated)
@@ -105,7 +107,7 @@ public class OfferService implements
                 });
     }
 
-    // --- 5. CONFIRMATION (CHAUFFEUR) ---
+    // --- 5. CONFIRMATION (CHAUFFEUR) -> CRÉATION TRIP ---
     public Mono<Ride> driverAcceptsOffer(UUID offerId, UUID driverId) {
         return repository.findById(offerId)
                 .flatMap(offer -> {
@@ -150,22 +152,36 @@ public class OfferService implements
                 });
     }
 
-    // --- UTILITAIRE (Enrichissement) ---
+    // --- UTILITAIRE (Enrichissement & Fake Data UI) ---
     public Mono<Offer> getOfferWithEnrichedBids(UUID offerId) {
         return repository.findById(offerId)
                 .flatMap(offer -> {
-                    if (offer.bids().isEmpty()) return Mono.just(offer);
+                    if (offer.bids() == null || offer.bids().isEmpty()) return Mono.just(offer);
+                    
                     return Flux.fromIterable(offer.bids())
                             .flatMap(bid -> Mono.zip(
                                     userRepositoryPort.findUserById(bid.driverId()),
                                     locationCachePort.getLocation(bid.driverId()).defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0))
                             ).flatMap(tuple -> etaCalculatorService.calculateEta(tuple.getT2().latitude(), tuple.getT2().longitude(), 0.0, 0.0)
-                                    .map(eta -> Bid.builder()
+                                    .map(eta -> {
+                                        // LOGIQUE DEMO : Choix aléatoire d'un véhicule pour l'UI
+                                        DemoVehicle fakeCar = FAKE_FLEET.get(ThreadLocalRandom.current().nextInt(FAKE_FLEET.size()));
+                                        
+                                        return Bid.builder()
                                             .driverId(tuple.getT1().id())
                                             .driverName(tuple.getT1().name())
                                             .latitude(tuple.getT2().latitude())
                                             .longitude(tuple.getT2().longitude())
-                                            .eta(eta).rating(4.8).build())))
+                                            .eta(eta)
+                                            .rating(4.5 + (Math.random() * 0.5)) // Note aléatoire entre 4.5 et 5.0
+                                            
+                                            // Injection des Fake Data Véhicule
+                                            .carModel(fakeCar.model())
+                                            .carColor(fakeCar.color())
+                                            .licensePlate(fakeCar.plate())
+                                            .driverImage(fakeCar.image())
+                                            .build();
+                                    })))
                             .collectList()
                             .map(offer::withBids);
                 });
@@ -192,7 +208,7 @@ public class OfferService implements
                     Offer updated = new Offer(
                             existingOffer.id(),
                             existingOffer.passengerId(),
-                            existingOffer.selectedDriverId(), // On garde le driver sélectionné s'il y en a un
+                            existingOffer.selectedDriverId(), 
                             offerDetails.startPoint() != null ? offerDetails.startPoint() : existingOffer.startPoint(),
                             offerDetails.endPoint() != null ? offerDetails.endPoint() : existingOffer.endPoint(),
                             offerDetails.price() > 0 ? offerDetails.price() : existingOffer.price(),

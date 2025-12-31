@@ -70,10 +70,10 @@
     - [x] 4.3 : API de gestion d'état (Start/End ride).
     - [x] 4.4 : Règles métier (Qui peut démarrer ? Qui peut finir ?).
 
-- [ ] **Tâche 5 : Gestion du GPS (Tracking Temps Réel)**
-    - [ ] 5.1 : Polling & Mise à jour Redis.
-    - [ ] 5.2 : API de consultation pour le Passager (Suivre son chauffeur).
-    - [ ] 5.3 : Calcul de distance parcourue (Post-traitement simple).
+- [x] **Tâche 5 : Gestion du GPS (Tracking Temps Réel)**
+    - [x] 5.1 : Polling & Mise à jour Redis.
+    - [x] 5.2 : API de consultation Smart (Suivre son partenaire : Chauffeur <-> Passager).
+    - [x] 5.3 : Calcul de distance & ETA (Service dédié Haversine).
 
 - [ ] **Tâche 6 : Gestion des Utilisateurs (Interne)**
     - [ ] 6.1 : CRUD Admin (si nécessaire).
@@ -84,4 +84,10 @@
     - [ ] 7.2 : Test Fare Calculator en réel.
     - [ ] 7.3 : Gestion des Timeouts & Circuit Breakers (Resilience4j).
 
-- [ ] **Tâche 8 :** Services Périphériques & Notation (Calculs réels, Reviews).
+- [ ] **Tâche 8 :** Services Périphériques & Notation (Calculs réels, Reviews,abonnement des chauffeurs).
+
+- [ ] **Tâche 9 : Fine-tuning & Consolidation (Post-Integration)**
+    - [ ] 9.1 : Back-office Admin (CRUD complet Trips/Offers pour le support/debug).
+    - [ ] 9.2 : Durcissement Sécurité (Rate Limiting, Renforcement JWT, Cors).
+    - [ ] 9.3 : Gestion Globale des Erreurs (Standardisation ProblemDetails 4xx/5xx).
+    - [ ] 9.4 : Optimisation & Nettoyage (Refactoring, Logs de prod, Code mort).
