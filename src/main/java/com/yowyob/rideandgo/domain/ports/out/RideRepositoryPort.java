@@ -7,6 +7,7 @@ import java.util.UUID;
 
 public interface RideRepositoryPort {
     Mono<Ride> save(Ride ride);
-
     Mono<Ride> findRideById(UUID id);
+    // Nouvelle méthode requise
+    Mono<Ride> findCurrentRideByDriverId(UUID driverId);
 }

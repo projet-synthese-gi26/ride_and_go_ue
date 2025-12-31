@@ -29,7 +29,6 @@ import java.util.*;
 public class OfferService implements 
     CreateOfferUseCase, 
     ResponseToOfferUseCase, 
-    AcceptedOfferUseCase,
     GetAvailableOffersUseCase,
     SelectDriverUseCase {
 
@@ -44,9 +43,7 @@ public class OfferService implements
     @Value("${application.kafka.notification-service.template.new-offer-id}")
     private int templateCreateOfferId;
 
-    /**
-     * UC-01: Create offer and notify drivers via Kafka
-     */
+    // --- 1. PUBLICATION ---
     @Override
     public Mono<Offer> createOffer(Offer request, UUID passengerId) {
         Offer offer = Offer.builder()
@@ -60,102 +57,33 @@ public class OfferService implements
                 .build();
 
         return repository.save(offer)
-                .flatMap(savedOffer -> 
-                    userRepositoryPort.findByRoleName(RoleType.DRIVER)
-                        .map(User::email)
-                        .collectList()
-                        .flatMap(driverEmails -> {
-                            SendNotificationRequest notification = SendNotificationRequest.builder()
-                                    .notificationType(NotificationType.EMAIL)
-                                    .templateId(templateCreateOfferId)
-                                    .to(driverEmails)
-                                    .data(Map.of("price", offer.price(), "from", offer.startPoint(), "to", offer.endPoint()))
-                                    .build();
-
-                            return Mono.zip(
-                                sendNotificationPort.sendNotification(notification),
-                                cache.saveInCache(savedOffer)
-                            ).thenReturn(savedOffer);
-                        })
-                )
-                .doOnSuccess(o -> log.info("Offer created and drivers notified: {}", o.id()));
+                .flatMap(saved -> cache.saveInCache(saved).thenReturn(saved))
+                .doOnSuccess(o -> log.info("Offer created: {}", o.id()));
     }
 
-    /**
-     * UC: Discovery - List offers for drivers
-     */
+    // --- 2. DECOUVERTE ---
     @Override
     public Flux<Offer> getAvailableOffers() {
-        // En vrai on filtrerait par geo-zone. Ici on filtre par état.
         return repository.findAll()
                 .filter(o -> o.state() == OfferState.PENDING || o.state() == OfferState.BID_RECEIVED);
     }
 
-    /**
-     * UC-02: Driver applies to an offer
-     */
+    // --- 3. CANDIDATURE ---
     @Override
     public Mono<Offer> responseToOffer(UUID offerId, UUID driverId) {
         return repository.findById(offerId)
-                .flatMap(offer -> userRepositoryPort.findUserById(driverId)
-                        .flatMap(user -> {
-                            boolean isDriver = user.roles().stream()
-                                    .anyMatch(role -> role.type() == RoleType.DRIVER);
-
-                            if (!isDriver) {
-                                return Mono.error(new UserIsNotDriverException("User is not a driver."));
-                            }
-
-                            if (offer.hasDriverApplied(driverId)) {
-                                return Mono.just(offer);
-                            }
-
-                            List<Bid> currentBids = new ArrayList<>(offer.bids());
-                            currentBids.add(Bid.builder().driverId(driverId).build());
-
-                            Offer updated = offer.withBids(currentBids).withState(OfferState.BID_RECEIVED);
-                            
-                            return repository.save(updated)
-                                    .flatMap(s -> cache.saveInCache(s).thenReturn(s));
-                        })
-                );
-    }
-
-    /**
-     * SPECIAL: Dynamic Enrichment (Calculates GPS + ETA on the fly)
-     */
-    public Mono<Offer> getOfferWithEnrichedBids(UUID offerId) {
-        return repository.findById(offerId)
                 .flatMap(offer -> {
-                    if (offer.bids().isEmpty()) return Mono.just(offer);
-
-                    return Flux.fromIterable(offer.bids())
-                            .flatMap(bid -> Mono.zip(
-                                    userRepositoryPort.findUserById(bid.driverId()),
-                                    locationCachePort.getLocation(bid.driverId())
-                                        .defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0))
-                            ).flatMap(tuple -> {
-                                User user = tuple.getT1();
-                                LocationCachePort.Location loc = tuple.getT2();
-                                
-                                return etaCalculatorService.calculateEta(loc.latitude(), loc.longitude(), 0.0, 0.0)
-                                        .map(eta -> Bid.builder()
-                                                .driverId(user.id())
-                                                .driverName(user.name())
-                                                .rating(4.8) // Mock rating
-                                                .latitude(loc.latitude())
-                                                .longitude(loc.longitude())
-                                                .eta(eta)
-                                                .build());
-                            }))
-                            .collectList()
-                            .map(offer::withBids);
+                    if (offer.hasDriverApplied(driverId)) return Mono.just(offer);
+                    
+                    List<Bid> currentBids = new ArrayList<>(offer.bids());
+                    currentBids.add(Bid.builder().driverId(driverId).build());
+                    
+                    return repository.save(offer.withBids(currentBids).withState(OfferState.BID_RECEIVED))
+                            .flatMap(s -> cache.saveInCache(s).thenReturn(s));
                 });
     }
 
-    /**
-     * UC: Passenger selects a specific driver
-     */
+    // --- 4. SÉLECTION (PASSAGER) ---
     @Override
     public Mono<Offer> selectDriver(UUID offerId, UUID driverId) {
         return repository.findById(offerId)
@@ -163,33 +91,64 @@ public class OfferService implements
                     if (!offer.hasDriverApplied(driverId)) {
                         return Mono.error(new IllegalArgumentException("Driver has not applied."));
                     }
+                    // TODO: Idéalement, stocker driverId sélectionné dans l'offre pour sécuriser le accept ensuite
                     return repository.save(offer.withState(OfferState.DRIVER_SELECTED));
                 });
     }
 
-    /**
-     * UC-03: Offer validation and Ride creation
-     */
-    @Override
-    public Mono<Ride> acceptedOffer(UUID offerId, UUID passengerId, UUID driverId) {
+    // --- 5. CONFIRMATION (CHAUFFEUR) ---
+    public Mono<Ride> driverAcceptsOffer(UUID offerId, UUID driverId) {
         return repository.findById(offerId)
                 .flatMap(offer -> {
-                    if (offer.state() != OfferState.BID_RECEIVED && offer.state() != OfferState.DRIVER_SELECTED) {
-                        return Mono.error(new OfferStatutNotMatchException("Offer state doesn't allow validation."));
+                    if (offer.state() != OfferState.DRIVER_SELECTED) {
+                        return Mono.error(new OfferStatutNotMatchException("Offer must be in DRIVER_SELECTED state."));
                     }
+                    // Passage à VALIDATED
                     return repository.save(offer.withState(OfferState.VALIDATED));
                 })
                 .flatMap(offer -> {
+                    // Création de la course
                     Ride ride = Ride.builder()
                             .id(Utils.generateUUID())
                             .offerId(offer.id())
-                            .passengerId(passengerId)
+                            .passengerId(offer.passengerId())
                             .driverId(driverId)
-                            .state(RideState.CREATED)
+                            .state(RideState.CREATED) // État initial: Chauffeur en route
                             .build();
 
                     return rideRepositoryPort.save(ride);
-                })
-                .doOnSuccess(r -> log.info("Ride context created: {}", r.id()));
+                });
+    }
+
+    // --- 6. ANNULATION (PASSAGER) ---
+    public Mono<Offer> cancelOffer(UUID offerId) {
+        return repository.findById(offerId)
+                .flatMap(offer -> {
+                    if (offer.state() == OfferState.VALIDATED) {
+                        return Mono.error(new IllegalStateException("Cannot cancel a validated offer. Cancel the ride instead."));
+                    }
+                    return repository.save(offer.withState(OfferState.CANCELLED));
+                });
+    }
+
+    // --- UTILITAIRE (Enrichissement) ---
+    public Mono<Offer> getOfferWithEnrichedBids(UUID offerId) {
+        return repository.findById(offerId)
+                .flatMap(offer -> {
+                    if (offer.bids().isEmpty()) return Mono.just(offer);
+                    return Flux.fromIterable(offer.bids())
+                            .flatMap(bid -> Mono.zip(
+                                    userRepositoryPort.findUserById(bid.driverId()),
+                                    locationCachePort.getLocation(bid.driverId()).defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0))
+                            ).flatMap(tuple -> etaCalculatorService.calculateEta(tuple.getT2().latitude(), tuple.getT2().longitude(), 0.0, 0.0)
+                                    .map(eta -> Bid.builder()
+                                            .driverId(tuple.getT1().id())
+                                            .driverName(tuple.getT1().name())
+                                            .latitude(tuple.getT2().latitude())
+                                            .longitude(tuple.getT2().longitude())
+                                            .eta(eta).rating(4.8).build())))
+                            .collectList()
+                            .map(offer::withBids);
+                });
     }
 }

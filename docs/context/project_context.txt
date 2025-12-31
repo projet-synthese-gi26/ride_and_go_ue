@@ -1,5 +1,5 @@
 # Contexte du Projet : Fleet & Geofence API
-Généré le : Wed 31 Dec 2025 07:58:22 AM WAT
+Généré le : Wed 31 Dec 2025 10:28:01 AM WAT
 Framework : Spring Boot WebFlux (Reactive)
 
 ## 1. Arborescence du Projet
@@ -8,15 +8,18 @@ Framework : Spring Boot WebFlux (Reactive)
 ├── docker-compose.yml
 ├── Dockerfile
 ├── docs
+│   ├── bd
+│   │   └── modifs.md
 │   ├── context
 │   │   └── project_context.txt
 │   ├── prompts
 │   │   └── master_pair_programmer.md
-│   ├── roadmaps
+│   ├── roadmap
 │   │   └── todo.md
 │   ├── specs
 │   │   └── spec.md
 │   └── tests
+│       ├── full_test_offer-course.md
 │       └── test_offer_creation.md
 ├── .gitattributes
 ├── .github
@@ -41,6 +44,7 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   │   ├── FareService.java
     │   │               │   │   ├── LocationService.java
     │   │               │   │   ├── OfferService.java
+    │   │               │   │   ├── RideService.java
     │   │               │   │   └── UserService.java
     │   │               │   └── utils
     │   │               │       ├── Constants.java
@@ -73,6 +77,7 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │       │   ├── ResponseToOfferUseCase.java
     │   │               │       │   ├── SelectDriverUseCase.java
     │   │               │       │   ├── UpdateLocationUseCase.java
+    │   │               │       │   ├── UpdateRideStatusUseCase.java
     │   │               │       │   └── UserUseCases.java
     │   │               │       └── out
     │   │               │           ├── AuthPort.java
@@ -104,12 +109,14 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   │   │       │   ├── OfferResponse.java
     │   │               │   │   │       │   ├── RideResponse.java
     │   │               │   │   │       │   ├── SendNotificationRequest.java
+    │   │               │   │   │       │   ├── UpdateStatusRequest.java
     │   │               │   │   │       │   └── UserResponse.java
     │   │               │   │   │       ├── FareController.java
     │   │               │   │   │       ├── GlobalExceptionHandler.java
     │   │               │   │   │       ├── HealthCheckController.java
     │   │               │   │   │       ├── LocationController.java
     │   │               │   │   │       ├── OfferController.java
+    │   │               │   │   │       ├── TripController.java
     │   │               │   │   │       └── UserController.java
     │   │               │   │   └── outbound
     │   │               │   │       ├── cache
@@ -178,7 +185,7 @@ Framework : Spring Boot WebFlux (Reactive)
                     └── reactive_hexagonal
                         └── ReactiveHexagonalApplicationTests.java
 
-48 directories, 124 files
+49 directories, 130 files
 ```
 ## 2. Contenu des Fichiers
 
@@ -409,6 +416,97 @@ distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-mav
 </project>```
 
 ---
+### Fichier : `./docs/roadmap/todo.md`
+```md
+### 📋 Roadmap API RIDE & GO 
+
+- [ ] **Tâche 1 :** Configuration du projet (config,Sécurité, alignement BD Centrale & Seeding,swagger).
+- [x] **1.1 : Identité & Nettoyage (Metadata)**
+    - [x] Mettre à jour le `pom.xml` (artifactId: `ride-and-go`, name: `Ride & Go API`).
+    - [x] Renommer le package racine `com.yowyob.rideandgo` en `com.yowyob.rideandgo`.
+    - [x] Supprimer tous les fichiers liés au domaine "Product" (Entities, Mappers, Services, Controllers).
+    - [x] Nettoyer `application.yml` (nom de l'app, group-id Kafka, suppression des clés inutiles).
+
+- [x] **1.2 : Alignement avec la DB Centrale (Structure)**
+    - [x] Harmoniser les scripts SQL : Utiliser les noms de tables globaux (`users`, `roles`, `business_actors`) au lieu des préfixes `ride_and_go_`.
+    - [x] Mettre à jour les entités Java (`UserEntity`, `RoleEntity`, etc.) avec les bonnes annotations `@Table`.
+    - [x] Valider la cohérence des types UUID pour toutes les clés primaires et étrangères.
+
+- [x] **1.3 : Sécurité Réactive & Documentation (Security/Swagger)**
+    - [x] Implémentation de `SecurityConfig` : Configuration WebFlux réactive (Stateless, protection des routes, désactivation du mot de passe par défaut).
+    - [x] Autorisation des routes Swagger et HealthCheck dans la chaîne de filtres.
+    - [x] Organisation du Swagger UI par tags métier (Auth, Fares, Offers, Trips) selon les spécifications.
+
+- [x] **1.4 : Automatisation & Seeding (Données de test)**
+    - [x] Configurer `DatabaseInitConfig` pour une exécution séquentielle (Schema -> Check -> Data).
+    - [x] Préparer `src/main/resources/local/data.sql` avec les rôles (`PASSENGER`, `DRIVER`) et des utilisateurs de test Ride & Go.
+    - [x] **Validation finale** : Démarrage complet de l'application et vérification des 100+ utilisateurs via Swagger.
+
+- [x] **Tâche 2 :** Gestion de l'Authentification (auth fake,Liaison TraMaSys & Profils).
+    - [x] **2.1 : Contrats du Domaine**
+        - [x] Mettre à jour `AuthPort` et `AuthUseCase` pour supporter Login/Register/Reset.
+        - [x] Aligner le modèle `AuthResponse` sur le format TraMaSys (Token, Rôles, Permissions).
+    - [x] **2.2 : Implémentation des Adaptateurs**
+        - [x] Créer `FakeAuthAdapter` (Mode développement sans réseau).
+        - [x] Créer `RemoteAuthAdapter` (Appels réels via `AuthApiClient`).
+        - [x] Configurer `AuthConfig` pour le switch dynamique via `application.auth.mode`.
+    - [x] **2.3 : Sécurisation par Token (JWT Validation)**
+        - [x] Implémenter le `AuthenticationManager` réactif pour valider les tokens via TraMaSys.
+        - [x] Configurer le filtre d'extraction du header `Authorization: Bearer`.
+    - [x] **2.4 : API REST & Documentation**
+        - [x] Finaliser `AuthController` avec les endpoints de Login et Register.
+        - [x] **Validation Swagger** : Scénario "Login réel sur TraMaSys -> Récupération du JWT -> Accès au HealthCheck protégé".
+
+- [ ] **Tâche 3 : Gestion des Offres (Flux Marketplace Complet)**
+    - [x] **3.1 : Stratégie d'Estimation (Fares - Stateless)**
+        - [x] Créer `FakeFareAdapter` et `RemoteFareAdapter`.
+        - [x] Configurer `FareConfig` (Switch application.fare.mode).
+    - [x] **3.2 : Infrastructure & Cache (Redis & SQL)**
+        - [x] Implémenter `LocationCachePort` dans `RedisAdapter` (TTL 5 min).
+        - [x] Configurer le Repository SQL pour `offer_driver_linkages`.
+    - [x] **3.3 : Modèles de Domaine & Ports**
+        - [x] Créer le record `Bid` (driverId, name, eta, latitude, longitude, rating).
+        - [x] Mettre à jour `Offer` pour inclure une `List<Bid>`.
+    - [x] **3.4 : Services de Calcul & Tracking**
+        - [x] Implémenter `EtaCalculatorService` (Logique dynamique via Redis).
+        - [x] Implémenter `UpdateLocationUseCase` (Tracking acteur via JWT).
+    - [x] **3.5 : Logique Métier Marketplace (Actions & États)**
+        - [x] `CreateOfferUseCase` : Publication (PENDING).
+        - [x] `GetAvailableOffersUseCase` : Liste des offres pour les chauffeurs.
+        - [x] `ResponseToOfferUseCase` (Apply) : Inscription du postulant en SQL.
+        - [x] `GetOfferBidsUseCase` : Agrégation réactive (SQL + Redis + ETA).
+        - [x] `SelectDriverUseCase` : Validation du choix passager (Passage à DRIVER_SELECTED).
+    - [x] **3.6 : API REST & Mapping**
+        - [x] `POST /api/v1/fares/estimate` (Consultation).
+        - [x] `POST /api/v1/location` (Tracking acteur).
+        - [x] `GET /api/v1/offers/available` (Discovery chauffeur).
+        - [x] `GET /api/v1/offers/{id}/bids` (Consultation passager).
+        - [x] `PATCH /api/v1/offers/{id}/select-driver` (Action de sélection).
+    - [x] **3.7 : test swagger d'un flux complet 1 client et 2 chauffeurs**
+
+- [x] **Tâche 4 : Gestion des Courses (Trips - Core Domain)**
+    - [x] 4.1 : Création du Trip (Transition depuis l'Offre).
+    - [x] 4.2 : Machine à états (CREATED -> ONGOING -> COMPLETED/CANCELLED).
+    - [x] 4.3 : API de gestion d'état (Start/End ride).
+    - [x] 4.4 : Règles métier (Qui peut démarrer ? Qui peut finir ?).
+
+- [ ] **Tâche 5 : Gestion du GPS (Tracking Temps Réel)**
+    - [ ] 5.1 : Polling & Mise à jour Redis.
+    - [ ] 5.2 : API de consultation pour le Passager (Suivre son chauffeur).
+    - [ ] 5.3 : Calcul de distance parcourue (Post-traitement simple).
+
+- [ ] **Tâche 6 : Gestion des Utilisateurs (Interne)**
+    - [ ] 6.1 : CRUD Admin (si nécessaire).
+    - [ ] 6.2 : Profil User & Driver (Rating, Info véhicule).
+
+- [ ] **Tâche 7 : Intégration Services Externes (Switch Remote)**
+    - [ ] 7.1 : Test Auth Service en réel.
+    - [ ] 7.2 : Test Fare Calculator en réel.
+    - [ ] 7.3 : Gestion des Timeouts & Circuit Breakers (Resilience4j).
+
+- [ ] **Tâche 8 :** Services Périphériques & Notation (Calculs réels, Reviews).```
+
+---
 ### Fichier : `./docs/tests/test_offer_creation.md`
 ```md
 ### Protocole de Test "1 Client + 2 Chauffeurs"
@@ -457,6 +555,145 @@ Il faut que les chauffeurs "existent" dans Redis pour que l'ETA puisse être cal
 *   Si le `POST /offers` échoue avec une erreur de clé étrangère (FK), vérifie que l'UUID du passager existe bien dans ta table `customers`.
 *   Si le `GET /bids` renvoie des coordonnées `0.0`, c'est que le TTL de 5 minutes de Redis a expiré ou que le token n'était pas le bon lors du `POST /location`.
 ```
+
+---
+### Fichier : `./docs/tests/full_test_offer-course.md`
+```md
+# 📱 Guide de Test E2E : Scénario Multi-Clients
+
+**Prérequis** : Ouvre 3 onglets/fenêtres de ton navigateur avec Swagger.
+1.  **Fenêtre A** : Passager (Client)
+2.  **Fenêtre B** : Chauffeur 1 (Eto'o - Douala)
+3.  **Fenêtre C** : Chauffeur 2 (Aboubakar - Yaoundé)
+
+---
+
+## 🔐 Phase 0 : Authentification (Sur chaque fenêtre)
+
+*   **Fenêtre A (Passager)** : Clique sur `Authorize` -> `client-token`
+*   **Fenêtre B (Chauffeur 1)** : Clique sur `Authorize` -> `driver-1-token`
+*   **Fenêtre C (Chauffeur 2)** : Clique sur `Authorize` -> `driver-2-token`
+
+---
+
+## 📍 Phase 1 : Mise en place (GPS)
+*Les chauffeurs doivent s'activer pour être visibles.*
+
+1.  **Fenêtre B (Chauffeur 1)**
+    *   **Route** : `POST /api/v1/location`
+    *   **Body** : `{ "latitude": 3.8666, "longitude": 11.5166 }`
+    *   **Attendu** : `200 OK`
+
+2.  **Fenêtre C (Chauffeur 2)**
+    *   **Route** : `POST /api/v1/location`
+    *   **Body** : `{ "latitude": 3.8444, "longitude": 11.5000 }`
+    *   **Attendu** : `200 OK`
+
+---
+
+## 🟢 SCÉNARIO PRINCIPAL : La Course Parfaite
+
+### Étape 1 : Le besoin (Passager)
+**Fenêtre A (Passager)**
+*   **Action** : Publier une demande de course.
+*   **Route** : `POST /api/v1/offers`
+*   **Body** :
+    ```json
+    {
+      "passengerId": "7f13909e-7170-4f91-872e-333333333333",
+      "startPoint": "Bastos",
+      "endPoint": "Poste Centrale",
+      "price": 2500,
+      "state": "PENDING"
+    }
+    ```
+*   **Attendu** : `200 OK`. L'objet Offre est créé.
+*   📝 **NOTE L'ID DE L'OFFRE (OFFER_ID) :** `__________________________`
+
+### Étape 2 : La découverte (Chauffeurs)
+**Fenêtre B (Chauffeur 1)**
+*   **Action** : Vérifier s'il y a du boulot.
+*   **Route** : `GET /api/v1/offers/available`
+*   **Attendu** : Une liste JSON contenant ton `OFFER_ID`.
+
+### Étape 3 : La candidature (Chauffeurs)
+**Fenêtre B (Chauffeur 1)**
+*   **Action** : "Je suis intéressé".
+*   **Route** : `POST /api/v1/offers/{OFFER_ID}/apply?driverId=a1b2c3d4-e5f6-4a5b-8c9d-111111111111`
+*   **Attendu** : `200 OK`.
+
+**Fenêtre C (Chauffeur 2)**
+*   **Action** : "Moi aussi".
+*   **Route** : `POST /api/v1/offers/{OFFER_ID}/apply?driverId=a1b2c3d4-e5f6-4a5b-8c9d-222222222222`
+*   **Attendu** : `200 OK`.
+
+### Étape 4 : Le Choix (Passager)
+**Fenêtre A (Passager)**
+*   **Action** : Voir qui a postulé.
+*   **Route** : `GET /api/v1/offers/{OFFER_ID}/bids`
+*   **Attendu** : Liste de 2 chauffeurs avec leurs noms et ETA calculés.
+
+**Fenêtre A (Passager)**
+*   **Action** : Choisir Chauffeur 1 (Eto'o).
+*   **Route** : `PATCH /api/v1/offers/{OFFER_ID}/select-driver?driverId=a1b2c3d4-e5f6-4a5b-8c9d-111111111111`
+*   **Attendu** : `200 OK`.
+    *   **Vérif** : `state` doit être **`DRIVER_SELECTED`**.
+
+### Étape 5 : La Confirmation "Handshake" (Chauffeur 1)
+*Le Chauffeur 1 reçoit une notif "Vous avez été choisi". Il doit confirmer.*
+
+**Fenêtre B (Chauffeur 1)**
+*   **Action** : "Ok, j'arrive !" (C'est ici que la Course est créée).
+*   **Route** : `POST /api/v1/offers/{OFFER_ID}/accept?driverId=a1b2c3d4-e5f6-4a5b-8c9d-111111111111`
+*   **Attendu** : `200 OK`. Retourne un objet **Ride**.
+    *   **Vérif** : `state` du Ride est `CREATED`.
+*   📝 **NOTE L'ID DE LA COURSE (TRIP_ID) :** `__________________________`
+
+### Étape 6 : L'Approche et Pickup (Chauffeur 1)
+*Le chauffeur roule vers le client... Il arrive.*
+
+**Fenêtre B (Chauffeur 1)**
+*   **Action** : "Client à bord, on démarre".
+*   **Route** : `PATCH /api/v1/trips/{TRIP_ID}/status`
+*   **Body** : `{ "status": "ONGOING" }`
+*   **Attendu** : `200 OK`. `state` passe à `ONGOING`.
+
+### Étape 7 : La Fin de Course (Chauffeur 1)
+*Arrivée à destination.*
+
+**Fenêtre B (Chauffeur 1)**
+*   **Action** : "Course terminée, paiement cash".
+*   **Route** : `PATCH /api/v1/trips/{TRIP_ID}/status`
+*   **Body** : `{ "status": "COMPLETED" }`
+*   **Attendu** : `200 OK`. `state` passe à `COMPLETED`.
+
+---
+
+## 🔴 SCÉNARIO ALTERNATIF : Annulation par le Client
+
+*Condition : Ce test se fait sur une NOUVELLE offre, avant l'étape 5 (Acceptation chauffeur).*
+
+### Cas 1 : Annulation avant sélection
+1.  **Fenêtre A** : Créer offre (`PENDING`). Note `OFFER_ID_2`.
+2.  **Fenêtre A** : "Finalement non, j'annule".
+3.  **Route** : `POST /api/v1/offers/{OFFER_ID_2}/cancel`
+4.  **Attendu** : `200 OK`. `state` passe à `CANCELLED`.
+5.  **Vérif** : Les chauffeurs ne doivent plus voir cette offre dans `/available`.
+
+### Cas 2 : Annulation après sélection (mais avant arrivée)
+1.  **Fenêtre A** : Créer offre, attendre bids, faire `select-driver` (`DRIVER_SELECTED`).
+2.  **Fenêtre A** : "Le chauffeur met trop de temps, j'annule".
+3.  **Route** : `POST /api/v1/offers/{OFFER_ID_3}/cancel`
+4.  **Attendu** : `200 OK`. `state` passe à `CANCELLED`.
+5.  **Impact** : Le chauffeur qui tente d'`accept` doit recevoir une erreur (400 ou 404).
+
+---
+
+## 🧪 Règles de validation technique
+
+1.  Un chauffeur **ne peut pas** accepter une offre qui ne lui est pas destinée (Test avec Fenêtre C essayant d'accepter l'offre de Fenêtre B).
+2.  Un passager **ne peut pas** annuler une course (`Ride`) qui est déjà `ONGOING` (seul le chauffeur gère le statut du Ride).
+3.  Les IDs (`OFFER_ID`, `TRIP_ID`) doivent être copiés-collés depuis les réponses JSON précédentes, ne les invente pas.```
 
 ---
 ### Fichier : `./docs/specs/spec.md`
@@ -1035,79 +1272,12 @@ showToast(error.message)
 ```
 
 ---
-### Fichier : `./docs/roadmaps/todo.md`
+### Fichier : `./docs/bd/modifs.md`
 ```md
-### 📋 Roadmap API RIDE & GO 
-
-- [ ] **Tâche 1 :** Configuration du projet (config,Sécurité, alignement BD Centrale & Seeding,swagger).
-- [x] **1.1 : Identité & Nettoyage (Metadata)**
-    - [x] Mettre à jour le `pom.xml` (artifactId: `ride-and-go`, name: `Ride & Go API`).
-    - [x] Renommer le package racine `com.yowyob.rideandgo` en `com.yowyob.rideandgo`.
-    - [x] Supprimer tous les fichiers liés au domaine "Product" (Entities, Mappers, Services, Controllers).
-    - [x] Nettoyer `application.yml` (nom de l'app, group-id Kafka, suppression des clés inutiles).
-
-- [x] **1.2 : Alignement avec la DB Centrale (Structure)**
-    - [x] Harmoniser les scripts SQL : Utiliser les noms de tables globaux (`users`, `roles`, `business_actors`) au lieu des préfixes `ride_and_go_`.
-    - [x] Mettre à jour les entités Java (`UserEntity`, `RoleEntity`, etc.) avec les bonnes annotations `@Table`.
-    - [x] Valider la cohérence des types UUID pour toutes les clés primaires et étrangères.
-
-- [x] **1.3 : Sécurité Réactive & Documentation (Security/Swagger)**
-    - [x] Implémentation de `SecurityConfig` : Configuration WebFlux réactive (Stateless, protection des routes, désactivation du mot de passe par défaut).
-    - [x] Autorisation des routes Swagger et HealthCheck dans la chaîne de filtres.
-    - [x] Organisation du Swagger UI par tags métier (Auth, Fares, Offers, Trips) selon les spécifications.
-
-- [x] **1.4 : Automatisation & Seeding (Données de test)**
-    - [x] Configurer `DatabaseInitConfig` pour une exécution séquentielle (Schema -> Check -> Data).
-    - [x] Préparer `src/main/resources/local/data.sql` avec les rôles (`PASSENGER`, `DRIVER`) et des utilisateurs de test Ride & Go.
-    - [x] **Validation finale** : Démarrage complet de l'application et vérification des 100+ utilisateurs via Swagger.
-
-- [x] **Tâche 2 :** Gestion de l'Authentification (auth fake,Liaison TraMaSys & Profils).
-    - [x] **2.1 : Contrats du Domaine**
-        - [x] Mettre à jour `AuthPort` et `AuthUseCase` pour supporter Login/Register/Reset.
-        - [x] Aligner le modèle `AuthResponse` sur le format TraMaSys (Token, Rôles, Permissions).
-    - [x] **2.2 : Implémentation des Adaptateurs**
-        - [x] Créer `FakeAuthAdapter` (Mode développement sans réseau).
-        - [x] Créer `RemoteAuthAdapter` (Appels réels via `AuthApiClient`).
-        - [x] Configurer `AuthConfig` pour le switch dynamique via `application.auth.mode`.
-    - [x] **2.3 : Sécurisation par Token (JWT Validation)**
-        - [x] Implémenter le `AuthenticationManager` réactif pour valider les tokens via TraMaSys.
-        - [x] Configurer le filtre d'extraction du header `Authorization: Bearer`.
-    - [x] **2.4 : API REST & Documentation**
-        - [x] Finaliser `AuthController` avec les endpoints de Login et Register.
-        - [x] **Validation Swagger** : Scénario "Login réel sur TraMaSys -> Récupération du JWT -> Accès au HealthCheck protégé".
-
-- [ ] **Tâche 3 : Gestion des Offres (Flux Marketplace Complet)**
-    - [x] **3.1 : Stratégie d'Estimation (Fares - Stateless)**
-        - [x] Créer `FakeFareAdapter` et `RemoteFareAdapter`.
-        - [x] Configurer `FareConfig` (Switch application.fare.mode).
-    - [x] **3.2 : Infrastructure & Cache (Redis & SQL)**
-        - [x] Implémenter `LocationCachePort` dans `RedisAdapter` (TTL 5 min).
-        - [x] Configurer le Repository SQL pour `offer_driver_linkages`.
-    - [x] **3.3 : Modèles de Domaine & Ports**
-        - [x] Créer le record `Bid` (driverId, name, eta, latitude, longitude, rating).
-        - [x] Mettre à jour `Offer` pour inclure une `List<Bid>`.
-    - [x] **3.4 : Services de Calcul & Tracking**
-        - [x] Implémenter `EtaCalculatorService` (Logique dynamique via Redis).
-        - [x] Implémenter `UpdateLocationUseCase` (Tracking acteur via JWT).
-    - [x] **3.5 : Logique Métier Marketplace (Actions & États)**
-        - [x] `CreateOfferUseCase` : Publication (PENDING).
-        - [x] `GetAvailableOffersUseCase` : Liste des offres pour les chauffeurs.
-        - [x] `ResponseToOfferUseCase` (Apply) : Inscription du postulant en SQL.
-        - [x] `GetOfferBidsUseCase` : Agrégation réactive (SQL + Redis + ETA).
-        - [x] `SelectDriverUseCase` : Validation du choix passager (Passage à DRIVER_SELECTED).
-    - [x] **3.6 : API REST & Mapping**
-        - [x] `POST /api/v1/fares/estimate` (Consultation).
-        - [x] `POST /api/v1/location` (Tracking acteur).
-        - [x] `GET /api/v1/offers/available` (Discovery chauffeur).
-        - [x] `GET /api/v1/offers/{id}/bids` (Consultation passager).
-        - [x] `PATCH /api/v1/offers/{id}/select-driver` (Action de sélection).
-    - [] **3.7 : test swagger d'un flux complet 1 client et 2 chauffeurs**
-
-- [ ] **Tâche 4 :** Gestion des Courses (Cycle de vie : Création -> Démarrage -> Fin).
-- [ ] **Tâche 5 :** Gestion du GPS (Moteur de tracking & Polling de position).
-- [ ] **Tâche 6 :** Services Périphériques & Notation (Calculs réels, Reviews).
-- [ ] **Tache 7:** gestions des users
-```
+-cretaion de la tabble user_has_rpermissions
+-modification des enums offers et ride
+-ajout du mappig de conversion des enums
+-modification de offer_driver_linkages```
 
 ---
 ### Fichier : `./docs/prompts/master_pair_programmer.md`
@@ -2185,14 +2355,15 @@ CREATE TABLE geofence_events (
 );
 
 CREATE TABLE offer_driver_linkages (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), -- La seule Clé Primaire
   offer_id UUID REFERENCES offers(id) ON DELETE CASCADE,
   driver_id UUID REFERENCES drivers(id) ON DELETE CASCADE,
-  PRIMARY KEY (offer_id, driver_id),
 
   created_at TIMESTAMP DEFAULT now(),
   updated_at TIMESTAMP DEFAULT now(),
-  UNIQUE(offer_id, driver_id)
+
+  -- Règle métier transformée en contrainte d'unicité
+  CONSTRAINT uk_offer_driver UNIQUE (offer_id, driver_id) 
 );
 
 -- =====================================================
@@ -3253,6 +3424,8 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -3263,7 +3436,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table("offer_driver_linkages") 
-public class OfferAgreementEntity {
+public class OfferAgreementEntity implements Persistable<UUID> {
     @Id
     private UUID id;
 
@@ -3280,6 +3453,22 @@ public class OfferAgreementEntity {
     @LastModifiedDate
     @Column("updated_at")
     private LocalDateTime lastModifiedDate;
+
+    // --- Gestion Insert/Update ---
+
+    @Transient
+    private boolean newEntity = false;
+
+    @Override
+    @Transient
+    public boolean isNew() {
+        return this.newEntity || id == null;
+    }
+
+    public OfferAgreementEntity asNew() {
+        this.newEntity = true;
+        return this;
+    }
 }```
 
 ---
@@ -3559,8 +3748,13 @@ public class RideR2dbcAdapter implements RideRepositoryPort {
         return repository.findById(id)
                 .map(mapper::toDomain);
     }
-}
-```
+
+    @Override
+    public Mono<Ride> findCurrentRideByDriverId(UUID driverId) {
+        return repository.findActiveRideByDriverId(driverId)
+                .map(mapper::toDomain);
+    }
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/persistence/repository/OfferAgreementR2dbcRepository.java`
@@ -3593,11 +3787,16 @@ public interface OfferAgreementR2dbcRepository extends ReactiveCrudRepository<Of
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository;
 
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.RideEntity;
+import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
 public interface RideR2dbcRepository extends ReactiveCrudRepository<RideEntity, UUID> {
+    // On cherche une course qui est soit CREATED (en approche), soit ONGOING (en cours)
+    @Query("SELECT * FROM rides WHERE driver_id = :driverId AND state IN ('CREATED', 'ONGOING') LIMIT 1")
+    Mono<RideEntity> findActiveRideByDriverId(UUID driverId);
 }```
 
 ---
@@ -3859,7 +4058,8 @@ public class OfferR2dbcAdapter implements OfferRepositoryPort {
                                                 bid.driverId(), 
                                                 savedEntity.getId(),
                                                 null, // createdDate (handled by Spring Data)
-                                                null  // updatedDate (handled by Spring Data)
+                                                null, // updatedDate (handled by Spring Data)
+                                                true  // <--- CORRECTION: newEntity=true pour forcer l'INSERT
                                             )
                                     ))))
                             .collectList()
@@ -4106,7 +4306,9 @@ package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
 import com.yowyob.rideandgo.domain.ports.in.*;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.CreateOfferRequest;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.OfferResponse;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.RideResponse;
 import com.yowyob.rideandgo.infrastructure.mappers.OfferMapper;
+import com.yowyob.rideandgo.infrastructure.mappers.RideMapper;
 import com.yowyob.rideandgo.application.service.OfferService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -4129,6 +4331,7 @@ public class OfferController {
     private final SelectDriverUseCase selectDriverUseCase;
     private final OfferService offerService; 
     private final OfferMapper mapper;
+    private final RideMapper rideMapper; 
 
     @PostMapping
     @Operation(summary = "Publish an offer (Passenger)")
@@ -4150,15 +4353,27 @@ public class OfferController {
     }
 
     @GetMapping("/{id}/bids")
-    @Operation(summary = "Review enriched bidders (Passenger)", description = "Shows GPS and ETA for each applicant")
+    @Operation(summary = "Review enriched bidders (Passenger)")
     public Mono<OfferResponse> getBids(@PathVariable UUID id) {
         return offerService.getOfferWithEnrichedBids(id).map(mapper::toResponse);
     }
 
     @PatchMapping("/{id}/select-driver")
-    @Operation(summary = "Confirm driver selection (Passenger)")
+    @Operation(summary = "1. Passenger selects driver", description = "Offer state -> DRIVER_SELECTED")
     public Mono<OfferResponse> select(@PathVariable UUID id, @RequestParam UUID driverId) {
         return selectDriverUseCase.selectDriver(id, driverId).map(mapper::toResponse);
+    }
+
+    @PostMapping("/{id}/accept")
+    @Operation(summary = "2. Driver confirms pickup", description = "Offer state -> VALIDATED. Creates Ride.")
+    public Mono<RideResponse> driverAccepts(@PathVariable UUID id, @RequestParam UUID driverId) {
+        return offerService.driverAcceptsOffer(id, driverId).map(rideMapper::toResponse);
+    }
+
+    @PostMapping("/{id}/cancel")
+    @Operation(summary = "Cancel offer (Passenger)")
+    public Mono<OfferResponse> cancel(@PathVariable UUID id) {
+        return offerService.cancelOffer(id).map(mapper::toResponse);
     }
 }```
 
@@ -4227,6 +4442,77 @@ public class AuthController {
 }```
 
 ---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/inbound/rest/TripController.java`
+```java
+package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
+
+import com.yowyob.rideandgo.application.service.RideService;
+import com.yowyob.rideandgo.domain.model.Ride;
+import com.yowyob.rideandgo.domain.model.enums.RideState;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.RideResponse;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.UpdateStatusRequest;
+import com.yowyob.rideandgo.infrastructure.mappers.RideMapper;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+@Slf4j
+@RestController
+@RequestMapping("/api/v1/trips")
+@RequiredArgsConstructor
+@Tag(name = "Trip-Controller", description = "Ride lifecycle management (Driver)")
+public class TripController {
+
+    private final RideService rideService; // Injection de la classe concrète pour avoir accès aux 2 méthodes
+    private final RideMapper rideMapper;
+
+    @GetMapping("/driver/current")
+    @Operation(summary = "Get current active ride for driver", description = "Finds ride in CREATED or ONGOING state")
+    public Mono<RideResponse> getCurrentRide() {
+        return ReactiveSecurityContextHolder.getContext()
+                .map(SecurityContext::getAuthentication)
+                .flatMap(auth -> {
+                    try {
+                        UUID driverId = UUID.fromString(auth.getName());
+                        return rideService.getCurrentRideForDriver(driverId);
+                    } catch (Exception e) {
+                        // Aide au compilateur: typer explicitement le retour d'erreur
+                        return Mono.<Ride>error(new IllegalStateException("Invalid Token"));
+                    }
+                })
+                .map(rideMapper::toResponse);
+    }
+
+    @PatchMapping("/{id}/status")
+    @Operation(summary = "Update ride status", description = "Transitions: CREATED -> ONGOING -> COMPLETED")
+    public Mono<RideResponse> updateStatus(
+            @PathVariable UUID id, 
+            @RequestBody UpdateStatusRequest request) {
+        
+        return ReactiveSecurityContextHolder.getContext()
+                .map(SecurityContext::getAuthentication)
+                .flatMap(auth -> {
+                    try {
+                        UUID actorId = UUID.fromString(auth.getName());
+                        // On appelle le service
+                        return rideService.updateRideStatus(id, request.status(), actorId);
+                    } catch (IllegalArgumentException e) {
+                        // FIX: On force le type <Ride> pour que le flatMap ne soit pas perdu
+                        return Mono.<Ride>error(new IllegalStateException("Invalid User ID in Token"));
+                    }
+                })
+                .map(rideMapper::toResponse);
+    }
+}```
+
+---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/inbound/rest/dto/SendNotificationRequest.java`
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto;
@@ -4290,6 +4576,17 @@ public record CreateOfferRequest(
         OfferState state
 ) {}
 ```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/inbound/rest/dto/UpdateStatusRequest.java`
+```java
+package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto;
+
+import com.yowyob.rideandgo.domain.model.enums.RideState;
+
+public record UpdateStatusRequest(
+    RideState status
+) {}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/inbound/rest/dto/FareRequest.java`
@@ -5233,3 +5530,1482 @@ public interface OfferNotFoundException {
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/Ride.java`
 ```java
+package com.yowyob.rideandgo.domain.model;
+
+import com.yowyob.rideandgo.domain.model.enums.RideState;
+import lombok.Builder;
+
+import java.util.UUID;
+
+@Builder
+public record Ride(
+        UUID id,
+        UUID offerId,
+        UUID passengerId,
+        UUID driverId,
+        double distance,
+        int duration,
+        RideState state,
+        int timeReal) {}
+```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/enums/OfferState.java`
+```java
+package com.yowyob.rideandgo.domain.model.enums;
+
+/**
+ * Lifecycle states of a transport Offer as defined in spec.md
+ */
+public enum OfferState {
+    /** Initial state, waiting for drivers */
+    PENDING,
+    
+    /** At least one driver applied */
+    BID_RECEIVED,
+    
+    /** Passenger chose a driver */
+    DRIVER_SELECTED,
+    
+    /** Driver confirmed, offer is closed and becomes a Ride */
+    VALIDATED,
+    
+    /** Cancelled or expired */
+    CANCELLED
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/enums/RoleType.java`
+```java
+package com.yowyob.rideandgo.domain.model.enums;
+
+public enum RoleType {
+    PASSENGER, DRIVER, ADMIN , CUSTOMER,      
+    FLEET_MANAGER 
+}
+```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/enums/RideState.java`
+```java
+package com.yowyob.rideandgo.domain.model.enums;
+
+/**
+ * Lifecycle states of a Trip (Ride) as defined in spec.md
+ */
+public enum RideState {
+    /** Ride initialized, driver approaching passenger */
+    CREATED,
+    
+    /** Passenger picked up, trip in progress */
+    ONGOING,
+    
+    /** Trip finished at destination */
+    COMPLETED,
+    
+    /** Trip interrupted or cancelled */
+    CANCELLED
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/Fare.java`
+```java
+package com.yowyob.rideandgo.domain.model;
+
+import java.util.UUID;
+
+public record Fare(
+        UUID id,
+        UUID userId,
+        String startPoint,
+        String endPoint,
+        Double estimatedFare,
+        Double  officialFare
+) {
+}
+```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/Role.java`
+```java
+package com.yowyob.rideandgo.domain.model;
+
+import com.yowyob.rideandgo.domain.model.enums.RoleType;
+import java.util.Set;
+import java.util.UUID;
+import lombok.Builder;
+
+@Builder
+public record Role(
+    UUID id, 
+    RoleType type,
+    Set<Permission> permissions
+) {}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/Permission.java`
+```java
+package com.yowyob.rideandgo.domain.model;
+import java.util.UUID;
+
+public record Permission(UUID id, String name) {}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/User.java`
+```java
+package com.yowyob.rideandgo.domain.model;
+
+import lombok.Builder;
+import java.util.Set;
+import java.util.UUID;
+
+@Builder
+public record User(
+    UUID id,
+    String name,
+    String email,
+    String telephone,
+    String password,
+    Set<Role> roles,
+    Set<Permission> directPermissions
+) {}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/Bid.java`
+```java
+package com.yowyob.rideandgo.domain.model;
+
+import lombok.Builder;
+import java.util.UUID;
+
+/**
+ * Domain model representing a driver's application to an offer.
+ * This is a transient object, computed on-the-fly by aggregating
+ * SQL bidder data, Redis location data, and ETA calculation.
+ */
+@Builder
+public record Bid(
+    UUID driverId,
+    String driverName,
+    Integer eta,              // Estimated Time of Arrival in minutes (computed)
+    Double latitude,          // Last known latitude from Redis
+    Double longitude,         // Last known longitude from Redis
+    Double rating             // Average driver rating
+) {}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/Offer.java`
+```java
+package com.yowyob.rideandgo.domain.model;
+
+import com.yowyob.rideandgo.domain.model.enums.OfferState;
+import lombok.Builder;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+@Builder
+public record Offer(
+        UUID id,
+        UUID passengerId,
+        String startPoint,
+        String endPoint,
+        double price,
+        OfferState state,
+        List<Bid> bids, 
+        Long version) {
+
+    public Offer withBids(List<Bid> bids) {
+        return new Offer(this.id, this.passengerId, this.startPoint, this.endPoint, this.price, this.state, bids, this.version);
+    }
+
+    public Offer withState(OfferState state) {
+        return new Offer(this.id, this.passengerId, this.startPoint, this.endPoint, this.price, state, this.bids, this.version);
+    }
+
+    /**
+     * Helper to check if a driver has already applied
+     */
+    public boolean hasDriverApplied(UUID driverId) {
+        if (bids == null) return false;
+        return bids.stream().anyMatch(b -> b.driverId().equals(driverId));
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/in/AuthUseCase.java`
+```java
+package com.yowyob.rideandgo.domain.ports.in;
+
+import com.yowyob.rideandgo.domain.ports.out.AuthPort;
+import reactor.core.publisher.Mono;
+
+public interface AuthUseCase {
+    Mono<AuthPort.AuthResponse> login(String identifier, String password);
+    
+    Mono<Void> resetPassword(String email);
+
+    // CETTE MÉTHODE DOIT EXISTER ICI AUSSI
+    Mono<AuthPort.AuthResponse> register(
+        String username, 
+        String password, 
+        String email, 
+        String phone, 
+        String firstName, 
+        String lastName
+    );
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/in/UserUseCases.java`
+```java
+package com.yowyob.rideandgo.domain.ports.in;
+
+import com.yowyob.rideandgo.domain.model.User;
+import com.yowyob.rideandgo.domain.model.enums.RoleType;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+public interface UserUseCases {
+    Mono<User> saveUser(User user);
+
+    Mono<User> getUserById(UUID userId);
+
+    Mono<Boolean> deleteUserById(UUID userId);
+
+    Flux<User> getAllUsers();
+
+    Flux<User> getUsersByRole(RoleType role);
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/in/UpdateLocationUseCase.java`
+```java
+package com.yowyob.rideandgo.domain.ports.in;
+
+import reactor.core.publisher.Mono;
+
+/**
+ * Input port for real-time location updates.
+ */
+public interface UpdateLocationUseCase {
+    /**
+     * Updates the GPS coordinates of the current authenticated actor.
+     * @param latitude Double
+     * @param longitude Double
+     * @return Mono<Boolean> true if success
+     */
+    Mono<Boolean> updateCurrentLocation(Double latitude, Double longitude);
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/in/UpdateRideStatusUseCase.java`
+```java
+package com.yowyob.rideandgo.domain.ports.in;
+
+import com.yowyob.rideandgo.domain.model.Ride;
+import com.yowyob.rideandgo.domain.model.enums.RideState;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+public interface UpdateRideStatusUseCase {
+    /**
+     * Updates the status of a ride obeying business rules.
+     * @param rideId The ID of the ride
+     * @param newStatus The target status (ONGOING, COMPLETED, CANCELLED)
+     * @param actorId The ID of the user performing the action (Security)
+     * @return The updated Ride
+     */
+    Mono<Ride> updateRideStatus(UUID rideId, RideState newStatus, UUID actorId);
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/in/ResponseToOfferUseCase.java`
+```java
+package com.yowyob.rideandgo.domain.ports.in;
+
+import com.yowyob.rideandgo.domain.model.Offer;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+public interface ResponseToOfferUseCase {
+    Mono<Offer> responseToOffer(UUID offerId, UUID driverId);
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/in/PutFareInCacheUseCase.java`
+```java
+package com.yowyob.rideandgo.domain.ports.in;
+
+import com.yowyob.rideandgo.domain.model.Fare;
+import reactor.core.publisher.Mono;
+
+public interface PutFareInCacheUseCase {
+    Mono<Boolean> putFareInCache(Fare fare);
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/in/SelectDriverUseCase.java`
+```java
+
+// SelectDriverUseCase.java
+package com.yowyob.rideandgo.domain.ports.in;
+import com.yowyob.rideandgo.domain.model.Offer;
+import java.util.UUID;
+import reactor.core.publisher.Mono;
+
+public interface SelectDriverUseCase {
+    Mono<Offer> selectDriver(UUID offerId, UUID driverId);
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/in/GetAvailableOffersUseCase.java`
+```java
+// GetAvailableOffersUseCase.java
+package com.yowyob.rideandgo.domain.ports.in;
+import com.yowyob.rideandgo.domain.model.Offer;
+import reactor.core.publisher.Flux;
+
+public interface GetAvailableOffersUseCase {
+    Flux<Offer> getAvailableOffers(); // Offers in PENDING state
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/in/CreateOfferUseCase.java`
+```java
+package com.yowyob.rideandgo.domain.ports.in;
+
+import com.yowyob.rideandgo.domain.model.Fare;
+import com.yowyob.rideandgo.domain.model.Offer;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+public interface CreateOfferUseCase {
+    Mono<Offer> createOffer(Offer offer, UUID passengerId);
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/in/AcceptedOfferUseCase.java`
+```java
+package com.yowyob.rideandgo.domain.ports.in;
+
+import com.yowyob.rideandgo.domain.model.Ride;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+public interface AcceptedOfferUseCase {
+    Mono<Ride> acceptedOffer(UUID offerId, UUID passengerId, UUID driverId);
+}
+```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/FareCachePort.java`
+```java
+package com.yowyob.rideandgo.domain.ports.out;
+
+import com.yowyob.rideandgo.domain.model.Fare;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+public interface FareCachePort {
+    Mono<Boolean> saveInCache(Fare fare);
+
+    Mono<Fare> findFareById(UUID fareId);
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/OfferRepositoryPort.java`
+```java
+package com.yowyob.rideandgo.domain.ports.out;
+
+import com.yowyob.rideandgo.domain.model.Offer;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import java.util.UUID;
+
+public interface OfferRepositoryPort {
+    Mono<Offer> save(Offer offer);
+    Mono<Boolean> delete(Offer offer);
+    Mono<Boolean> exists(Offer offer);
+    Mono<Offer> findById(UUID offerId);
+    Flux<Offer> findAll(); 
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/RoleRepositoryPort.java`
+```java
+package com.yowyob.rideandgo.domain.ports.out;
+
+import com.yowyob.rideandgo.domain.model.Role;
+import com.yowyob.rideandgo.domain.model.enums.RoleType;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+public interface RoleRepositoryPort {
+    Mono<Role> findRoleById(UUID roleId);
+
+    Mono<Role> findByRoleName(RoleType type);
+}
+```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/UserRepositoryPort.java`
+```java
+package com.yowyob.rideandgo.domain.ports.out;
+
+import com.yowyob.rideandgo.domain.model.User;
+import com.yowyob.rideandgo.domain.model.enums.RoleType;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.util.List;
+import java.util.UUID;
+
+public interface UserRepositoryPort {
+    Mono<User> save(User user);
+
+    Mono<Boolean> delete(User user);
+
+    Mono<Boolean> deleteById(UUID userId);
+
+    Mono<Boolean> exists(User user);
+
+    Mono<User> findUserById(UUID userId);
+
+    Flux<User> findByRoleName(RoleType role);
+
+    Flux<User> findAll();
+
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/UserCachePort.java`
+```java
+package com.yowyob.rideandgo.domain.ports.out;
+
+import com.yowyob.rideandgo.domain.model.User;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+public interface UserCachePort {
+    Mono<Boolean> saveInCache(User user);
+
+    Mono<User> findUserById(UUID userId);
+}
+```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/LocationCachePort.java`
+```java
+package com.yowyob.rideandgo.domain.ports.out;
+
+import reactor.core.publisher.Mono;
+import java.util.UUID;
+
+public interface LocationCachePort {
+    /**
+     * Saves the live location of an actor (Driver or Passenger).
+     * @param actorId The ID of the BusinessActor
+     * @param latitude GPS Latitude
+     * @param longitude GPS Longitude
+     */
+    Mono<Boolean> saveLocation(UUID actorId, Double latitude, Double longitude);
+
+    /**
+     * Retrieves the last known location from cache.
+     */
+    Mono<Location> getLocation(UUID actorId);
+
+    /**
+     * Internal domain record for coordinates
+     */
+    record Location(Double latitude, Double longitude) {}
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/OfferCachePort.java`
+```java
+package com.yowyob.rideandgo.domain.ports.out;
+
+import com.yowyob.rideandgo.domain.model.Offer;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+public interface OfferCachePort {
+    Mono<Boolean> saveInCache(Offer offer);
+
+    Mono<Offer> findOfferById(UUID offerId);
+}
+```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/StockClientPort.java`
+```java
+package com.yowyob.rideandgo.domain.ports.out;
+
+import reactor.core.publisher.Mono;
+
+public interface StockClientPort {
+    /**
+     * Verify if te stock is full.
+     * @return true full, false otherwise
+     */
+    Mono<Boolean> isStockFull(String productName);
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/RideRepositoryPort.java`
+```java
+package com.yowyob.rideandgo.domain.ports.out;
+
+import com.yowyob.rideandgo.domain.model.Ride;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+public interface RideRepositoryPort {
+    Mono<Ride> save(Ride ride);
+    Mono<Ride> findRideById(UUID id);
+    // Nouvelle méthode requise
+    Mono<Ride> findCurrentRideByDriverId(UUID driverId);
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/OfferEventPublisherPort.java`
+```java
+package com.yowyob.rideandgo.domain.ports.out;
+
+import com.yowyob.rideandgo.domain.model.Offer;
+import reactor.core.publisher.Mono;
+
+public interface OfferEventPublisherPort {
+    Mono<Void> publishOfferCreatedEvent(Offer offer);
+}
+```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/FareClientPort.java`
+```java
+package com.yowyob.rideandgo.domain.ports.out;
+
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FareRequest;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FareResponse;
+import reactor.core.publisher.Mono;
+
+public interface FareClientPort {
+    Mono<FareResponse> caclculateFare(FareRequest request);
+}
+```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/SendNotificationPort.java`
+```java
+package com.yowyob.rideandgo.domain.ports.out;
+
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.SendNotificationRequest;
+import reactor.core.publisher.Mono;
+
+public interface SendNotificationPort {
+    Mono<Boolean> sendNotification(SendNotificationRequest request);
+}
+```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/AuthPort.java`
+```java
+package com.yowyob.rideandgo.domain.ports.out;
+
+import reactor.core.publisher.Mono;
+
+import java.util.List;
+import java.util.Map;
+
+public interface AuthPort {
+    Mono<AuthResponse> login(String email, String password);
+    
+    Mono<Void> forgotPassword(String email);
+
+    Mono<AuthResponse> register(
+        String username, 
+        String password, 
+        String email, 
+        String phone, 
+        String firstName, 
+        String lastName);
+
+    
+    record AuthResponse(
+        String accessToken, 
+        String refreshToken, 
+        String username, 
+        List<String> roles,
+        List<String> permissions
+    ) {}
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/application/utils/Constants.java`
+```java
+package com.yowyob.rideandgo.application.utils;
+
+public class Constants {
+    public static final String NOTIFICATION_SERVICE_TOKEN_HEADER = "X-Service-Token";
+}
+```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/application/utils/Utils.java`
+```java
+package com.yowyob.rideandgo.application.utils;
+
+import java.util.UUID;
+
+public class Utils {
+    public static UUID generateUUID(){
+        return UUID.randomUUID();
+    }
+
+    public static int generateRandomNumber(){
+        return (int) (Math.random()*100);
+    }
+
+    public static int generateRandomNumber(int max){
+        return (int) (Math.random()*max);
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/application/service/OfferService.java`
+```java
+package com.yowyob.rideandgo.application.service;
+
+import com.yowyob.rideandgo.application.utils.Utils;
+import com.yowyob.rideandgo.domain.exception.OfferStatutNotMatchException;
+import com.yowyob.rideandgo.domain.exception.UserIsNotDriverException;
+import com.yowyob.rideandgo.domain.model.Bid;
+import com.yowyob.rideandgo.domain.model.Offer;
+import com.yowyob.rideandgo.domain.model.Ride;
+import com.yowyob.rideandgo.domain.model.User;
+import com.yowyob.rideandgo.domain.model.enums.OfferState;
+import com.yowyob.rideandgo.domain.model.enums.RideState;
+import com.yowyob.rideandgo.domain.model.enums.RoleType;
+import com.yowyob.rideandgo.domain.ports.in.*;
+import com.yowyob.rideandgo.domain.ports.out.*;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.NotificationType;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.SendNotificationRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.util.*;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class OfferService implements 
+    CreateOfferUseCase, 
+    ResponseToOfferUseCase, 
+    GetAvailableOffersUseCase,
+    SelectDriverUseCase {
+
+    private final OfferCachePort cache;
+    private final OfferRepositoryPort repository;
+    private final UserRepositoryPort userRepositoryPort;
+    private final SendNotificationPort sendNotificationPort;
+    private final RideRepositoryPort rideRepositoryPort;
+    private final LocationCachePort locationCachePort;
+    private final EtaCalculatorService etaCalculatorService;
+
+    @Value("${application.kafka.notification-service.template.new-offer-id}")
+    private int templateCreateOfferId;
+
+    // --- 1. PUBLICATION ---
+    @Override
+    public Mono<Offer> createOffer(Offer request, UUID passengerId) {
+        Offer offer = Offer.builder()
+                .id(Utils.generateUUID())
+                .passengerId(passengerId)
+                .startPoint(request.startPoint())
+                .endPoint(request.endPoint())
+                .price(request.price())
+                .state(OfferState.PENDING)
+                .bids(new ArrayList<>())
+                .build();
+
+        return repository.save(offer)
+                .flatMap(saved -> cache.saveInCache(saved).thenReturn(saved))
+                .doOnSuccess(o -> log.info("Offer created: {}", o.id()));
+    }
+
+    // --- 2. DECOUVERTE ---
+    @Override
+    public Flux<Offer> getAvailableOffers() {
+        return repository.findAll()
+                .filter(o -> o.state() == OfferState.PENDING || o.state() == OfferState.BID_RECEIVED);
+    }
+
+    // --- 3. CANDIDATURE ---
+    @Override
+    public Mono<Offer> responseToOffer(UUID offerId, UUID driverId) {
+        return repository.findById(offerId)
+                .flatMap(offer -> {
+                    if (offer.hasDriverApplied(driverId)) return Mono.just(offer);
+                    
+                    List<Bid> currentBids = new ArrayList<>(offer.bids());
+                    currentBids.add(Bid.builder().driverId(driverId).build());
+                    
+                    return repository.save(offer.withBids(currentBids).withState(OfferState.BID_RECEIVED))
+                            .flatMap(s -> cache.saveInCache(s).thenReturn(s));
+                });
+    }
+
+    // --- 4. SÉLECTION (PASSAGER) ---
+    @Override
+    public Mono<Offer> selectDriver(UUID offerId, UUID driverId) {
+        return repository.findById(offerId)
+                .flatMap(offer -> {
+                    if (!offer.hasDriverApplied(driverId)) {
+                        return Mono.error(new IllegalArgumentException("Driver has not applied."));
+                    }
+                    // TODO: Idéalement, stocker driverId sélectionné dans l'offre pour sécuriser le accept ensuite
+                    return repository.save(offer.withState(OfferState.DRIVER_SELECTED));
+                });
+    }
+
+    // --- 5. CONFIRMATION (CHAUFFEUR) ---
+    public Mono<Ride> driverAcceptsOffer(UUID offerId, UUID driverId) {
+        return repository.findById(offerId)
+                .flatMap(offer -> {
+                    if (offer.state() != OfferState.DRIVER_SELECTED) {
+                        return Mono.error(new OfferStatutNotMatchException("Offer must be in DRIVER_SELECTED state."));
+                    }
+                    // Passage à VALIDATED
+                    return repository.save(offer.withState(OfferState.VALIDATED));
+                })
+                .flatMap(offer -> {
+                    // Création de la course
+                    Ride ride = Ride.builder()
+                            .id(Utils.generateUUID())
+                            .offerId(offer.id())
+                            .passengerId(offer.passengerId())
+                            .driverId(driverId)
+                            .state(RideState.CREATED) // État initial: Chauffeur en route
+                            .build();
+
+                    return rideRepositoryPort.save(ride);
+                });
+    }
+
+    // --- 6. ANNULATION (PASSAGER) ---
+    public Mono<Offer> cancelOffer(UUID offerId) {
+        return repository.findById(offerId)
+                .flatMap(offer -> {
+                    if (offer.state() == OfferState.VALIDATED) {
+                        return Mono.error(new IllegalStateException("Cannot cancel a validated offer. Cancel the ride instead."));
+                    }
+                    return repository.save(offer.withState(OfferState.CANCELLED));
+                });
+    }
+
+    // --- UTILITAIRE (Enrichissement) ---
+    public Mono<Offer> getOfferWithEnrichedBids(UUID offerId) {
+        return repository.findById(offerId)
+                .flatMap(offer -> {
+                    if (offer.bids().isEmpty()) return Mono.just(offer);
+                    return Flux.fromIterable(offer.bids())
+                            .flatMap(bid -> Mono.zip(
+                                    userRepositoryPort.findUserById(bid.driverId()),
+                                    locationCachePort.getLocation(bid.driverId()).defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0))
+                            ).flatMap(tuple -> etaCalculatorService.calculateEta(tuple.getT2().latitude(), tuple.getT2().longitude(), 0.0, 0.0)
+                                    .map(eta -> Bid.builder()
+                                            .driverId(tuple.getT1().id())
+                                            .driverName(tuple.getT1().name())
+                                            .latitude(tuple.getT2().latitude())
+                                            .longitude(tuple.getT2().longitude())
+                                            .eta(eta).rating(4.8).build())))
+                            .collectList()
+                            .map(offer::withBids);
+                });
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/application/service/UserService.java`
+```java
+package com.yowyob.rideandgo.application.service;
+
+import com.yowyob.rideandgo.domain.model.User;
+import com.yowyob.rideandgo.domain.model.enums.RoleType;
+import com.yowyob.rideandgo.domain.ports.in.UserUseCases;
+import com.yowyob.rideandgo.domain.ports.out.UserRepositoryPort;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class UserService implements UserUseCases {
+
+    private final UserRepositoryPort userRepositoryPort;
+
+    @Override
+    public Mono<User> saveUser(User user) {
+        return userRepositoryPort.save(user);
+    }
+
+    @Override
+    public Mono<User> getUserById(UUID userId) {
+        return userRepositoryPort.findUserById(userId);
+    }
+
+    @Override
+    public Mono<Boolean> deleteUserById(UUID userId) {
+        return userRepositoryPort.deleteById(userId);
+    }
+
+    @Override
+    public Flux<User> getAllUsers() {
+        return userRepositoryPort.findAll();
+    }
+
+    @Override
+    public Flux<User> getUsersByRole(RoleType role) {
+        return userRepositoryPort.findByRoleName(role);
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/application/service/RideService.java`
+```java
+package com.yowyob.rideandgo.application.service;
+
+import com.yowyob.rideandgo.domain.model.Ride;
+import com.yowyob.rideandgo.domain.model.enums.RideState;
+import com.yowyob.rideandgo.domain.ports.in.UpdateRideStatusUseCase;
+import com.yowyob.rideandgo.domain.ports.out.RideRepositoryPort;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class RideService implements UpdateRideStatusUseCase {
+
+    private final RideRepositoryPort rideRepository;
+
+    @Override
+    public Mono<Ride> updateRideStatus(UUID rideId, RideState newStatus, UUID actorId) {
+        return rideRepository.findRideById(rideId)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Ride not found with id: " + rideId)))
+                .flatMap(ride -> {
+                    // 1. Security Check
+                    if (!ride.driverId().equals(actorId)) {
+                        return Mono.error(new IllegalStateException("Access Denied: You are not the driver of this ride."));
+                    }
+
+                    // 2. State Machine Logic
+                    if (!isValidTransition(ride.state(), newStatus)) {
+                        return Mono.error(new IllegalStateException(
+                                String.format("Invalid transition from %s to %s", ride.state(), newStatus)));
+                    }
+
+                    // 3. Apply Update
+                    Ride updatedRide = new Ride(
+                            ride.id(),
+                            ride.offerId(),
+                            ride.passengerId(),
+                            ride.driverId(),
+                            ride.distance(),
+                            ride.duration(),
+                            newStatus, 
+                            ride.timeReal()
+                    );
+
+                    return rideRepository.save(updatedRide);
+                })
+                .doOnSuccess(r -> log.info("Ride {} status updated to {}", r.id(), r.state()));
+    }
+
+    /**
+     * Nouvelle méthode pour le scénario de test E2E (Chauffeur récupère sa course)
+     */
+    public Mono<Ride> getCurrentRideForDriver(UUID driverId) {
+        return rideRepository.findCurrentRideByDriverId(driverId)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("No active ride found for this driver")));
+    }
+
+    private boolean isValidTransition(RideState current, RideState target) {
+        if (current == target) return true;
+        return switch (current) {
+            case CREATED -> target == RideState.ONGOING || target == RideState.CANCELLED;
+            case ONGOING -> target == RideState.COMPLETED || target == RideState.CANCELLED;
+            case COMPLETED, CANCELLED -> false;
+        };
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/application/service/AuthService.java`
+```java
+package com.yowyob.rideandgo.application.service;
+
+import com.yowyob.rideandgo.domain.ports.in.AuthUseCase;
+import com.yowyob.rideandgo.domain.ports.out.AuthPort;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+@Service
+@RequiredArgsConstructor
+public class AuthService implements AuthUseCase {
+
+    private final AuthPort authPort;
+
+    @Override
+    public Mono<AuthPort.AuthResponse> login(String identifier, String password) {
+        return authPort.login(identifier, password);
+    }
+
+    @Override
+    public Mono<AuthPort.AuthResponse> register(String username, String email, String password, String phone, String firstName, String lastName) {
+        return authPort.register(username, password, email, phone, firstName, lastName);
+    }
+
+    @Override
+    public Mono<Void> resetPassword(String email) {
+        return authPort.forgotPassword(email);
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/application/service/LocationService.java`
+```java
+package com.yowyob.rideandgo.application.service;
+
+import com.yowyob.rideandgo.domain.ports.in.UpdateLocationUseCase;
+import com.yowyob.rideandgo.domain.ports.out.LocationCachePort;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class LocationService implements UpdateLocationUseCase {
+
+    private final LocationCachePort locationCachePort;
+
+    @Override
+    public Mono<Boolean> updateCurrentLocation(Double latitude, Double longitude) {
+        return ReactiveSecurityContextHolder.getContext()
+                .map(SecurityContext::getAuthentication)
+                .flatMap(auth -> {
+                    String userIdStr = auth.getName(); // Extracted from JWT
+                    try {
+                        UUID userId = UUID.fromString(userIdStr);
+                        return locationCachePort.saveLocation(userId, latitude, longitude);
+                    } catch (IllegalArgumentException e) {
+                        log.error("Security Context principal is not a valid UUID: {}", userIdStr);
+                        return Mono.just(false);
+                    }
+                })
+                .switchIfEmpty(Mono.error(new RuntimeException("No security context found for location update")));
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/application/service/FareService.java`
+```java
+package com.yowyob.rideandgo.application.service;
+
+import com.yowyob.rideandgo.domain.model.Fare;
+import com.yowyob.rideandgo.domain.ports.in.PutFareInCacheUseCase;
+import com.yowyob.rideandgo.domain.ports.out.FareCachePort;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class FareService implements PutFareInCacheUseCase {
+
+    private final FareCachePort fareCachePort;
+
+    @Override
+    public Mono<Boolean> putFareInCache(Fare fare) {
+        return fareCachePort.saveInCache(fare);
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/application/service/EtaCalculatorService.java`
+```java
+package com.yowyob.rideandgo.application.service;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+import java.util.concurrent.ThreadLocalRandom;
+
+@Slf4j
+@Service
+public class EtaCalculatorService {
+
+    /**
+     * Logic: Random value between 3 and 12 minutes for MVP.
+     */
+    public Mono<Integer> calculateEta(Double startLat, Double startLon, Double endLat, Double endLon) {
+        return Mono.fromCallable(() -> ThreadLocalRandom.current().nextInt(3, 13));
+    }
+}```
+
+---
+### Fichier : `./.mvn/wrapper/maven-wrapper.properties`
+```properties
+wrapperVersion=3.3.4
+distributionType=only-script
+distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.11/apache-maven-3.9.11-bin.zip
+```
+
+---
+### Fichier : `./Readme.md`
+```md
+# 🚗 Ride & Go API - Guide de démarrage rapide
+
+Ce guide permet de configurer l'environnement de développement complet (Postgres, Redis, Kafka) en local.
+
+## 📋 Prérequis
+- **Java 21**
+- **Docker & Docker Compose**
+
+## 🚀 Étape 1 : Lancer l'infrastructure
+Depuis la racine du projet :
+```bash
+docker-compose up -d
+```
+Ceci démarre :
+- **Postgres** (Port 5432) : Stockage des utilisateurs et offres.
+- **Redis** (Port 6379) : Tracking GPS temps réel (Mot de passe: `password`).
+- **Redpanda/Kafka** (Port 9092) : Système de notifications.
+
+## ⚙️ Étape 2 : Configuration de l'application
+Assurez-vous que le profil `local` est activé dans `src/main/resources/application.yml` :
+```yaml
+spring:
+  profiles:
+    active: local
+```
+
+## 🛠️ Étape 3 : Lancer le projet
+```bash
+./mvnw clean spring-boot:run
+```
+Le système va automatiquement :
+1. Créer le schéma central (Postgres).
+2. Injecter **100 utilisateurs de test** (5 Admins, 30 Chauffeurs, 65 Passagers).
+
+## ✅ Étape 4 : Tester le flux Marketplace
+1. **Swagger UI** : [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+2. **Identités de test (Tokens statiques)** :
+   - Client : `Bearer client-token`
+   - Chauffeur 1 : `Bearer driver-1-token`
+   - Chauffeur 2 : `Bearer driver-2-token`
+
+## 🐳 Utilitaires Docker
+- Stopper l'infra : `docker-compose stop`
+- Tout supprimer (volumes inclus) : `docker-compose down -v`
+```
+
+---
+### Fichier : `./pom.xml`
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" 
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.6</version>
+        <relativePath/>
+    </parent>
+    
+    <groupId>com.yowyob</groupId>
+    <artifactId>reactive-hexagonal</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>ride-and-go</name>
+    <description>API Ride and Go - Marketplace de transport urbain</description>
+    
+    <properties>
+        <java.version>21</java.version>
+        <spring-cloud.version>2023.0.0</spring-cloud.version>
+        <mapstruct.version>1.5.5.Final</mapstruct.version>
+    </properties>
+    
+    <dependencies>
+        <!-- REACTIVE CORE -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- DATA (R2DBC & REDIS) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-r2dbc</artifactId>
+        </dependency>
+        
+        <!-- CORRECTION CRITIQUE : Enlever le scope runtime pour r2dbc-postgresql -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>r2dbc-postgresql</artifactId>
+        </dependency>
+        
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+        </dependency>
+
+        <!-- MESSAGING (KAFKA) -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor.kafka</groupId>
+            <artifactId>reactor-kafka</artifactId>
+            <version>1.3.22</version>
+        </dependency>
+
+        <!-- CLOUD & RESILIENCE -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-circuitbreaker-reactor-resilience4j</artifactId>
+        </dependency>
+
+        <!-- TOOLS (Lombok & Mapstruct) -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+            <version>${mapstruct.version}</version>
+        </dependency>
+        
+        <!-- Docker Compose Auto-setup -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-docker-compose</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+        
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Documentation API (Swagger/OpenAPI) -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+            <version>2.5.0</version>
+        </dependency>
+        
+        <!-- SPRING SECURITY REACTIVE -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- SECURITY TESTING -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.30</version>
+                        </path>
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${mapstruct.version}</version>
+                        </path>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok-mapstruct-binding</artifactId>
+                            <version>0.2.0</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>```
+
+---
+### Fichier : `./.github/workflows/ci-cd.yml`
+```yaml
+name: Spring Boot CI/CD
+
+on:
+  push:
+    branches:
+      - "**"
+      #- main
+
+env:
+  REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/ride-and-go
+  APP_NAME: ride-and-go
+  HEALTH_DELAY: ${{ secrets.DEPLOY_DELAY }}
+  CONTAINER_NAME: ride-and-go
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Run Unit Tests + SonarQube Analysis
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          mvn clean verify sonar:sonar \
+            -Dsonar.projectKey=${{ env.APP_NAME }} \
+            -Dsonar.projectName=${{ env.APP_NAME }} \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
+
+  build:
+    needs: tests
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Log in to GitHub Container Registry
+        run: |
+          echo "${{ secrets.PERSONAL_ACCESS_TOKEN }}" | docker login ghcr.io -u ${{ secrets.REGISTRY_NAMESPACE }} --password-stdin
+
+      - name: Use prod.application.yml
+        run: |
+          echo "Using prod.application.yml"
+          rm src/main/resources/application.yml
+          mv src/main/resources/prod.application.yml src/main/resources/application.yml
+          cat src/main/resources/application.yml
+
+      - name: Build Docker image
+        run: |
+          echo "Building Docker image..."
+          docker build -t ${{ env.REGISTRY_IMAGE }}:latest .
+
+      - name: Push Docker image
+        run: |
+          echo "Pushing Docker image..."
+          docker push ${{ env.REGISTRY_IMAGE }}:latest
+
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Add SSH key
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy on server
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }} << 'EOF'
+
+            echo "Pulling latest image ${{ env.REGISTRY_IMAGE }}"
+
+            docker login ghcr.io -u ${{ secrets.REGISTRY_NAMESPACE }} -p ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+            cd /root/projet_synthese/infra
+
+            echo "Stopping container"
+            docker compose down ${{ env.CONTAINER_NAME }}
+
+            echo "Removing old image"
+            docker rmi -f ${{ env.REGISTRY_IMAGE }}:latest || true
+
+            echo "Pulling new image"
+            docker pull ${{ env.REGISTRY_IMAGE }}:latest
+
+            echo " Starting container"
+            docker compose up -d ${{ env.CONTAINER_NAME }}
+
+            echo " Waiting ${{ env.HEALTH_DELAY }} seconds for health check"
+            sleep ${{ env.HEALTH_DELAY }}
+
+            echo " Checking container health..."
+            STATUS=$(docker inspect --format='{{json .State.Health.Status}}' ${{ env.CONTAINER_NAME }})
+
+            echo "Health status: $STATUS"
+
+            if [ "$STATUS" != "\"healthy\"" ]; then
+              echo "ERROR: Container is not healthy"
+              exit 1
+            fi
+
+            echo "Deployment successful & container healthy!"
+          EOF
+```
+
+---
+### Fichier : `./docker-compose.yml`
+```yaml
+services:
+  # 1. Base de données PostgreSQL
+  postgres:
+    image: postgres:16
+    container_name: ride-go-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: yowyob_db
+      POSTGRES_USER: fleet_admin
+      POSTGRES_PASSWORD: fleet_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. Cache Redis pour le tracking GPS
+  redis:
+    image: redis:alpine
+    container_name: ride-go-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass password
+
+  # 3. Kafka (Redpanda) pour les notifications
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:latest
+    container_name: ride-go-kafka
+    ports:
+      - "9092:9092"
+    command:
+      - redpanda start
+      - --overprovisioned
+      - --smp 1
+      - --memory 1G
+      - --reserve-memory 0M
+      - --node-id 0
+      - --check=false
+      - --kafka-addr plaintext://0.0.0.0:29092,external://0.0.0.0:9092
+      - --advertise-kafka-addr plaintext://redpanda:29092,external://localhost:9092
+
+volumes:
+  postgres_data:```

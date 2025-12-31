@@ -64,7 +64,24 @@
         - [x] `PATCH /api/v1/offers/{id}/select-driver` (Action de sélection).
     - [x] **3.7 : test swagger d'un flux complet 1 client et 2 chauffeurs**
 
-- [ ] **Tâche 4 :** Gestion des Courses (Cycle de vie : Création -> Démarrage -> Fin).
-- [ ] **Tâche 5 :** Gestion du GPS (Moteur de tracking & Polling de position).
-- [ ] **Tâche 6 :** Services Périphériques & Notation (Calculs réels, Reviews).
-- [ ] **Tache 7:** gestions des users
+- [x] **Tâche 4 : Gestion des Courses (Trips - Core Domain)**
+    - [x] 4.1 : Création du Trip (Transition depuis l'Offre).
+    - [x] 4.2 : Machine à états (CREATED -> ONGOING -> COMPLETED/CANCELLED).
+    - [x] 4.3 : API de gestion d'état (Start/End ride).
+    - [x] 4.4 : Règles métier (Qui peut démarrer ? Qui peut finir ?).
+
+- [ ] **Tâche 5 : Gestion du GPS (Tracking Temps Réel)**
+    - [ ] 5.1 : Polling & Mise à jour Redis.
+    - [ ] 5.2 : API de consultation pour le Passager (Suivre son chauffeur).
+    - [ ] 5.3 : Calcul de distance parcourue (Post-traitement simple).
+
+- [ ] **Tâche 6 : Gestion des Utilisateurs (Interne)**
+    - [ ] 6.1 : CRUD Admin (si nécessaire).
+    - [ ] 6.2 : Profil User & Driver (Rating, Info véhicule).
+
+- [ ] **Tâche 7 : Intégration Services Externes (Switch Remote)**
+    - [ ] 7.1 : Test Auth Service en réel.
+    - [ ] 7.2 : Test Fare Calculator en réel.
+    - [ ] 7.3 : Gestion des Timeouts & Circuit Breakers (Resilience4j).
+
+- [ ] **Tâche 8 :** Services Périphériques & Notation (Calculs réels, Reviews).

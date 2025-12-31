@@ -26,7 +26,7 @@ spring:
       validation-query: SELECT 1
   sql:
     init:
-      mode: always
+      mode: never
 
   # REDIS CLUSTER 
   data:
