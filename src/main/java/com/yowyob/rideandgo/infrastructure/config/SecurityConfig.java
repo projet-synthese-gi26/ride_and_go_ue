@@ -11,7 +11,12 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -36,16 +41,38 @@ public class SecurityConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+                
+                // --- AJOUT CORRECTION CORS ---
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                // -----------------------------
+
                 .authenticationManager(authenticationManager)
                 .securityContextRepository(securityContextRepository)
                 .authorizeExchange(exchanges -> exchanges
-                        // Public routes
-                        .pathMatchers("/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/webjars/**").permitAll()
-                        // Public Healthcheck (for dev convenience)
-                        .pathMatchers("/api/v1/health/**").permitAll()
-                        // Protected business routes
+                        .pathMatchers(
+                                "/api/v1/auth/**", 
+                                "/v3/api-docs/**", 
+                                "/swagger-ui/**", 
+                                "/swagger-ui.html", 
+                                "/webjars/**",
+                                "/api/v1/health/**" // Healthcheck public
+                        ).permitAll()
                         .anyExchange().authenticated()
                 )
                 .build();
+    }
+
+    // --- BEAN CORS ---
+    @Bean
+    CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        // En prod, idéalement on met le domaine précis, mais pour le dev/démo "*" est OK
+        configuration.setAllowedOrigins(List.of("*")); 
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(List.of("*")); // Autorise tous les headers (Authorization, etc.)
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }

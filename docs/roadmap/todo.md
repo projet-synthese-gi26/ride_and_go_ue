@@ -75,19 +75,20 @@
     - [x] 5.2 : API de consultation Smart (Suivre son partenaire : Chauffeur <-> Passager).
     - [x] 5.3 : Calcul de distance & ETA (Service dédié Haversine).
 
-- [ ] **Tâche 6 : Gestion des Utilisateurs (Interne)**
+- [x] **Tâche 6 : Intégration Services Externes (Switch Remote)**
+    - [x] 7.1 : Test Auth Service en réel.
+    - [x] 7.2 : Test Fare Calculator en réel.
+    - [x] 7.3 : Gestion des Timeouts & Circuit Breakers (Resilience4j).
+
+- [ ] **Tâche 7 : Gestion des Utilisateurs (Interne)**
     - [ ] 6.1 : CRUD Admin (si nécessaire).
-    - [ ] 6.2 : Profil User & Driver (Rating, Info véhicule).
+    - [ ] 6.2 : Profil User & Driver 
+    - [ ] 6.3 : gestion de vehicules par le vehicule service
 
-- [ ] **Tâche 7 : Intégration Services Externes (Switch Remote)**
-    - [ ] 7.1 : Test Auth Service en réel.
-    - [ ] 7.2 : Test Fare Calculator en réel.
-    - [ ] 7.3 : Gestion des Timeouts & Circuit Breakers (Resilience4j).
-
-- [ ] **Tâche 8 :** Services Périphériques & Notation (Calculs réels, Reviews,abonnement des chauffeurs).
+- [ ] **Tâche 8 :** Services Périphériques & Notation (medias, Reviews,abonnement des chauffeurs).
 
 - [ ] **Tâche 9 : Fine-tuning & Consolidation (Post-Integration)**
     - [ ] 9.1 : Back-office Admin (CRUD complet Trips/Offers pour le support/debug).
-    - [ ] 9.2 : Durcissement Sécurité (Rate Limiting, Renforcement JWT, Cors).
+    - [ ] 9.2 : Durcissement Sécurité (Rate Limiting, Renforcement JWT, Cors,gestion des roles et permissions).
     - [ ] 9.3 : Gestion Globale des Erreurs (Standardisation ProblemDetails 4xx/5xx).
     - [ ] 9.4 : Optimisation & Nettoyage (Refactoring, Logs de prod, Code mort).

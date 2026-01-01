@@ -1,5 +1,5 @@
 # Contexte du Projet : Fleet & Geofence API
-Généré le : Thu 01 Jan 2026 10:31:02 AM WAT
+Généré le : Thu 01 Jan 2026 03:51:42 PM WAT
 Framework : Spring Boot WebFlux (Reactive)
 
 ## 1. Arborescence du Projet
@@ -501,20 +501,21 @@ distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-mav
     - [x] 5.2 : API de consultation Smart (Suivre son partenaire : Chauffeur <-> Passager).
     - [x] 5.3 : Calcul de distance & ETA (Service dédié Haversine).
 
-- [ ] **Tâche 6 : Gestion des Utilisateurs (Interne)**
+- [x] **Tâche 6 : Intégration Services Externes (Switch Remote)**
+    - [x] 7.1 : Test Auth Service en réel.
+    - [x] 7.2 : Test Fare Calculator en réel.
+    - [x] 7.3 : Gestion des Timeouts & Circuit Breakers (Resilience4j).
+
+- [ ] **Tâche 7 : Gestion des Utilisateurs (Interne)**
     - [ ] 6.1 : CRUD Admin (si nécessaire).
-    - [ ] 6.2 : Profil User & Driver (Rating, Info véhicule).
+    - [ ] 6.2 : Profil User & Driver 
+    - [ ] 6.3 : gestion de vehicules par le vehicule service
 
-- [ ] **Tâche 7 : Intégration Services Externes (Switch Remote)**
-    - [ ] 7.1 : Test Auth Service en réel.
-    - [ ] 7.2 : Test Fare Calculator en réel.
-    - [ ] 7.3 : Gestion des Timeouts & Circuit Breakers (Resilience4j).
-
-- [ ] **Tâche 8 :** Services Périphériques & Notation (Calculs réels, Reviews,abonnement des chauffeurs).
+- [ ] **Tâche 8 :** Services Périphériques & Notation (medias, Reviews,abonnement des chauffeurs).
 
 - [ ] **Tâche 9 : Fine-tuning & Consolidation (Post-Integration)**
     - [ ] 9.1 : Back-office Admin (CRUD complet Trips/Offers pour le support/debug).
-    - [ ] 9.2 : Durcissement Sécurité (Rate Limiting, Renforcement JWT, Cors).
+    - [ ] 9.2 : Durcissement Sécurité (Rate Limiting, Renforcement JWT, Cors,gestion des roles et permissions).
     - [ ] 9.3 : Gestion Globale des Erreurs (Standardisation ProblemDetails 4xx/5xx).
     - [ ] 9.4 : Optimisation & Nettoyage (Refactoring, Logs de prod, Code mort).```
 
@@ -2774,11 +2775,12 @@ spring:
 # CUSTOM CONFIG 
 application:
   auth:
-    mode: fake # 'fake' pour ton dev local, 'remote' pour le serveur réel
+    mode: remote # 'fake' pour ton dev local, 'remote' pour le serveur réel
     url: https://auth-service.pynfi.com
   fare:
-    mode: fake # 'fake' pour ton dev local, 'remote' pour le serveur réel
+    mode: remote # 'fake' pour ton dev local, 'remote' pour le serveur réel
     url: https://fare-calculator-service.pynfi.com
+    api-key: 974e9428-6ce2-48e7-b74b-93f572007ef8
 
   kafka:
     topics:
@@ -2813,19 +2815,29 @@ management:
       prometheus:
         enabled: true
 
-# RESILIENCE4J 
+# ======================================================
+# 2. CONFIGURATION TIMEOUT (Resilience4j)
+# ======================================================
 resilience4j:
   circuitbreaker:
     instances:
-      stock-service:
-        failureRateThreshold: 50
-        waitDurationInOpenState: 5s
-        slidingWindowSize: 5
+      # Config pour le service de prix
       fare-calculator-service:
         failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+      # Config pour le service auth (si besoin)
+      auth-service:
+        failureRateThreshold: 50
         waitDurationInOpenState: 5s
         slidingWindowSize: 5
-```
+  timelimiter:
+    instances:
+      fare-calculator-service:
+        timeoutDuration: 20s  
+      auth-service:
+        timeoutDuration: 20s```
 
 ---
 ### Fichier : `./src/main/resources/prod.application.yml`
@@ -2887,11 +2899,12 @@ spring:
 # CUSTOM BUSINESS SERVICES CONFIGURATION
 application:
   auth:
-    mode: fake # 'fake' pour ton dev local, 'remote' pour le serveur réel
+    mode: remote # 'fake' pour ton dev local, 'remote' pour le serveur réel
     url: https://auth-service.pynfi.com
   fare:
-    mode: fake # 'fake' pour ton dev local, 'remote' pour le serveur réel
+    mode: remote # 'fake' pour ton dev local, 'remote' pour le serveur réel
     url: https://fare-calculator-service.pynfi.com
+    api-key: 974e9428-6ce2-48e7-b74b-93f572007ef8
 
   kafka:
     topics:
@@ -2927,18 +2940,31 @@ management:
       prometheus:
         enabled: true
 
-# RESILIENCE CONFIGURATION (CIRCUIT BREAKERS)
+# ======================================================
+# 2. CONFIGURATION TIMEOUT (Resilience4j)
+# ======================================================
 resilience4j:
   circuitbreaker:
     instances:
+      # Config pour le service de prix
       fare-calculator-service:
         failureRateThreshold: 50
         waitDurationInOpenState: 10s
         slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+      # Config pour le service auth (si besoin)
       auth-service:
         failureRateThreshold: 50
         waitDurationInOpenState: 5s
         slidingWindowSize: 5
+
+  # C'est ici qu'on règle le problème "Did not observe any item... within 1000ms"
+  timelimiter:
+    instances:
+      fare-calculator-service:
+        timeoutDuration: 20s  
+      auth-service:
+        timeoutDuration: 20s
 ```
 
 ---
@@ -3047,32 +3073,28 @@ import org.mapstruct.ReportingPolicy;
 public interface FareMapper {
 
     /**
-     * Maps API response to domain model.
+     * Mappe la réponse de l'API (Pynfi/Yowyob) vers le Domaine.
      */
-    @Mapping(target = "startPoint", source = "startLocationName")
-    @Mapping(target = "endPoint", source = "endLocationName")
+    @Mapping(target = "estimatedFare", source = "prixMoyen") // Mapping du prix
+    @Mapping(target = "officialFare", source = "prixMoyen")
+    // Les champs suivants ne sont pas dans la réponse API racine, on les ignore ou on les laisse null
+    @Mapping(target = "startPoint", ignore = true) 
+    @Mapping(target = "endPoint", ignore = true)
     @Mapping(target = "userId", ignore = true)
+    @Mapping(target = "id", ignore = true)
     Fare toDomain(FareResponse response);
 
     /**
-     * Maps domain model to API response for the frontend.
+     * Mappe la requête entrante (DTO) vers le Domaine.
      */
-    @Mapping(target = "startLocationName", source = "domain.startPoint")
-    @Mapping(target = "endLocationName", source = "domain.endPoint")
-    @Mapping(target = "cached", source = "isCached")
-    FareResponse toResponse(Fare domain, boolean isCached);
-
-    /**
-     * Maps initial request to domain model.
-     */
-    @Mapping(target = "startPoint", source = "startLocationName")
-    @Mapping(target = "endPoint", source = "endLocationName")
+    @Mapping(target = "startPoint", source = "depart") // Mapping français -> anglais
+    @Mapping(target = "endPoint", source = "arrivee")
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "userId", ignore = true)
     @Mapping(target = "estimatedFare", ignore = true)
     @Mapping(target = "officialFare", ignore = true)
     Fare toDomain(FareRequest request);
-}   ```
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/mappers/OfferMapper.java`
@@ -3112,6 +3134,7 @@ public interface OfferMapper {
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.external;
 
+import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.out.AuthPort;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
@@ -3122,18 +3145,28 @@ public class FakeAuthAdapter implements AuthPort {
     @Override
     public Mono<AuthResponse> login(String email, String password) {
         log.info("🛠 MODE FAKE AUTH : Login pour {}", email);
-        return Mono.just(new AuthResponse("fake-jwt", "fake-refresh", email, List.of("ADMIN"), List.of("*")));
+        return Mono.just(new AuthResponse(
+            "fake.jwt.token", 
+            "fake.refresh.token", 
+            email, 
+            List.of("RIDE_AND_GO_DRIVER"), 
+            List.of("*")
+        ));
     }
 
     @Override
-    public Mono<AuthResponse> register(String username, String email, String password, String phone, String firstName, String lastName) {
-        log.info("🛠 MODE FAKE AUTH : Inscription pour {}", username);
+    public Mono<AuthResponse> register(String username, String email, String password, String phone, String firstName, String lastName, List<RoleType> roles) {
+        log.info("🛠 MODE FAKE AUTH : Inscription pour {} avec rôles {}", username, roles);
+        
+        List<String> rolesStr = roles.stream().map(Enum::name).toList();
+
         return Mono.just(new AuthResponse(
-            "fake-jwt", 
-            "fake-refresh", 
+            "fake.jwt.token", 
+            "fake.refresh.token", 
             username, 
-            List.of("ADMIN"), 
-            List.of("*")));
+            rolesStr, 
+            List.of("*")
+        ));
     }
 
     @Override
@@ -3153,35 +3186,43 @@ import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FareRespons
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 public class FakeFareAdapter implements FareClientPort {
 
-    private static final double MINIMUM_CAMEROON_FARE = 350.0;
-
     @Override
     public Mono<FareResponse> caclculateFare(FareRequest request) {
-        log.info("🛠 MODE FAKE FARE : Calculation for {} to {}", request.startLocationName(), request.endLocationName());
+        log.info("🛠 MODE FAKE FARE : Calcul pour {} -> {}", request.depart(), request.arrivee());
         
-        // Simulating random distance between 1km and 10km
-        double distanceKm = ThreadLocalRandom.current().nextDouble(1.0, 10.0);
+        double randomPrice = ThreadLocalRandom.current().nextDouble(1500.0, 5000.0);
+        double roundedPrice = Math.round(randomPrice / 100.0) * 100.0; // Arrondi à 100
+
+        // Construction des sous-objets Fake
+        FareResponse.FeaturesUtilisees features = new FareResponse.FeaturesUtilisees(
+            5500.0, 900.0, 5.0, 1.2, 12, "matin", 1, 2
+        );
         
-        // Logic: 250 base + 150 per km
-        double calculatedFare = 250.0 + (distanceKm * 150.0);
-        
-        // Apply Cameroon floor price (350 XAF)
-        double officialFare = Math.max(calculatedFare, MINIMUM_CAMEROON_FARE);
-        
-        // Estimate is slightly lower for the passenger proposal
-        double estimatedFare = Math.max(officialFare * 0.9, MINIMUM_CAMEROON_FARE);
+        FareResponse.EstimationsSupplementaires estimations = new FareResponse.EstimationsSupplementaires(
+            roundedPrice, features
+        );
 
         return Mono.just(new FareResponse(
-                estimatedFare,
-                officialFare,
-                request.startLocationName(),
-                request.endLocationName(),
-                false // Dynamic calculation, not from cache
+                "exact",
+                roundedPrice,       // prix_moyen
+                roundedPrice - 200, // prix_min
+                roundedPrice + 200, // prix_max
+                5.5,                // distance
+                15.0,               // duree
+                estimations,        // estimations_supplementaires
+                Map.of("Heure de pointe", "+500F"), // ajustements_appliques
+                1,                  // fiabilite
+                "Estimation Fake réussie",
+                Map.of("type_route", "bitume"),     // details_trajet
+                List.of("Eviter le centre ville")   // suggestions
         ));
     }
 }```
@@ -3210,7 +3251,7 @@ public class RemoteFareAdapter implements FareClientPort {
 
     @Override
     public Mono<FareResponse> caclculateFare(FareRequest request) {
-        log.info("🌐 MODE REMOTE FARE : Calling external API for {} to {}", request.startLocationName(), request.endLocationName());
+        log.info("🌐 MODE REMOTE FARE : Calling external API for {} to {}", request.depart(), request.arrivee());
         ReactiveCircuitBreaker rcb = cbFactory.create("fare-calculator-service");
 
         return rcb.run(
@@ -3228,68 +3269,99 @@ public class RemoteFareAdapter implements FareClientPort {
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.external;
 
+import com.yowyob.rideandgo.domain.model.User;
+import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.out.AuthPort;
+import com.yowyob.rideandgo.domain.ports.out.UserRepositoryPort;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.AuthApiClient;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import reactor.core.publisher.Mono;
-import java.util.List;
-
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Mono;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
+@RequiredArgsConstructor
 public class RemoteAuthAdapter implements AuthPort {
 
-    private final AuthApiClient authApiClient;
+    private final AuthApiClient client;
+    private final UserRepositoryPort userRepository;
 
-    public RemoteAuthAdapter(AuthApiClient authApiClient) {
-        this.authApiClient = authApiClient;
-    }
+    private static final String SERVICE_NAME = "RIDE_AND_GO";
 
     @Override
     public Mono<AuthResponse> login(String identifier, String password) {
-        return authApiClient.authenticate(new AuthApiClient.LoginRequest(identifier, password))
-                .map(this::mapToDomain);
+        log.info("🌐 REMOTE AUTH : Login pour {}", identifier);
+        return client.login(new AuthApiClient.LoginRequest(identifier, password))
+                .map(this::mapToDomain)
+                .doOnError(e -> log.error("Login failed: {}", e.getMessage()));
     }
 
     @Override
-     public Mono<AuthResponse> register(String username, String email, String password, String phone, String firstName, String lastName) {
-        // CORRECTION DE L'ORDRE : username, password, email (et non email, password)
+    public Mono<AuthResponse> register(String username, String email, String password, String phone, String firstName, String lastName, List<RoleType> roles) {
+        log.info("🌐 REMOTE AUTH : Register pour {} avec rôles {}", username, roles);
+
+        // Transformation dynamique : List<Enum> -> List<String>
+        List<String> rolesToSend = roles.stream()
+                .map(Enum::name)
+                .toList();
+
         AuthApiClient.RegisterRequest request = new AuthApiClient.RegisterRequest(
-            username, 
-            password, 
-            email,    
-            phone, 
-            firstName, 
-            lastName,
-            "FLEET_MANAGEMENT", 
-            List.of("ADMIN") 
+            username, password, email, phone, firstName, lastName,
+            SERVICE_NAME, 
+            rolesToSend
         );
 
-       return authApiClient.register(request)
-            .map(this::mapToDomain)
-            .doOnSuccess(res -> log.info("✅ Inscription réussie : {}", res.username()))
-            .onErrorResume(WebClientResponseException.class, ex -> {
-                // On logue le message d'erreur détaillé venant du serveur distant
-                String errorBody = ex.getResponseBodyAsString();
-                log.error("❌ Erreur TraMaSys (400) : {}",ex.getStatusCode(), errorBody);
-                return Mono.error(new RuntimeException("Erreur TraMaSys : " + errorBody));
-            });
-    }
+        return client.register(request)
+                .flatMap(response -> {
+                    // Sauvegarde locale (ID, Info, mais pas les rôles car gérés à distance)
+                    User localUser = User.builder()
+                            .id(UUID.fromString(response.user().id()))
+                            .name(response.user().username())
+                            .email(response.user().email())
+                            .telephone(response.user().phone())
+                            .roles(Collections.emptySet())
+                            .directPermissions(Collections.emptySet())
+                            .build();
 
-    private AuthResponse mapToDomain(AuthApiClient.TraMaSysResponse res) {
-        return new AuthResponse(
-            res.accessToken(),
-            res.refreshToken(),
-            res.user().username(),
-            res.user().roles(),
-            res.user().permissions()
-        );
+                    return userRepository.save(localUser)
+                            .doOnSuccess(u -> log.info("✅ User synced locally: {}", u.id()))
+                            .thenReturn(mapToDomain(response));
+                })
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    log.error("❌ Register Failed (Remote): {}", ex.getResponseBodyAsString());
+                    return Mono.error(new RuntimeException("Erreur inscription : " + ex.getResponseBodyAsString()));
+                });
     }
 
     @Override
     public Mono<Void> forgotPassword(String email) {
-        log.info("Appel forgot password pour {}", email);
-        return Mono.empty();
+        return Mono.empty(); 
+    }
+
+    private AuthResponse mapToDomain(AuthApiClient.TraMaSysResponse res) {
+        List<String> filteredRoles = res.user().roles().stream()
+                .filter(roleStr -> {
+                    try {
+                        RoleType.valueOf(roleStr);
+                        return true;
+                    } catch (IllegalArgumentException e) {
+                        return false;
+                    }
+                })
+                .collect(Collectors.toList());
+
+        return new AuthResponse(
+            res.accessToken(),
+            res.refreshToken(),
+            res.user().username(),
+            filteredRoles,
+            res.user().permissions()
+        );
     }
 }```
 
@@ -3306,9 +3378,9 @@ import org.springframework.web.service.annotation.HttpExchange;
 import org.springframework.web.service.annotation.PostExchange;
 import reactor.core.publisher.Mono;
 
-@HttpExchange("/api/v2")
+@HttpExchange("/api")
 public interface FareCalculatorClient {
-    @PostExchange("/fares/calculate")
+    @PostExchange("/estimate/")
     Mono<FareResponse> calculateFare(@RequestBody FareRequest request);
 }
 ```
@@ -3318,9 +3390,9 @@ public interface FareCalculatorClient {
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client;
 
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.service.annotation.HttpExchange;
 import org.springframework.web.service.annotation.PostExchange;
-import org.springframework.web.bind.annotation.RequestBody;
 import reactor.core.publisher.Mono;
 import java.util.List;
 
@@ -3328,10 +3400,12 @@ import java.util.List;
 public interface AuthApiClient {
     
     @PostExchange("/login")
-    Mono<TraMaSysResponse> authenticate(@RequestBody LoginRequest request);
+    Mono<TraMaSysResponse> login(@RequestBody LoginRequest request);
 
     @PostExchange("/register")
     Mono<TraMaSysResponse> register(@RequestBody RegisterRequest request);
+
+    // --- DTOs Internes ---
 
     record LoginRequest(String identifier, String password) {}
 
@@ -3342,12 +3416,28 @@ public interface AuthApiClient {
         String phone,
         String firstName,
         String lastName,
-        String service, // Sera "FLEET_MANAGEMENT"
+        String service, // Fixé à "RIDE_AND_GO"
         List<String> roles
     ) {}
 
-    record TraMaSysResponse(String accessToken, String refreshToken, UserDetail user) {}
-    record UserDetail(String id, String username, List<String> roles, List<String> permissions) {}
+    // Structure de réponse standard du service Auth
+    record TraMaSysResponse(
+        String accessToken, 
+        String refreshToken, 
+        UserDetail user
+    ) {}
+
+    record UserDetail(
+        String id, 
+        String username, 
+        String email, 
+        String phone,
+        String firstName,
+        String lastName,
+        String service,
+        List<String> roles, 
+        List<String> permissions
+    ) {}
 }```
 
 ---
@@ -3593,6 +3683,8 @@ package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity
 
 import lombok.*;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable; // <--- Import Important
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -3602,7 +3694,7 @@ import java.util.UUID;
 @NoArgsConstructor 
 @AllArgsConstructor
 @Table("users") 
-public class UserEntity { // Plus d'héritage
+public class UserEntity implements Persistable<UUID> { // <--- Implémente Persistable
     @Id
     private UUID id;
 
@@ -3614,9 +3706,24 @@ public class UserEntity { // Plus d'héritage
     @Column("phone_number") 
     private String telephone;
 
-    // Note: Le mot de passe n'est pas dans le schéma SQL 'users' fourni
-    // Je le garde ici pour que ça compile, mais attention au runtime si la colonne manque.
+    // Le mot de passe est géré à distance, mais on garde le champ pour la compatibilité schéma
     private String password; 
+
+    // --- Gestion Insert/Update (Magie R2DBC) ---
+
+    @Transient
+    private boolean newEntity = false;
+
+    @Override
+    @Transient
+    public boolean isNew() {
+        // Si on marque explicitement 'newEntity' à true, ou si l'ID est null (cas classique)
+        return this.newEntity || id == null;
+    }
+
+    public void setNewEntity(boolean newEntity) {
+        this.newEntity = newEntity;
+    }
 }```
 
 ---
@@ -4015,11 +4122,22 @@ public class UserR2dbcAdapter implements UserRepositoryPort {
                 .flatMap(this::enrichUser);
     }
 
-    @Override
+   @Override
     public Mono<User> save(User user) {
         UserEntity entity = userMapper.toEntity(user);
-        return userRepository.save(entity)
-                .map(saved -> user); 
+        
+        // CORRECTION : On vérifie si l'utilisateur existe déjà pour décider INSERT ou UPDATE
+        // C'est moins performant qu'un flag explicite mais plus sûr si on n'a pas le contexte 'isNew' dans le domaine.
+        // Alternative optimisée : Si on vient du RemoteAuthAdapter, on sait que c'est un nouveau user.
+        
+        return userRepository.existsById(user.id())
+                .flatMap(exists -> {
+                    if (!exists) {
+                        entity.setNewEntity(true); 
+                    }
+                    return userRepository.save(entity);
+                })
+                .map(saved -> user);
     }
 
     @Override
@@ -4517,6 +4635,7 @@ public class GlobalExceptionHandler {
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
 
+import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.in.AuthUseCase;
 import com.yowyob.rideandgo.domain.ports.out.AuthPort;
 import io.swagger.v3.oas.annotations.Operation;
@@ -4524,6 +4643,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -4539,11 +4660,17 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    @Operation(summary = "Inscription Fleet Management")
+    @Operation(summary = "Inscription Multi-Rôles")
     public Mono<AuthPort.AuthResponse> register(@RequestBody RegisterDto dto) {
+        // Gestion par défaut : Si aucune liste n'est fournie, on assigne PASSENGER
+        List<RoleType> rolesToAssign = (dto.roles() != null && !dto.roles().isEmpty()) 
+                ? dto.roles() 
+                : List.of(RoleType.RIDE_AND_GO_PASSENGER);
+
         return authUseCase.register(
             dto.username(), dto.password(), dto.email(), 
-            dto.phone(), dto.firstName(), dto.lastName()
+            dto.phone(), dto.firstName(), dto.lastName(),
+            rolesToAssign
         );
     }
 
@@ -4555,7 +4682,8 @@ public class AuthController {
         String email, 
         String phone, 
         String firstName, 
-        String lastName
+        String lastName,
+        List<RoleType> roles 
     ) {}
 }```
 
@@ -4725,11 +4853,19 @@ public record UpdateStatusRequest(
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/inbound/rest/dto/FareRequest.java`
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
+// Cette annotation retire les champs NULL du JSON envoyé
+@JsonInclude(JsonInclude.Include.NON_NULL) 
 public record FareRequest(
-        String startLocationName,
-        String endLocationName,
-        String departureTime) {}```
+    @JsonProperty("depart") String depart,
+    @JsonProperty("arrivee") String arrivee,
+    @JsonProperty("heure") String heure,
+    @JsonProperty("meteo") Integer meteo,
+    @JsonProperty("type_zone") Integer typeZone,
+    @JsonProperty("congestion_user") Integer congestionUser
+) {}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/inbound/rest/dto/CreateUserRequest.java`
@@ -4807,12 +4943,53 @@ public record OfferResponse(
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto;
 
-public record FareResponse (
-        double estimatedFare,
-        double officialFare,
-        String startLocationName,
-        String endLocationName,
-        boolean cached) {}```
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * DTO complet aligné sur la réponse de l'API FareCalculator (Yowyob/Pynfi).
+ */
+public record FareResponse(
+    @JsonProperty("statut") String statut,
+    @JsonProperty("prix_moyen") Double prixMoyen,
+    @JsonProperty("prix_min") Double prixMin,
+    @JsonProperty("prix_max") Double prixMax,
+    @JsonProperty("distance") Double distance,
+    @JsonProperty("duree") Double duree,
+    
+    // Objets imbriqués complexes
+    @JsonProperty("estimations_supplementaires") EstimationsSupplementaires estimationsSupplementaires,
+    
+    // Maps dynamiques pour les ajustements et détails (clé/valeur)
+    @JsonProperty("ajustements_appliques") Map<String, Object> ajustementsAppliques,
+    
+    @JsonProperty("fiabilite") Integer fiabilite,
+    @JsonProperty("message") String message,
+    
+    @JsonProperty("details_trajet") Map<String, Object> detailsTrajet,
+    
+    @JsonProperty("suggestions") List<String> suggestions
+) {
+    
+    // --- Records internes pour la structure imbriquée ---
+
+    public record EstimationsSupplementaires(
+        @JsonProperty("ml_prediction") Double mlPrediction,
+        @JsonProperty("features_utilisees") FeaturesUtilisees featuresUtilisees
+    ) {}
+
+    public record FeaturesUtilisees(
+        @JsonProperty("distance_metres") Double distanceMetres,
+        @JsonProperty("duree_secondes") Double dureeSecondes,
+        @JsonProperty("congestion") Double congestion,
+        @JsonProperty("sinuosite") Double sinuosite,
+        @JsonProperty("nb_virages") Integer nbVirages,
+        @JsonProperty("heure") String heure,
+        @JsonProperty("meteo") Integer meteo,
+        @JsonProperty("type_zone") Integer typeZone
+    ) {}
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/inbound/rest/dto/NotificationType.java`
@@ -5075,6 +5252,7 @@ public class HealthCheckController {
 package com.yowyob.rideandgo.infrastructure.config;
 
 import com.yowyob.rideandgo.domain.ports.out.AuthPort;
+import com.yowyob.rideandgo.domain.ports.out.UserRepositoryPort;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.FakeAuthAdapter;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.RemoteAuthAdapter;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.AuthApiClient;
@@ -5093,9 +5271,9 @@ public class AuthConfig {
 
     @Bean
     @ConditionalOnProperty(name = "application.auth.mode", havingValue = "remote", matchIfMissing = true)
-    public AuthPort remoteAuthPort(AuthApiClient authApiClient) {
-        // Maintenant, le constructeur de RemoteAuthAdapter accepte bien l'interface
-        return new RemoteAuthAdapter(authApiClient);
+    public AuthPort remoteAuthPort(AuthApiClient authApiClient, UserRepositoryPort userRepositoryPort) {
+        // Injection du repository pour la sauvegarde locale des utilisateurs lors du register
+        return new RemoteAuthAdapter(authApiClient, userRepositoryPort);
     }
 }```
 
@@ -5118,22 +5296,25 @@ public class WebClientConfig {
 
     @Bean
     public FareCalculatorClient fareCalculatorClient(WebClient.Builder builder,
-                                         @Value("${application.external.fare-calculator-url:https://fare-calculator-service.pynfi.com}") String url) {
-        return createClient(builder, url, FareCalculatorClient.class);
+                                         @Value("${application.fare.url}") String url,
+                                         @Value("${application.fare.api-key}") String apiKey) {
+        
+        // Configuration pour API Key (Header standard)
+        WebClient webClient = builder
+                .baseUrl(url)
+                .defaultHeader("Authorization", "ApiKey " + apiKey) 
+                .build();
+
+        WebClientAdapter adapter = WebClientAdapter.create(webClient);
+        return HttpServiceProxyFactory.builderFor(adapter).build().createClient(FareCalculatorClient.class);
     }
 
-    /**
-     * Client for the external Authentication Service (TraMaSys).
-     */
     @Bean
     public AuthApiClient authApiClient(WebClient.Builder builder, 
-                                       @Value("${application.auth.url:https://auth-service.pynfi.com}") String url) {
+                                       @Value("${application.auth.url}") String url) {
         return createClient(builder, url, AuthApiClient.class);
     }
 
-    /**
-     * Generic helper to build declarative HTTP clients.
-     */
     private <T> T createClient(WebClient.Builder builder, String url, Class<T> clientClass) {
         WebClient webClient = builder.baseUrl(url).build();
         WebClientAdapter adapter = WebClientAdapter.create(webClient);
@@ -5740,10 +5921,11 @@ public enum OfferState {
 package com.yowyob.rideandgo.domain.model.enums;
 
 public enum RoleType {
-    PASSENGER, DRIVER, ADMIN , CUSTOMER,      
-    FLEET_MANAGER 
-}
-```
+    // Rôles Métier Ride & Go (Identiques à la DB Distante)
+    RIDE_AND_GO_PASSENGER,
+    RIDE_AND_GO_DRIVER,
+    RIDE_AND_GO_ADMIN
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/model/enums/RideState.java`
@@ -5903,22 +6085,24 @@ public record Offer(
 ```java
 package com.yowyob.rideandgo.domain.ports.in;
 
+import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.out.AuthPort;
 import reactor.core.publisher.Mono;
+import java.util.List;
 
 public interface AuthUseCase {
     Mono<AuthPort.AuthResponse> login(String identifier, String password);
     
     Mono<Void> resetPassword(String email);
 
-    // CETTE MÉTHODE DOIT EXISTER ICI AUSSI
     Mono<AuthPort.AuthResponse> register(
         String username, 
         String password, 
         String email, 
         String phone, 
         String firstName, 
-        String lastName
+        String lastName,
+        List<RoleType> roles 
     );
 }```
 
@@ -6325,10 +6509,9 @@ public interface SendNotificationPort {
 ```java
 package com.yowyob.rideandgo.domain.ports.out;
 
+import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import reactor.core.publisher.Mono;
-
 import java.util.List;
-import java.util.Map;
 
 public interface AuthPort {
     Mono<AuthResponse> login(String email, String password);
@@ -6341,9 +6524,10 @@ public interface AuthPort {
         String email, 
         String phone, 
         String firstName, 
-        String lastName);
+        String lastName,
+        List<RoleType> roles 
+    );
 
-    
     record AuthResponse(
         String accessToken, 
         String refreshToken, 
@@ -6814,11 +6998,13 @@ public class TrackingCalculatorService {
 ```java
 package com.yowyob.rideandgo.application.service;
 
+import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.in.AuthUseCase;
 import com.yowyob.rideandgo.domain.ports.out.AuthPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -6832,8 +7018,8 @@ public class AuthService implements AuthUseCase {
     }
 
     @Override
-    public Mono<AuthPort.AuthResponse> register(String username, String email, String password, String phone, String firstName, String lastName) {
-        return authPort.register(username, password, email, phone, firstName, lastName);
+    public Mono<AuthPort.AuthResponse> register(String username, String email, String password, String phone, String firstName, String lastName, List<RoleType> roles) {
+        return authPort.register(username, password, email, phone, firstName, lastName, roles);
     }
 
     @Override
