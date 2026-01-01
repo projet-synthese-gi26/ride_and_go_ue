@@ -47,11 +47,22 @@ public class UserR2dbcAdapter implements UserRepositoryPort {
                 .flatMap(this::enrichUser);
     }
 
-    @Override
+   @Override
     public Mono<User> save(User user) {
         UserEntity entity = userMapper.toEntity(user);
-        return userRepository.save(entity)
-                .map(saved -> user); 
+        
+        // CORRECTION : On vérifie si l'utilisateur existe déjà pour décider INSERT ou UPDATE
+        // C'est moins performant qu'un flag explicite mais plus sûr si on n'a pas le contexte 'isNew' dans le domaine.
+        // Alternative optimisée : Si on vient du RemoteAuthAdapter, on sait que c'est un nouveau user.
+        
+        return userRepository.existsById(user.id())
+                .flatMap(exists -> {
+                    if (!exists) {
+                        entity.setNewEntity(true); 
+                    }
+                    return userRepository.save(entity);
+                })
+                .map(saved -> user);
     }
 
     @Override

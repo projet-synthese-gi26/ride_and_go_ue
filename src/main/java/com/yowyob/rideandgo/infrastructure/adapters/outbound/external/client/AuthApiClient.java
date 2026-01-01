@@ -1,8 +1,8 @@
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client;
 
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.service.annotation.HttpExchange;
 import org.springframework.web.service.annotation.PostExchange;
-import org.springframework.web.bind.annotation.RequestBody;
 import reactor.core.publisher.Mono;
 import java.util.List;
 
@@ -10,10 +10,12 @@ import java.util.List;
 public interface AuthApiClient {
     
     @PostExchange("/login")
-    Mono<TraMaSysResponse> authenticate(@RequestBody LoginRequest request);
+    Mono<TraMaSysResponse> login(@RequestBody LoginRequest request);
 
     @PostExchange("/register")
     Mono<TraMaSysResponse> register(@RequestBody RegisterRequest request);
+
+    // --- DTOs Internes ---
 
     record LoginRequest(String identifier, String password) {}
 
@@ -24,10 +26,26 @@ public interface AuthApiClient {
         String phone,
         String firstName,
         String lastName,
-        String service, // Sera "FLEET_MANAGEMENT"
+        String service, // Fixé à "RIDE_AND_GO"
         List<String> roles
     ) {}
 
-    record TraMaSysResponse(String accessToken, String refreshToken, UserDetail user) {}
-    record UserDetail(String id, String username, List<String> roles, List<String> permissions) {}
+    // Structure de réponse standard du service Auth
+    record TraMaSysResponse(
+        String accessToken, 
+        String refreshToken, 
+        UserDetail user
+    ) {}
+
+    record UserDetail(
+        String id, 
+        String username, 
+        String email, 
+        String phone,
+        String firstName,
+        String lastName,
+        String service,
+        List<String> roles, 
+        List<String> permissions
+    ) {}
 }

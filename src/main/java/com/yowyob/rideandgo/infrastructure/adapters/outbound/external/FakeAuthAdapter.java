@@ -1,5 +1,6 @@
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.external;
 
+import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.out.AuthPort;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
@@ -10,18 +11,28 @@ public class FakeAuthAdapter implements AuthPort {
     @Override
     public Mono<AuthResponse> login(String email, String password) {
         log.info("🛠 MODE FAKE AUTH : Login pour {}", email);
-        return Mono.just(new AuthResponse("fake-jwt", "fake-refresh", email, List.of("ADMIN"), List.of("*")));
+        return Mono.just(new AuthResponse(
+            "fake.jwt.token", 
+            "fake.refresh.token", 
+            email, 
+            List.of("RIDE_AND_GO_DRIVER"), 
+            List.of("*")
+        ));
     }
 
     @Override
-    public Mono<AuthResponse> register(String username, String email, String password, String phone, String firstName, String lastName) {
-        log.info("🛠 MODE FAKE AUTH : Inscription pour {}", username);
+    public Mono<AuthResponse> register(String username, String email, String password, String phone, String firstName, String lastName, List<RoleType> roles) {
+        log.info("🛠 MODE FAKE AUTH : Inscription pour {} avec rôles {}", username, roles);
+        
+        List<String> rolesStr = roles.stream().map(Enum::name).toList();
+
         return Mono.just(new AuthResponse(
-            "fake-jwt", 
-            "fake-refresh", 
+            "fake.jwt.token", 
+            "fake.refresh.token", 
             username, 
-            List.of("ADMIN"), 
-            List.of("*")));
+            rolesStr, 
+            List.of("*")
+        ));
     }
 
     @Override

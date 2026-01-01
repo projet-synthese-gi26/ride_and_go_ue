@@ -1,5 +1,5 @@
 # Contexte du Projet : Fleet & Geofence API
-Généré le : Wed 31 Dec 2025 01:51:33 PM WAT
+Généré le : Thu 01 Jan 2026 10:31:02 AM WAT
 Framework : Spring Boot WebFlux (Reactive)
 
 ## 1. Arborescence du Projet
@@ -20,7 +20,8 @@ Framework : Spring Boot WebFlux (Reactive)
 │   │   └── spec.md
 │   └── tests
 │       ├── full_test_offer-course.md
-│       └── test_offer_creation.md
+│       ├── test_offer_creation.md
+│       └── test_ride_annulation.md
 ├── .gitattributes
 ├── .github
 │   └── workflows
@@ -45,6 +46,7 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   │   ├── LocationService.java
     │   │               │   │   ├── OfferService.java
     │   │               │   │   ├── RideService.java
+    │   │               │   │   ├── TrackingCalculatorService.java
     │   │               │   │   └── UserService.java
     │   │               │   └── utils
     │   │               │       ├── Constants.java
@@ -73,6 +75,7 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │       │   ├── AuthUseCase.java
     │   │               │       │   ├── CreateOfferUseCase.java
     │   │               │       │   ├── GetAvailableOffersUseCase.java
+    │   │               │       │   ├── GetRideLocationUseCase.java
     │   │               │       │   ├── OfferManagementUseCase.java
     │   │               │       │   ├── PutFareInCacheUseCase.java
     │   │               │       │   ├── ResponseToOfferUseCase.java
@@ -109,6 +112,7 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   │   │       │   ├── NotificationType.java
     │   │               │   │   │       │   ├── OfferResponse.java
     │   │               │   │   │       │   ├── RideResponse.java
+    │   │               │   │   │       │   ├── RideTrackingResponse.java
     │   │               │   │   │       │   ├── SendNotificationRequest.java
     │   │               │   │   │       │   ├── UpdateOfferRequest.java
     │   │               │   │   │       │   ├── UpdateStatusRequest.java
@@ -187,7 +191,7 @@ Framework : Spring Boot WebFlux (Reactive)
                     └── reactive_hexagonal
                         └── ReactiveHexagonalApplicationTests.java
 
-49 directories, 132 files
+49 directories, 136 files
 ```
 ## 2. Contenu des Fichiers
 
@@ -422,7 +426,7 @@ distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-mav
 ```md
 ### 📋 Roadmap API RIDE & GO 
 
-- [ ] **Tâche 1 :** Configuration du projet (config,Sécurité, alignement BD Centrale & Seeding,swagger).
+- [x] **Tâche 1 :** Configuration du projet (config,Sécurité, alignement BD Centrale & Seeding,swagger).
 - [x] **1.1 : Identité & Nettoyage (Metadata)**
     - [x] Mettre à jour le `pom.xml` (artifactId: `ride-and-go`, name: `Ride & Go API`).
     - [x] Renommer le package racine `com.yowyob.rideandgo` en `com.yowyob.rideandgo`.
@@ -459,7 +463,7 @@ distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-mav
         - [x] Finaliser `AuthController` avec les endpoints de Login et Register.
         - [x] **Validation Swagger** : Scénario "Login réel sur TraMaSys -> Récupération du JWT -> Accès au HealthCheck protégé".
 
-- [ ] **Tâche 3 : Gestion des Offres (Flux Marketplace Complet)**
+- [x] **Tâche 3 : Gestion des Offres (Flux Marketplace Complet)**
     - [x] **3.1 : Stratégie d'Estimation (Fares - Stateless)**
         - [x] Créer `FakeFareAdapter` et `RemoteFareAdapter`.
         - [x] Configurer `FareConfig` (Switch application.fare.mode).
@@ -492,10 +496,10 @@ distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-mav
     - [x] 4.3 : API de gestion d'état (Start/End ride).
     - [x] 4.4 : Règles métier (Qui peut démarrer ? Qui peut finir ?).
 
-- [ ] **Tâche 5 : Gestion du GPS (Tracking Temps Réel)**
-    - [ ] 5.1 : Polling & Mise à jour Redis.
-    - [ ] 5.2 : API de consultation pour le Passager (Suivre son chauffeur).
-    - [ ] 5.3 : Calcul de distance parcourue (Post-traitement simple).
+- [x] **Tâche 5 : Gestion du GPS (Tracking Temps Réel)**
+    - [x] 5.1 : Polling & Mise à jour Redis.
+    - [x] 5.2 : API de consultation Smart (Suivre son partenaire : Chauffeur <-> Passager).
+    - [x] 5.3 : Calcul de distance & ETA (Service dédié Haversine).
 
 - [ ] **Tâche 6 : Gestion des Utilisateurs (Interne)**
     - [ ] 6.1 : CRUD Admin (si nécessaire).
@@ -506,7 +510,13 @@ distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-mav
     - [ ] 7.2 : Test Fare Calculator en réel.
     - [ ] 7.3 : Gestion des Timeouts & Circuit Breakers (Resilience4j).
 
-- [ ] **Tâche 8 :** Services Périphériques & Notation (Calculs réels, Reviews).```
+- [ ] **Tâche 8 :** Services Périphériques & Notation (Calculs réels, Reviews,abonnement des chauffeurs).
+
+- [ ] **Tâche 9 : Fine-tuning & Consolidation (Post-Integration)**
+    - [ ] 9.1 : Back-office Admin (CRUD complet Trips/Offers pour le support/debug).
+    - [ ] 9.2 : Durcissement Sécurité (Rate Limiting, Renforcement JWT, Cors).
+    - [ ] 9.3 : Gestion Globale des Erreurs (Standardisation ProblemDetails 4xx/5xx).
+    - [ ] 9.4 : Optimisation & Nettoyage (Refactoring, Logs de prod, Code mort).```
 
 ---
 ### Fichier : `./docs/tests/test_offer_creation.md`
@@ -557,6 +567,34 @@ Il faut que les chauffeurs "existent" dans Redis pour que l'ETA puisse être cal
 *   Si le `POST /offers` échoue avec une erreur de clé étrangère (FK), vérifie que l'UUID du passager existe bien dans ta table `customers`.
 *   Si le `GET /bids` renvoie des coordonnées `0.0`, c'est que le TTL de 5 minutes de Redis a expiré ou que le token n'était pas le bon lors du `POST /location`.
 ```
+
+---
+### Fichier : `./docs/tests/test_ride_annulation.md`
+```md
+### 🧪 Comment Tester l'Annulation (Swagger)
+
+Une fois le fichier mis à jour et l'app redémarrée :
+
+#### Cas A : Le Chauffeur annule (N'importe quand)
+1.  **Auth** : `driver-1-token`
+2.  **Route** : `PATCH /api/v1/trips/{TRIP_ID}/status`
+3.  **Body** :
+    ```json
+    { "status": "CANCELLED" }
+    ```
+4.  **Résultat** : `200 OK`, état `CANCELLED`.
+
+#### Cas B : Le Passager annule (Avant départ)
+1.  **Auth** : `client-token`
+2.  **Condition** : La course doit être en état `CREATED` (juste après l'acceptation).
+3.  **Route** : `PATCH /api/v1/trips/{TRIP_ID}/status`
+4.  **Body** : `{ "status": "CANCELLED" }`
+5.  **Résultat** : `200 OK`.
+
+#### Cas C : Le Passager essaie de tricher (Après départ)
+1.  Fais passer la course à `ONGOING` avec le Chauffeur.
+2.  Essaie d'annuler avec le Passager.
+3.  **Résultat** : `400` ou `500` avec le message *"Too late to cancel..."*.```
 
 ---
 ### Fichier : `./docs/tests/full_test_offer-course.md`
@@ -2708,7 +2746,7 @@ spring:
       validation-query: SELECT 1
   sql:
     init:
-      mode: always
+      mode: never
 
   # REDIS CLUSTER 
   data:
@@ -3053,14 +3091,16 @@ import org.mapstruct.ReportingPolicy;
 public interface OfferMapper {
 
     @Mapping(target = "bids", ignore = true)
-    @Mapping(target = "version", ignore = true) // Le domaine a une version, mais pas l'entité SQL
+    @Mapping(target = "version", ignore = true) 
     Offer toDomain(OfferEntity entity);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "bids", ignore = true)
     @Mapping(target = "version", ignore = true)
+    @Mapping(target = "selectedDriverId", ignore = true) // Pas de driver à la création
     Offer toDomain(CreateOfferRequest request);
 
+    // MapStruct mappera automatiquement selectedDriverId -> selectedDriverId
     OfferResponse toResponse(Offer domain);
 
     @Mapping(target = "agreements", ignore = true) 
@@ -3618,6 +3658,7 @@ public class RideEntity implements Persistable<UUID> {
 
     private double distance;
 
+    @Column("time_estimation") 
     private int duration;
 
     @Column("state")
@@ -3751,12 +3792,14 @@ import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository.RideR2dbcRepository;
 import com.yowyob.rideandgo.infrastructure.mappers.RideMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class RideR2dbcAdapter implements RideRepositoryPort {
@@ -3764,28 +3807,25 @@ public class RideR2dbcAdapter implements RideRepositoryPort {
     private final RideR2dbcRepository repository;
     private final RideMapper mapper;
 
-    /**
-     * Sauvegarde une course (Ride).
-     * Gère explicitement la distinction INSERT / UPDATE pour éviter l'erreur
-     * "Row with Id does not exist" quand l'ID est pré-généré par le domaine.
-     */
     @Override
     @Transactional
     public Mono<Ride> save(Ride ride) {
         RideEntity entity = mapper.toEntity(ride);
 
-        // 1. On vérifie si la course existe déjà en base
-        return repository.existsById(ride.id())
-                .flatMap(exists -> {
-                    if (!exists) {
-                        // 2. Si elle n'existe pas, on force le flag 'newEntity' à true
-                        // Cela indique à l'entité (qui implémente Persistable) de dire à Spring Data : "Fais un INSERT !"
-                        entity.setNewEntity(true);
-                    }
-                    // 3. Sinon (exists = true), le flag reste false, Spring Data fera un UPDATE
-                    return repository.save(entity);
-                })
-                .map(mapper::toDomain);
+        // OPTIMISATION : Comme l'ID est généré par le domaine (Service), 
+        // on sait que c'est une création. On force le flag 'newEntity' à true immédiatement.
+        // Cela évite l'appel inutile à 'existsById' et garantit le retour de l'objet.
+        if (ride.state() == com.yowyob.rideandgo.domain.model.enums.RideState.CREATED) {
+             entity.setNewEntity(true); // Force INSERT SQL
+        } else {
+             entity.setNewEntity(false); // Force UPDATE SQL
+        }
+
+        return repository.save(entity)
+                .map(mapper::toDomain)
+                // Sécurité : si save retourne empty (ne devrait pas arriver sur un insert réussi), 
+                // on log l'erreur pour comprendre.
+                .switchIfEmpty(Mono.error(new RuntimeException("Erreur critique : La sauvegarde de la course a retourné vide.")));
     }
 
     @Override
@@ -4066,61 +4106,52 @@ public class OfferR2dbcAdapter implements OfferRepositoryPort {
     private final OfferR2dbcRepository offerRepository;
     private final OfferMapper offerMapper;
 
-    /**
-     * Saves an Offer with proper INSERT/UPDATE detection and join table management.
-     * This method is transactional to ensure atomicity between offer and bidder insertions.
-     */
     @Override
     @Transactional
     public Mono<Offer> save(Offer offer) {
         OfferEntity entity = offerMapper.toEntity(offer);
         
-        // STEP 1: Check if the offer already exists in the database
         return offerRepository.existsById(offer.id())
                 .flatMap(exists -> {
-                    // If it doesn't exist, mark it as new to force INSERT
                     if (!exists) {
-                        entity.setNewEntity(true);
+                        entity.setNewEntity(true); // Force INSERT
                     }
-                    // Save the main offer entity
                     return offerRepository.save(entity);
                 })
-                // STEP 2: Handle bidder associations (join table)
                 .flatMap(savedEntity -> {
-                    // If no bids to process, return immediately
+                    // OPTIMISATION : Si la liste des bids est vide (ex: création) ou null, on ne fait rien sur la table de liaison.
+                    // Si on est dans un Update de statut (ex: SELECT_DRIVER), on ne touche pas aux bids non plus ici, 
+                    // car ils ont été insérés lors du 'Apply'.
+                    // On ne sauvegarde les bids que si c'est explicitement demandé par le cas d'usage (ex: ResponseToOffer).
+                    
                     if (offer.bids() == null || offer.bids().isEmpty()) {
                         return Mono.just(savedEntity);
                     }
 
-                    // For each bid, check if the driver already applied (avoid duplicates)
+                    // On ne traite les bids que s'ils ne sont pas déjà liés.
+                    // Pour éviter les conflits SQL lors d'un update global, on utilise insert-ignore logique via 'switchIfEmpty'
                     return Flux.fromIterable(offer.bids())
                             .flatMap(bid -> offerAgreementRepository
                                     .findByOfferIdAndDriverId(savedEntity.getId(), bid.driverId())
-                                    // If not found, insert the new agreement
                                     .switchIfEmpty(Mono.defer(() -> offerAgreementRepository.save(
                                             new OfferAgreementEntity(
                                                 Utils.generateUUID(), 
                                                 bid.driverId(), 
                                                 savedEntity.getId(),
-                                                null, // createdDate (handled by Spring Data)
-                                                null, // updatedDate (handled by Spring Data)
-                                                true  // <--- CORRECTION: newEntity=true pour forcer l'INSERT
+                                                null, 
+                                                null, 
+                                                true // Force INSERT
                                             )
                                     ))))
                             .collectList()
                             .map(agreements -> {
-                                // Attach the persisted agreements back to the entity
                                 savedEntity.setAgreements(agreements);
                                 return savedEntity;
                             });
                 })
-                // STEP 3: Map back to domain model
                 .map(this::mapToDomainManual);
     }
 
-    /**
-     * Finds an offer by ID and enriches it with its bidder associations.
-     */
     @Override
     public Mono<Offer> findById(UUID offerId) {
         return offerRepository.findById(offerId)
@@ -4128,9 +4159,6 @@ public class OfferR2dbcAdapter implements OfferRepositoryPort {
                 .map(this::mapToDomainManual);
     }
 
-    /**
-     * Lists all offers with their bidder data.
-     */
     @Override
     public Flux<Offer> findAll() {
         return offerRepository.findAll()
@@ -4138,9 +4166,6 @@ public class OfferR2dbcAdapter implements OfferRepositoryPort {
                 .map(this::mapToDomainManual);
     }
 
-    /**
-     * Helper method to fetch bidder linkages from the join table.
-     */
     private Mono<OfferEntity> enrichOfferWithAgreements(OfferEntity entity) {
         return offerAgreementRepository.findByOfferId(entity.getId())
                 .collectList()
@@ -4150,14 +4175,8 @@ public class OfferR2dbcAdapter implements OfferRepositoryPort {
                 });
     }
 
-    /**
-     * Manual mapping from Entity to Domain because MapStruct doesn't handle
-     * the bidder list properly (it's stored in a separate table).
-     */
     private Offer mapToDomainManual(OfferEntity entity) {
         Offer domain = offerMapper.toDomain(entity);
-        
-        // Convert SQL agreements to domain Bid objects
         if (entity.getAgreements() != null) {
             return domain.withBids(entity.getAgreements().stream()
                     .map(a -> Bid.builder().driverId(a.getDriverId()).build())
@@ -4547,8 +4566,9 @@ package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
 
 import com.yowyob.rideandgo.application.service.RideService;
 import com.yowyob.rideandgo.domain.model.Ride;
-import com.yowyob.rideandgo.domain.model.enums.RideState;
+import com.yowyob.rideandgo.domain.ports.in.GetRideLocationUseCase;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.RideResponse;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.RideTrackingResponse;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.UpdateStatusRequest;
 import com.yowyob.rideandgo.infrastructure.mappers.RideMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -4566,10 +4586,11 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/trips")
 @RequiredArgsConstructor
-@Tag(name = "Trip-Controller", description = "Ride lifecycle management (Driver)")
+@Tag(name = "Trip-Controller", description = "Ride lifecycle & GPS management")
 public class TripController {
 
-    private final RideService rideService; // Injection de la classe concrète pour avoir accès aux 2 méthodes
+    private final RideService rideService;
+    private final GetRideLocationUseCase getRideLocationUseCase; // Injection du nouveau use case
     private final RideMapper rideMapper;
 
     @GetMapping("/driver/current")
@@ -4582,7 +4603,6 @@ public class TripController {
                         UUID driverId = UUID.fromString(auth.getName());
                         return rideService.getCurrentRideForDriver(driverId);
                     } catch (Exception e) {
-                        // Aide au compilateur: typer explicitement le retour d'erreur
                         return Mono.<Ride>error(new IllegalStateException("Invalid Token"));
                     }
                 })
@@ -4600,14 +4620,28 @@ public class TripController {
                 .flatMap(auth -> {
                     try {
                         UUID actorId = UUID.fromString(auth.getName());
-                        // On appelle le service
                         return rideService.updateRideStatus(id, request.status(), actorId);
                     } catch (IllegalArgumentException e) {
-                        // FIX: On force le type <Ride> pour que le flatMap ne soit pas perdu
                         return Mono.<Ride>error(new IllegalStateException("Invalid User ID in Token"));
                     }
                 })
                 .map(rideMapper::toResponse);
+    }
+
+    // --- TRACKING INTELLIGENT (Task 5.2 & 5.3) ---
+    @GetMapping("/{id}/location")
+    @Operation(summary = "Smart Tracking", description = "Returns Partner Location + Distance + ETA")
+    public Mono<RideTrackingResponse> getTrackingInfo(@PathVariable UUID id) {
+        return ReactiveSecurityContextHolder.getContext()
+                .map(SecurityContext::getAuthentication)
+                .flatMap(auth -> {
+                    try {
+                        UUID requesterId = UUID.fromString(auth.getName());
+                        return getRideLocationUseCase.getPartnerLocation(id, requesterId);
+                    } catch (IllegalArgumentException e) {
+                        return Mono.error(new IllegalStateException("Invalid User ID in Token"));
+                    }
+                });
     }
 }```
 
@@ -4759,6 +4793,7 @@ import java.util.UUID;
 public record OfferResponse(
         UUID id,
         UUID passengerId,
+        UUID selectedDriverId,
         String startPoint,
         String endPoint,
         double price,
@@ -4798,6 +4833,19 @@ public record UpdateOfferRequest(
     String startPoint,
     String endPoint,
     Double price
+) {}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/inbound/rest/dto/RideTrackingResponse.java`
+```java
+package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto;
+
+public record RideTrackingResponse(
+    Double latitude,       // La position de la cible
+    Double longitude,
+    Double distanceKm,     // Distance calculée
+    Integer etaMinutes,    // Temps estimé
+    String targetRole      // "DRIVER" ou "PASSENGER"
 ) {}```
 
 ---
@@ -5792,17 +5840,21 @@ import java.util.UUID;
 
 /**
  * Domain model representing a driver's application to an offer.
- * This is a transient object, computed on-the-fly by aggregating
- * SQL bidder data, Redis location data, and ETA calculation.
  */
 @Builder
 public record Bid(
     UUID driverId,
     String driverName,
-    Integer eta,              // Estimated Time of Arrival in minutes (computed)
-    Double latitude,          // Last known latitude from Redis
-    Double longitude,         // Last known longitude from Redis
-    Double rating             // Average driver rating
+    Integer eta,              // Temps en minutes
+    Double latitude,          
+    Double longitude,         
+    Double rating,            // Note du chauffeur (ex: 4.8)
+    
+    // --- Nouveaux champs pour la Démo UI ---
+    String carModel,          // ex: "Toyota Yaris"
+    String carColor,          // ex: "Rouge"
+    String licensePlate,      // ex: "LT-123-AB"
+    String driverImage        // URL photo chauffeur
 ) {}```
 
 ---
@@ -5934,6 +5986,23 @@ public interface UpdateRideStatusUseCase {
      * @return The updated Ride
      */
     Mono<Ride> updateRideStatus(UUID rideId, RideState newStatus, UUID actorId);
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/in/GetRideLocationUseCase.java`
+```java
+package com.yowyob.rideandgo.domain.ports.in;
+
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.RideTrackingResponse;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+public interface GetRideLocationUseCase {
+    /**
+     * Récupère la position, la distance et l'ETA du partenaire de course.
+     */
+    Mono<RideTrackingResponse> getPartnerLocation(UUID rideId, UUID requesterId);
 }```
 
 ---
@@ -6323,26 +6392,21 @@ package com.yowyob.rideandgo.application.service;
 import com.yowyob.rideandgo.application.utils.Utils;
 import com.yowyob.rideandgo.domain.exception.OfferNotFoundException;
 import com.yowyob.rideandgo.domain.exception.OfferStatutNotMatchException;
-import com.yowyob.rideandgo.domain.exception.UserIsNotDriverException;
 import com.yowyob.rideandgo.domain.model.Bid;
 import com.yowyob.rideandgo.domain.model.Offer;
 import com.yowyob.rideandgo.domain.model.Ride;
-import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.domain.model.enums.OfferState;
 import com.yowyob.rideandgo.domain.model.enums.RideState;
-import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.in.*;
 import com.yowyob.rideandgo.domain.ports.out.*;
-import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.NotificationType;
-import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.SendNotificationRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 @Service
@@ -6357,13 +6421,19 @@ public class OfferService implements
     private final OfferCachePort cache;
     private final OfferRepositoryPort repository;
     private final UserRepositoryPort userRepositoryPort;
-    private final SendNotificationPort sendNotificationPort;
+    private final SendNotificationPort sendNotificationPort; // Gardé pour cohérence d'injection
     private final RideRepositoryPort rideRepositoryPort;
     private final LocationCachePort locationCachePort;
     private final EtaCalculatorService etaCalculatorService;
 
-    @Value("${application.kafka.notification-service.template.new-offer-id}")
-    private int templateCreateOfferId;
+    // --- DATA DEMO POUR LE FRONTEND (Temporaire) ---
+    private record DemoVehicle(String model, String color, String plate, String image) {}
+    
+    private static final List<DemoVehicle> FAKE_FLEET = List.of(
+        new DemoVehicle("Toyota Yaris", "Grise", "LT-882-AF", "https://randomuser.me/api/portraits/men/32.jpg"), 
+        new DemoVehicle("Hyundai Elantra", "Blanche", "CE-102-ZZ", "https://randomuser.me/api/portraits/men/45.jpg"), 
+        new DemoVehicle("Peugeot 301", "Noire", "LT-440-GG", "https://randomuser.me/api/portraits/men/22.jpg")    
+    );
 
     // --- 1. PUBLICATION ---
     @Override
@@ -6396,11 +6466,13 @@ public class OfferService implements
         return repository.findById(offerId)
                 .flatMap(offer -> userRepositoryPort.findUserById(driverId)
                         .flatMap(user -> {
+                            // Vérifie si déjà postulé pour éviter doublons logiques (même si géré par repo)
                             if (offer.hasDriverApplied(driverId)) return Mono.just(offer);
                             
                             List<Bid> currentBids = new ArrayList<>(offer.bids());
                             currentBids.add(Bid.builder().driverId(driverId).build());
                             
+                            // On passe en BID_RECEIVED si c'était PENDING
                             return repository.save(offer.withBids(currentBids).withState(OfferState.BID_RECEIVED))
                                     .flatMap(s -> cache.saveInCache(s).thenReturn(s));
                         }));
@@ -6416,7 +6488,6 @@ public class OfferService implements
                         return Mono.error(new IllegalArgumentException("Driver has not applied."));
                     }
                     
-                    // MISE A JOUR CRITIQUE : On stocke l'ID du chauffeur sélectionné
                     Offer updated = offer.withDriverSelected(driverId);
                     
                     return repository.save(updated)
@@ -6425,7 +6496,7 @@ public class OfferService implements
                 });
     }
 
-    // --- 5. CONFIRMATION (CHAUFFEUR) ---
+    // --- 5. CONFIRMATION (CHAUFFEUR) -> CRÉATION TRIP ---
     public Mono<Ride> driverAcceptsOffer(UUID offerId, UUID driverId) {
         return repository.findById(offerId)
                 .flatMap(offer -> {
@@ -6470,22 +6541,36 @@ public class OfferService implements
                 });
     }
 
-    // --- UTILITAIRE (Enrichissement) ---
+    // --- UTILITAIRE (Enrichissement & Fake Data UI) ---
     public Mono<Offer> getOfferWithEnrichedBids(UUID offerId) {
         return repository.findById(offerId)
                 .flatMap(offer -> {
-                    if (offer.bids().isEmpty()) return Mono.just(offer);
+                    if (offer.bids() == null || offer.bids().isEmpty()) return Mono.just(offer);
+                    
                     return Flux.fromIterable(offer.bids())
                             .flatMap(bid -> Mono.zip(
                                     userRepositoryPort.findUserById(bid.driverId()),
                                     locationCachePort.getLocation(bid.driverId()).defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0))
                             ).flatMap(tuple -> etaCalculatorService.calculateEta(tuple.getT2().latitude(), tuple.getT2().longitude(), 0.0, 0.0)
-                                    .map(eta -> Bid.builder()
+                                    .map(eta -> {
+                                        // LOGIQUE DEMO : Choix aléatoire d'un véhicule pour l'UI
+                                        DemoVehicle fakeCar = FAKE_FLEET.get(ThreadLocalRandom.current().nextInt(FAKE_FLEET.size()));
+                                        
+                                        return Bid.builder()
                                             .driverId(tuple.getT1().id())
                                             .driverName(tuple.getT1().name())
                                             .latitude(tuple.getT2().latitude())
                                             .longitude(tuple.getT2().longitude())
-                                            .eta(eta).rating(4.8).build())))
+                                            .eta(eta)
+                                            .rating(4.5 + (Math.random() * 0.5)) // Note aléatoire entre 4.5 et 5.0
+                                            
+                                            // Injection des Fake Data Véhicule
+                                            .carModel(fakeCar.model())
+                                            .carColor(fakeCar.color())
+                                            .licensePlate(fakeCar.plate())
+                                            .driverImage(fakeCar.image())
+                                            .build();
+                                    })))
                             .collectList()
                             .map(offer::withBids);
                 });
@@ -6512,7 +6597,7 @@ public class OfferService implements
                     Offer updated = new Offer(
                             existingOffer.id(),
                             existingOffer.passengerId(),
-                            existingOffer.selectedDriverId(), // On garde le driver sélectionné s'il y en a un
+                            existingOffer.selectedDriverId(), 
                             offerDetails.startPoint() != null ? offerDetails.startPoint() : existingOffer.startPoint(),
                             offerDetails.endPoint() != null ? offerDetails.endPoint() : existingOffer.endPoint(),
                             offerDetails.price() > 0 ? offerDetails.price() : existingOffer.price(),
@@ -6609,18 +6694,33 @@ public class RideService implements UpdateRideStatusUseCase {
         return rideRepository.findRideById(rideId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Ride not found with id: " + rideId)))
                 .flatMap(ride -> {
-                    // 1. Security Check
-                    if (!ride.driverId().equals(actorId)) {
-                        return Mono.error(new IllegalStateException("Access Denied: You are not the driver of this ride."));
+                    boolean isDriver = ride.driverId().equals(actorId);
+                    boolean isPassenger = ride.passengerId().equals(actorId);
+
+                    // 1. Vérification de Sécurité (Qui es-tu ?)
+                    if (!isDriver && !isPassenger) {
+                        return Mono.error(new IllegalStateException("Access Denied: You are not involved in this ride."));
                     }
 
-                    // 2. State Machine Logic
+                    // 2. Règles Métier pour le PASSAGER
+                    if (isPassenger) {
+                        // Le passager ne peut QUE annuler
+                        if (newStatus != RideState.CANCELLED) {
+                            return Mono.error(new IllegalStateException("Passenger is not allowed to change status to " + newStatus));
+                        }
+                        // Le passager ne peut annuler QUE si la course n'a pas démarré
+                        if (ride.state() != RideState.CREATED) {
+                            return Mono.error(new IllegalStateException("Too late to cancel. The ride has already started or finished."));
+                        }
+                    }
+
+                    // 3. Règles Métier pour la Machine à États (Valable pour Driver & Passenger)
                     if (!isValidTransition(ride.state(), newStatus)) {
                         return Mono.error(new IllegalStateException(
                                 String.format("Invalid transition from %s to %s", ride.state(), newStatus)));
                     }
 
-                    // 3. Apply Update
+                    // 4. Application de la mise à jour
                     Ride updatedRide = new Ride(
                             ride.id(),
                             ride.offerId(),
@@ -6634,12 +6734,9 @@ public class RideService implements UpdateRideStatusUseCase {
 
                     return rideRepository.save(updatedRide);
                 })
-                .doOnSuccess(r -> log.info("Ride {} status updated to {}", r.id(), r.state()));
+                .doOnSuccess(r -> log.info("Ride {} status updated to {} by actor {}", r.id(), r.state(), actorId));
     }
 
-    /**
-     * Nouvelle méthode pour le scénario de test E2E (Chauffeur récupère sa course)
-     */
     public Mono<Ride> getCurrentRideForDriver(UUID driverId) {
         return rideRepository.findCurrentRideByDriverId(driverId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("No active ride found for this driver")));
@@ -6650,8 +6747,65 @@ public class RideService implements UpdateRideStatusUseCase {
         return switch (current) {
             case CREATED -> target == RideState.ONGOING || target == RideState.CANCELLED;
             case ONGOING -> target == RideState.COMPLETED || target == RideState.CANCELLED;
-            case COMPLETED, CANCELLED -> false;
+            case COMPLETED, CANCELLED -> false; // États finaux
         };
+    }
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/application/service/TrackingCalculatorService.java`
+```java
+package com.yowyob.rideandgo.application.service;
+
+import org.springframework.stereotype.Service;
+
+@Service
+public class TrackingCalculatorService {
+
+    private static final int EARTH_RADIUS_KM = 6371;
+    // Vitesse moyenne en ville estimée à 30 km/h pour le MVP
+    private static final double AVERAGE_SPEED_KMH = 30.0; 
+
+    /**
+     * Calcule la distance à vol d'oiseau (Formule de Haversine).
+     * @return Distance en kilomètres.
+     */
+    public double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+        if ((lat1 == lat2) && (lon1 == lon2)) {
+            return 0.0;
+        }
+
+        double latDistance = Math.toRadians(lat2 - lat1);
+        double lonDistance = Math.toRadians(lon2 - lon1);
+        
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        
+        double distance = EARTH_RADIUS_KM * c;
+        
+        // Arrondi à 2 décimales (ex: 1.54 km)
+        return Math.round(distance * 100.0) / 100.0;
+    }
+
+    /**
+     * Estime le temps d'arrivée (ETA) basé sur la distance et une vitesse moyenne.
+     * @param distanceKm La distance en kilomètres.
+     * @return Temps estimé en minutes (arrondi à l'entier supérieur).
+     */
+    public int calculateEtaInMinutes(double distanceKm) {
+        if (distanceKm <= 0) return 0;
+
+        // Temps (heures) = Distance / Vitesse
+        double timeInHours = distanceKm / AVERAGE_SPEED_KMH;
+        
+        // Conversion en minutes
+        double timeInMinutes = timeInHours * 60;
+
+        // On arrondit toujours à la minute supérieure pour ne pas être en retard
+        return (int) Math.ceil(timeInMinutes);
     }
 }```
 
@@ -6693,8 +6847,11 @@ public class AuthService implements AuthUseCase {
 ```java
 package com.yowyob.rideandgo.application.service;
 
+import com.yowyob.rideandgo.domain.ports.in.GetRideLocationUseCase;
 import com.yowyob.rideandgo.domain.ports.in.UpdateLocationUseCase;
 import com.yowyob.rideandgo.domain.ports.out.LocationCachePort;
+import com.yowyob.rideandgo.domain.ports.out.RideRepositoryPort;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.RideTrackingResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
@@ -6707,16 +6864,19 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class LocationService implements UpdateLocationUseCase {
+public class LocationService implements UpdateLocationUseCase, GetRideLocationUseCase {
 
     private final LocationCachePort locationCachePort;
+    private final RideRepositoryPort rideRepositoryPort;
+    private final TrackingCalculatorService trackingCalculatorService; // Injection du nouveau service
 
+    // --- 1. Mise à jour de ma position (Existante) ---
     @Override
     public Mono<Boolean> updateCurrentLocation(Double latitude, Double longitude) {
         return ReactiveSecurityContextHolder.getContext()
                 .map(SecurityContext::getAuthentication)
                 .flatMap(auth -> {
-                    String userIdStr = auth.getName(); // Extracted from JWT
+                    String userIdStr = auth.getName(); 
                     try {
                         UUID userId = UUID.fromString(userIdStr);
                         return locationCachePort.saveLocation(userId, latitude, longitude);
@@ -6726,6 +6886,61 @@ public class LocationService implements UpdateLocationUseCase {
                     }
                 })
                 .switchIfEmpty(Mono.error(new RuntimeException("No security context found for location update")));
+    }
+
+    // --- 2. Consultation Intelligente (Nouvelle Implémentation) ---
+    @Override
+    public Mono<RideTrackingResponse> getPartnerLocation(UUID rideId, UUID requesterId) {
+        return rideRepositoryPort.findRideById(rideId)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Ride not found")))
+                .flatMap(ride -> {
+                    UUID targetId;
+                    String targetRole;
+
+                    // Détermination Symétrique
+                    if (requesterId.equals(ride.driverId())) {
+                        targetId = ride.passengerId();
+                        targetRole = "PASSENGER";
+                    } else if (requesterId.equals(ride.passengerId())) {
+                        targetId = ride.driverId();
+                        targetRole = "DRIVER";
+                    } else {
+                        return Mono.error(new IllegalStateException("Access Denied: You are not part of this ride"));
+                    }
+
+                    // Récupération Parallèle des 2 positions
+                    Mono<LocationCachePort.Location> targetLocMono = locationCachePort.getLocation(targetId)
+                            .defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0));
+                    
+                    Mono<LocationCachePort.Location> myLocMono = locationCachePort.getLocation(requesterId)
+                            .defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0));
+
+                    return Mono.zip(targetLocMono, myLocMono)
+                            .map(tuple -> {
+                                LocationCachePort.Location targetLoc = tuple.getT1();
+                                LocationCachePort.Location myLoc = tuple.getT2();
+
+                                double distance = 0.0;
+                                int eta = 0;
+
+                                // On ne calcule que si les positions sont valides
+                                if (targetLoc.latitude() != 0.0 && myLoc.latitude() != 0.0) {
+                                    distance = trackingCalculatorService.calculateDistance(
+                                            myLoc.latitude(), myLoc.longitude(),
+                                            targetLoc.latitude(), targetLoc.longitude()
+                                    );
+                                    eta = trackingCalculatorService.calculateEtaInMinutes(distance);
+                                }
+
+                                return new RideTrackingResponse(
+                                        targetLoc.latitude(),
+                                        targetLoc.longitude(),
+                                        distance,
+                                        eta,
+                                        targetRole
+                                );
+                            });
+                });
     }
 }```
 

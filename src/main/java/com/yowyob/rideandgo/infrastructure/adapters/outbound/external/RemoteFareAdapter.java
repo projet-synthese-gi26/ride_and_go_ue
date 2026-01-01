@@ -19,7 +19,7 @@ public class RemoteFareAdapter implements FareClientPort {
 
     @Override
     public Mono<FareResponse> caclculateFare(FareRequest request) {
-        log.info("🌐 MODE REMOTE FARE : Calling external API for {} to {}", request.startLocationName(), request.endLocationName());
+        log.info("🌐 MODE REMOTE FARE : Calling external API for {} to {}", request.depart(), request.arrivee());
         ReactiveCircuitBreaker rcb = cbFactory.create("fare-calculator-service");
 
         return rcb.run(

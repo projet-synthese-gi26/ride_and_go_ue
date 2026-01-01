@@ -6,35 +6,43 @@ import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FareRespons
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 public class FakeFareAdapter implements FareClientPort {
 
-    private static final double MINIMUM_CAMEROON_FARE = 350.0;
-
     @Override
     public Mono<FareResponse> caclculateFare(FareRequest request) {
-        log.info("🛠 MODE FAKE FARE : Calculation for {} to {}", request.startLocationName(), request.endLocationName());
+        log.info("🛠 MODE FAKE FARE : Calcul pour {} -> {}", request.depart(), request.arrivee());
         
-        // Simulating random distance between 1km and 10km
-        double distanceKm = ThreadLocalRandom.current().nextDouble(1.0, 10.0);
+        double randomPrice = ThreadLocalRandom.current().nextDouble(1500.0, 5000.0);
+        double roundedPrice = Math.round(randomPrice / 100.0) * 100.0; // Arrondi à 100
+
+        // Construction des sous-objets Fake
+        FareResponse.FeaturesUtilisees features = new FareResponse.FeaturesUtilisees(
+            5500.0, 900.0, 5.0, 1.2, 12, "matin", 1, 2
+        );
         
-        // Logic: 250 base + 150 per km
-        double calculatedFare = 250.0 + (distanceKm * 150.0);
-        
-        // Apply Cameroon floor price (350 XAF)
-        double officialFare = Math.max(calculatedFare, MINIMUM_CAMEROON_FARE);
-        
-        // Estimate is slightly lower for the passenger proposal
-        double estimatedFare = Math.max(officialFare * 0.9, MINIMUM_CAMEROON_FARE);
+        FareResponse.EstimationsSupplementaires estimations = new FareResponse.EstimationsSupplementaires(
+            roundedPrice, features
+        );
 
         return Mono.just(new FareResponse(
-                estimatedFare,
-                officialFare,
-                request.startLocationName(),
-                request.endLocationName(),
-                false // Dynamic calculation, not from cache
+                "exact",
+                roundedPrice,       // prix_moyen
+                roundedPrice - 200, // prix_min
+                roundedPrice + 200, // prix_max
+                5.5,                // distance
+                15.0,               // duree
+                estimations,        // estimations_supplementaires
+                Map.of("Heure de pointe", "+500F"), // ajustements_appliques
+                1,                  // fiabilite
+                "Estimation Fake réussie",
+                Map.of("type_route", "bitume"),     // details_trajet
+                List.of("Eviter le centre ville")   // suggestions
         ));
     }
 }

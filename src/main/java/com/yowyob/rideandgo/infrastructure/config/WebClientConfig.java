@@ -14,22 +14,25 @@ public class WebClientConfig {
 
     @Bean
     public FareCalculatorClient fareCalculatorClient(WebClient.Builder builder,
-                                         @Value("${application.external.fare-calculator-url:https://fare-calculator-service.pynfi.com}") String url) {
-        return createClient(builder, url, FareCalculatorClient.class);
+                                         @Value("${application.fare.url}") String url,
+                                         @Value("${application.fare.api-key}") String apiKey) {
+        
+        // Configuration pour API Key (Header standard)
+        WebClient webClient = builder
+                .baseUrl(url)
+                .defaultHeader("Authorization", "ApiKey " + apiKey) 
+                .build();
+
+        WebClientAdapter adapter = WebClientAdapter.create(webClient);
+        return HttpServiceProxyFactory.builderFor(adapter).build().createClient(FareCalculatorClient.class);
     }
 
-    /**
-     * Client for the external Authentication Service (TraMaSys).
-     */
     @Bean
     public AuthApiClient authApiClient(WebClient.Builder builder, 
-                                       @Value("${application.auth.url:https://auth-service.pynfi.com}") String url) {
+                                       @Value("${application.auth.url}") String url) {
         return createClient(builder, url, AuthApiClient.class);
     }
 
-    /**
-     * Generic helper to build declarative HTTP clients.
-     */
     private <T> T createClient(WebClient.Builder builder, String url, Class<T> clientClass) {
         WebClient webClient = builder.baseUrl(url).build();
         WebClientAdapter adapter = WebClientAdapter.create(webClient);

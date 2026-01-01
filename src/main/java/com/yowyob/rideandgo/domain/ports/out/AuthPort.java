@@ -1,9 +1,8 @@
 package com.yowyob.rideandgo.domain.ports.out;
 
+import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import reactor.core.publisher.Mono;
-
 import java.util.List;
-import java.util.Map;
 
 public interface AuthPort {
     Mono<AuthResponse> login(String email, String password);
@@ -16,9 +15,10 @@ public interface AuthPort {
         String email, 
         String phone, 
         String firstName, 
-        String lastName);
+        String lastName,
+        List<RoleType> roles 
+    );
 
-    
     record AuthResponse(
         String accessToken, 
         String refreshToken, 

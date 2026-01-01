@@ -1,5 +1,6 @@
 package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
 
+import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.in.AuthUseCase;
 import com.yowyob.rideandgo.domain.ports.out.AuthPort;
 import io.swagger.v3.oas.annotations.Operation;
@@ -7,6 +8,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -22,11 +25,17 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    @Operation(summary = "Inscription Fleet Management")
+    @Operation(summary = "Inscription Multi-Rôles")
     public Mono<AuthPort.AuthResponse> register(@RequestBody RegisterDto dto) {
+        // Gestion par défaut : Si aucune liste n'est fournie, on assigne PASSENGER
+        List<RoleType> rolesToAssign = (dto.roles() != null && !dto.roles().isEmpty()) 
+                ? dto.roles() 
+                : List.of(RoleType.RIDE_AND_GO_PASSENGER);
+
         return authUseCase.register(
             dto.username(), dto.password(), dto.email(), 
-            dto.phone(), dto.firstName(), dto.lastName()
+            dto.phone(), dto.firstName(), dto.lastName(),
+            rolesToAssign
         );
     }
 
@@ -38,6 +47,7 @@ public class AuthController {
         String email, 
         String phone, 
         String firstName, 
-        String lastName
+        String lastName,
+        List<RoleType> roles 
     ) {}
 }

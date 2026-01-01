@@ -1,6 +1,6 @@
 ### 📋 Roadmap API RIDE & GO 
 
-- [ ] **Tâche 1 :** Configuration du projet (config,Sécurité, alignement BD Centrale & Seeding,swagger).
+- [x] **Tâche 1 :** Configuration du projet (config,Sécurité, alignement BD Centrale & Seeding,swagger).
 - [x] **1.1 : Identité & Nettoyage (Metadata)**
     - [x] Mettre à jour le `pom.xml` (artifactId: `ride-and-go`, name: `Ride & Go API`).
     - [x] Renommer le package racine `com.yowyob.rideandgo` en `com.yowyob.rideandgo`.
@@ -37,7 +37,7 @@
         - [x] Finaliser `AuthController` avec les endpoints de Login et Register.
         - [x] **Validation Swagger** : Scénario "Login réel sur TraMaSys -> Récupération du JWT -> Accès au HealthCheck protégé".
 
-- [ ] **Tâche 3 : Gestion des Offres (Flux Marketplace Complet)**
+- [x] **Tâche 3 : Gestion des Offres (Flux Marketplace Complet)**
     - [x] **3.1 : Stratégie d'Estimation (Fares - Stateless)**
         - [x] Créer `FakeFareAdapter` et `RemoteFareAdapter`.
         - [x] Configurer `FareConfig` (Switch application.fare.mode).

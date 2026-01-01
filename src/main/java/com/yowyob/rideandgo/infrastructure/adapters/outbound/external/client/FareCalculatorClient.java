@@ -8,8 +8,8 @@ import org.springframework.web.service.annotation.HttpExchange;
 import org.springframework.web.service.annotation.PostExchange;
 import reactor.core.publisher.Mono;
 
-@HttpExchange("/api/v2")
+@HttpExchange("/api")
 public interface FareCalculatorClient {
-    @PostExchange("/fares/calculate")
+    @PostExchange("/estimate/")
     Mono<FareResponse> calculateFare(@RequestBody FareRequest request);
 }

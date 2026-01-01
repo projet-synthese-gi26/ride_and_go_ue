@@ -11,29 +11,25 @@ import org.mapstruct.ReportingPolicy;
 public interface FareMapper {
 
     /**
-     * Maps API response to domain model.
+     * Mappe la réponse de l'API (Pynfi/Yowyob) vers le Domaine.
      */
-    @Mapping(target = "startPoint", source = "startLocationName")
-    @Mapping(target = "endPoint", source = "endLocationName")
+    @Mapping(target = "estimatedFare", source = "prixMoyen") // Mapping du prix
+    @Mapping(target = "officialFare", source = "prixMoyen")
+    // Les champs suivants ne sont pas dans la réponse API racine, on les ignore ou on les laisse null
+    @Mapping(target = "startPoint", ignore = true) 
+    @Mapping(target = "endPoint", ignore = true)
     @Mapping(target = "userId", ignore = true)
+    @Mapping(target = "id", ignore = true)
     Fare toDomain(FareResponse response);
 
     /**
-     * Maps domain model to API response for the frontend.
+     * Mappe la requête entrante (DTO) vers le Domaine.
      */
-    @Mapping(target = "startLocationName", source = "domain.startPoint")
-    @Mapping(target = "endLocationName", source = "domain.endPoint")
-    @Mapping(target = "cached", source = "isCached")
-    FareResponse toResponse(Fare domain, boolean isCached);
-
-    /**
-     * Maps initial request to domain model.
-     */
-    @Mapping(target = "startPoint", source = "startLocationName")
-    @Mapping(target = "endPoint", source = "endLocationName")
+    @Mapping(target = "startPoint", source = "depart") // Mapping français -> anglais
+    @Mapping(target = "endPoint", source = "arrivee")
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "userId", ignore = true)
     @Mapping(target = "estimatedFare", ignore = true)
     @Mapping(target = "officialFare", ignore = true)
     Fare toDomain(FareRequest request);
-}   
+}

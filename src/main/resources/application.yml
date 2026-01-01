@@ -54,11 +54,12 @@ spring:
 # CUSTOM CONFIG 
 application:
   auth:
-    mode: fake # 'fake' pour ton dev local, 'remote' pour le serveur réel
+    mode: remote # 'fake' pour ton dev local, 'remote' pour le serveur réel
     url: https://auth-service.pynfi.com
   fare:
-    mode: fake # 'fake' pour ton dev local, 'remote' pour le serveur réel
+    mode: remote # 'fake' pour ton dev local, 'remote' pour le serveur réel
     url: https://fare-calculator-service.pynfi.com
+    api-key: 974e9428-6ce2-48e7-b74b-93f572007ef8
 
   kafka:
     topics:
@@ -93,15 +94,26 @@ management:
       prometheus:
         enabled: true
 
-# RESILIENCE4J 
+# ======================================================
+# 2. CONFIGURATION TIMEOUT (Resilience4j)
+# ======================================================
 resilience4j:
   circuitbreaker:
     instances:
-      stock-service:
-        failureRateThreshold: 50
-        waitDurationInOpenState: 5s
-        slidingWindowSize: 5
+      # Config pour le service de prix
       fare-calculator-service:
         failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+      # Config pour le service auth (si besoin)
+      auth-service:
+        failureRateThreshold: 50
         waitDurationInOpenState: 5s
         slidingWindowSize: 5
+  timelimiter:
+    instances:
+      fare-calculator-service:
+        timeoutDuration: 20s  
+      auth-service:
+        timeoutDuration: 20s

@@ -2,6 +2,8 @@ package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity
 
 import lombok.*;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable; // <--- Import Important
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -11,7 +13,7 @@ import java.util.UUID;
 @NoArgsConstructor 
 @AllArgsConstructor
 @Table("users") 
-public class UserEntity { // Plus d'héritage
+public class UserEntity implements Persistable<UUID> { // <--- Implémente Persistable
     @Id
     private UUID id;
 
@@ -23,7 +25,22 @@ public class UserEntity { // Plus d'héritage
     @Column("phone_number") 
     private String telephone;
 
-    // Note: Le mot de passe n'est pas dans le schéma SQL 'users' fourni
-    // Je le garde ici pour que ça compile, mais attention au runtime si la colonne manque.
+    // Le mot de passe est géré à distance, mais on garde le champ pour la compatibilité schéma
     private String password; 
+
+    // --- Gestion Insert/Update (Magie R2DBC) ---
+
+    @Transient
+    private boolean newEntity = false;
+
+    @Override
+    @Transient
+    public boolean isNew() {
+        // Si on marque explicitement 'newEntity' à true, ou si l'ID est null (cas classique)
+        return this.newEntity || id == null;
+    }
+
+    public void setNewEntity(boolean newEntity) {
+        this.newEntity = newEntity;
+    }
 }
