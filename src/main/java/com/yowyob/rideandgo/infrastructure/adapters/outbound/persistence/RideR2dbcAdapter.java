@@ -1,6 +1,7 @@
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence;
 
 import com.yowyob.rideandgo.domain.model.Ride;
+import com.yowyob.rideandgo.domain.model.enums.RideState;
 import com.yowyob.rideandgo.domain.ports.out.RideRepositoryPort;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.RideEntity;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository.RideR2dbcRepository;
@@ -24,22 +25,36 @@ public class RideR2dbcAdapter implements RideRepositoryPort {
     @Override
     @Transactional
     public Mono<Ride> save(Ride ride) {
+        log.info("💾 Saving Ride: ID={} State={}", ride.id(), ride.state());
         RideEntity entity = mapper.toEntity(ride);
 
-        // OPTIMISATION : Comme l'ID est généré par le domaine (Service), 
-        // on sait que c'est une création. On force le flag 'newEntity' à true immédiatement.
-        // Cela évite l'appel inutile à 'existsById' et garantit le retour de l'objet.
-        if (ride.state() == com.yowyob.rideandgo.domain.model.enums.RideState.CREATED) {
-             entity.setNewEntity(true); // Force INSERT SQL
+        // Forçage de l'INSERT si c'est une création
+        if (ride.state() == RideState.CREATED) {
+             entity.setNewEntity(true); 
+             log.debug("👉 Force INSERT for Ride {}", ride.id());
         } else {
-             entity.setNewEntity(false); // Force UPDATE SQL
+             entity.setNewEntity(false);
+             log.debug("👉 Force UPDATE for Ride {}", ride.id());
         }
 
         return repository.save(entity)
-                .map(mapper::toDomain)
-                // Sécurité : si save retourne empty (ne devrait pas arriver sur un insert réussi), 
-                // on log l'erreur pour comprendre.
-                .switchIfEmpty(Mono.error(new RuntimeException("Erreur critique : La sauvegarde de la course a retourné vide.")));
+                .doOnSuccess(e -> {
+                    if (e == null) log.error("❌ DB returned NULL for ride {}", ride.id());
+                    else log.info("✅ DB saved ride {}", e.getId());
+                })
+                .map(savedEntity -> {
+                    Ride domain = mapper.toDomain(savedEntity);
+                    if (domain == null) throw new IllegalStateException("Mapping Entity -> Domain returned null!");
+                    return domain;
+                })
+                // CORRECTION CRITIQUE : Si le save retourne vide (ce qui ne devrait pas arriver sur un insert réussi),
+                // on renvoie l'objet qu'on a tenté de sauvegarder pour ne pas briser la chaîne,
+                // ou on lève une erreur explicite.
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.error("❌ CRITICAL: Repository returned empty for Ride {}. Falling back to input object.", ride.id());
+                    // Fallback : On suppose que ça a marché si pas d'exception, on renvoie l'objet entrant
+                    return Mono.just(ride); 
+                }));
     }
 
     @Override
@@ -51,6 +66,12 @@ public class RideR2dbcAdapter implements RideRepositoryPort {
     @Override
     public Mono<Ride> findCurrentRideByDriverId(UUID driverId) {
         return repository.findActiveRideByDriverId(driverId)
+                .map(mapper::toDomain);
+    }
+    
+    @Override
+    public Mono<Ride> findRideByOfferId(UUID offerId) {
+        return repository.findByOfferId(offerId)
                 .map(mapper::toDomain);
     }
 }

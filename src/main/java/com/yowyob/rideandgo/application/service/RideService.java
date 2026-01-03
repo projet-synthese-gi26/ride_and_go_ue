@@ -33,17 +33,15 @@ public class RideService implements UpdateRideStatusUseCase {
 
                     // 2. Règles Métier pour le PASSAGER
                     if (isPassenger) {
-                        // Le passager ne peut QUE annuler
                         if (newStatus != RideState.CANCELLED) {
                             return Mono.error(new IllegalStateException("Passenger is not allowed to change status to " + newStatus));
                         }
-                        // Le passager ne peut annuler QUE si la course n'a pas démarré
                         if (ride.state() != RideState.CREATED) {
                             return Mono.error(new IllegalStateException("Too late to cancel. The ride has already started or finished."));
                         }
                     }
 
-                    // 3. Règles Métier pour la Machine à États (Valable pour Driver & Passenger)
+                    // 3. Règles Métier pour la Machine à États
                     if (!isValidTransition(ride.state(), newStatus)) {
                         return Mono.error(new IllegalStateException(
                                 String.format("Invalid transition from %s to %s", ride.state(), newStatus)));
@@ -70,13 +68,24 @@ public class RideService implements UpdateRideStatusUseCase {
         return rideRepository.findCurrentRideByDriverId(driverId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("No active ride found for this driver")));
     }
+    
+    // --- NOUVEAU : Récupération par Offre ---
+    public Mono<Ride> getRideByOfferId(UUID offerId) {
+        return rideRepository.findRideByOfferId(offerId);
+    }
+
+    // --- NOUVEAU : Récupération par ID ---
+    public Mono<Ride> getRideById(UUID rideId) {
+        return rideRepository.findRideById(rideId)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Ride not found with id: " + rideId)));
+    }
 
     private boolean isValidTransition(RideState current, RideState target) {
         if (current == target) return true;
         return switch (current) {
             case CREATED -> target == RideState.ONGOING || target == RideState.CANCELLED;
             case ONGOING -> target == RideState.COMPLETED || target == RideState.CANCELLED;
-            case COMPLETED, CANCELLED -> false; // États finaux
+            case COMPLETED, CANCELLED -> false;
         };
     }
 }

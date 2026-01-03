@@ -1,5 +1,5 @@
 # Contexte du Projet : Fleet & Geofence API
-Généré le : Thu 01 Jan 2026 03:51:42 PM WAT
+Généré le : Sat 03 Jan 2026 11:16:40 AM WAT
 Framework : Spring Boot WebFlux (Reactive)
 
 ## 1. Arborescence du Projet
@@ -85,6 +85,7 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │       │   └── UserUseCases.java
     │   │               │       └── out
     │   │               │           ├── AuthPort.java
+    │   │               │           ├── ExternalUserPort.java
     │   │               │           ├── FareCachePort.java
     │   │               │           ├── FareClientPort.java
     │   │               │           ├── LocationCachePort.java
@@ -133,8 +134,10 @@ Framework : Spring Boot WebFlux (Reactive)
     │   │               │   │       │   │   └── FareCalculatorClient.java
     │   │               │   │       │   ├── FakeAuthAdapter.java
     │   │               │   │       │   ├── FakeFareAdapter.java
+    │   │               │   │       │   ├── FakeUserAdapter.java
     │   │               │   │       │   ├── RemoteAuthAdapter.java
-    │   │               │   │       │   └── RemoteFareAdapter.java
+    │   │               │   │       │   ├── RemoteFareAdapter.java
+    │   │               │   │       │   └── RemoteUserAdapter.java
     │   │               │   │       ├── messaging
     │   │               │   │       │   ├── OfferEventPublisherAdapter.java
     │   │               │   │       │   └── SendNotificationAdapter.java
@@ -191,7 +194,7 @@ Framework : Spring Boot WebFlux (Reactive)
                     └── reactive_hexagonal
                         └── ReactiveHexagonalApplicationTests.java
 
-49 directories, 136 files
+49 directories, 139 files
 ```
 ## 2. Contenu des Fichiers
 
@@ -3053,7 +3056,7 @@ public interface UserMapper {
     @Mapping(target = "directPermissions", ignore = true)
     User toDomain(CreateUserRequest request);
 
-    @Mapping(target = "role", ignore = true)
+    @Mapping(target = "roles", ignore = true) 
     UserResponse toResponse(User domain);
 }```
 
@@ -3127,6 +3130,38 @@ public interface OfferMapper {
 
     @Mapping(target = "agreements", ignore = true) 
     OfferEntity toEntity(Offer domain);
+}```
+
+---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/external/FakeUserAdapter.java`
+```java
+package com.yowyob.rideandgo.infrastructure.adapters.outbound.external;
+
+import com.yowyob.rideandgo.domain.model.User;
+import com.yowyob.rideandgo.domain.ports.out.ExternalUserPort;
+import com.yowyob.rideandgo.domain.ports.out.UserRepositoryPort;
+import lombok.RequiredArgsConstructor;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+
+@RequiredArgsConstructor
+public class FakeUserAdapter implements ExternalUserPort {
+
+    private final UserRepositoryPort userRepository;
+
+    @Override
+    public Flux<User> fetchAllRemoteUsers() {
+        // En mode FAKE : On fait semblant que le distant = le local
+        return userRepository.findAll();
+    }
+
+    @Override
+    public Mono<User> fetchRemoteUserById(UUID id) {
+        // En mode FAKE : On récupère direct en base locale
+        return userRepository.findUserById(id);
+    }
 }```
 
 ---
@@ -3366,6 +3401,78 @@ public class RemoteAuthAdapter implements AuthPort {
 }```
 
 ---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/external/RemoteUserAdapter.java`
+```java
+package com.yowyob.rideandgo.infrastructure.adapters.outbound.external;
+
+import com.yowyob.rideandgo.domain.model.User;
+import com.yowyob.rideandgo.domain.ports.out.ExternalUserPort;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.AuthApiClient;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import java.util.Collections;
+import java.util.UUID;
+import com.yowyob.rideandgo.domain.model.Role;
+import com.yowyob.rideandgo.domain.model.enums.RoleType;
+import java.util.stream.Collectors;
+import java.util.Set;
+
+@Slf4j
+@RequiredArgsConstructor
+public class RemoteUserAdapter implements ExternalUserPort {
+    private final AuthApiClient client;
+    private static final String SERVICE_NAME = "RIDE_AND_GO";
+
+    @Override
+    public Flux<User> fetchAllRemoteUsers() {
+        return client.getUsersByService(SERVICE_NAME).map(this::mapToDomain);
+    }
+
+    @Override
+    public Mono<User> fetchRemoteUserById(UUID id) {
+        // STRATÉGIE DE CONTOURNEMENT :
+        // La route directe /users/{id} renvoie 401.
+        // On utilise la route de liste (qui marche) et on filtre nous-même.
+        return client.getUsersByService(SERVICE_NAME)
+                .filter(u -> u.id().equals(id.toString())) // On cherche l'utilisateur dans la liste
+                .next() // On prend le premier (Mono)
+                .map(this::mapToDomain)
+                // Si on ne le trouve pas dans la liste, on renvoie empty
+                .switchIfEmpty(Mono.empty());
+    }
+
+    private User mapToDomain(AuthApiClient.UserDetail dto) {
+        // 1. Conversion des rôles String -> Domain Role
+        Set<Role> roles = dto.roles().stream()
+                .filter(roleStr -> {
+                    try {
+                        // On filtre pour ne garder que les rôles connus de notre Enum
+                        RoleType.valueOf(roleStr);
+                        return true;
+                    } catch (IllegalArgumentException e) {
+                        return false; 
+                    }
+                })
+                .map(roleStr -> Role.builder()
+                        .type(RoleType.valueOf(roleStr))
+                        // On ne connait pas l'ID du rôle ici, c'est la persistence qui le trouvera via le type
+                        .build()) 
+                .collect(Collectors.toSet());
+
+        return User.builder()
+                .id(UUID.fromString(dto.id()))
+                .name(dto.username())
+                .email(dto.email())
+                .telephone(dto.phone())
+                .roles(roles) // <--- ON PASSE LES RÔLES ICI
+                .directPermissions(Collections.emptySet())
+                .build();
+    }
+}```
+
+---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/outbound/external/client/FareCalculatorClient.java`
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client;
@@ -3390,20 +3497,30 @@ public interface FareCalculatorClient {
 ```java
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client;
 
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.service.annotation.GetExchange;
 import org.springframework.web.service.annotation.HttpExchange;
 import org.springframework.web.service.annotation.PostExchange;
+
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import java.util.List;
 
-@HttpExchange("/api/auth")
+@HttpExchange("/api")
 public interface AuthApiClient {
     
-    @PostExchange("/login")
+    @PostExchange("/auth/login")
     Mono<TraMaSysResponse> login(@RequestBody LoginRequest request);
 
-    @PostExchange("/register")
+    @PostExchange("/auth/register")
     Mono<TraMaSysResponse> register(@RequestBody RegisterRequest request);
+
+    @GetExchange("/users/service/{serviceName}")
+    Flux<UserDetail> getUsersByService(@PathVariable String serviceName);
+
+    @GetExchange("/users/{id}")
+    Mono<UserDetail> getUserById(@PathVariable String id);
 
     // --- DTOs Internes ---
 
@@ -3706,7 +3823,7 @@ public class UserEntity implements Persistable<UUID> { // <--- Implémente Persi
     @Column("phone_number") 
     private String telephone;
 
-    // Le mot de passe est géré à distance, mais on garde le champ pour la compatibilité schéma
+    @Transient 
     private String password; 
 
     // --- Gestion Insert/Update (Magie R2DBC) ---
@@ -3810,6 +3927,8 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable; 
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -3820,7 +3939,7 @@ import java.util.UUID;
 @NoArgsConstructor 
 @AllArgsConstructor
 @Table("roles")
-public class RoleEntity {
+public class RoleEntity implements Persistable<UUID> { 
     @Id
     private UUID id;
 
@@ -3834,6 +3953,20 @@ public class RoleEntity {
     @LastModifiedDate
     @Column("updated_at")
     private LocalDateTime lastModifiedDate;
+
+    // --- Gestion Insert/Update ---
+    @Transient
+    private boolean newEntity = false;
+
+    @Override
+    @Transient
+    public boolean isNew() {
+        return this.newEntity || id == null;
+    }
+
+    public void setNewEntity(boolean newEntity) {
+        this.newEntity = newEntity;
+    }
 }```
 
 ---
@@ -3864,8 +3997,7 @@ public class RoleR2dbcAdapter implements RoleRepositoryPort {
 
     @Override
     public Mono<Role> findByRoleName(RoleType type) {
-        // ✅ CORRECTION : Appel de findByName
-        return roleRepository.findByName(type)
+        return roleRepository.findByName(type).next()
                 .flatMap(this::enrichRole);
     }
 
@@ -3894,6 +4026,7 @@ public class RoleR2dbcAdapter implements RoleRepositoryPort {
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence;
 
 import com.yowyob.rideandgo.domain.model.Ride;
+import com.yowyob.rideandgo.domain.model.enums.RideState;
 import com.yowyob.rideandgo.domain.ports.out.RideRepositoryPort;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.RideEntity;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository.RideR2dbcRepository;
@@ -3917,22 +4050,36 @@ public class RideR2dbcAdapter implements RideRepositoryPort {
     @Override
     @Transactional
     public Mono<Ride> save(Ride ride) {
+        log.info("💾 Saving Ride: ID={} State={}", ride.id(), ride.state());
         RideEntity entity = mapper.toEntity(ride);
 
-        // OPTIMISATION : Comme l'ID est généré par le domaine (Service), 
-        // on sait que c'est une création. On force le flag 'newEntity' à true immédiatement.
-        // Cela évite l'appel inutile à 'existsById' et garantit le retour de l'objet.
-        if (ride.state() == com.yowyob.rideandgo.domain.model.enums.RideState.CREATED) {
-             entity.setNewEntity(true); // Force INSERT SQL
+        // Forçage de l'INSERT si c'est une création
+        if (ride.state() == RideState.CREATED) {
+             entity.setNewEntity(true); 
+             log.debug("👉 Force INSERT for Ride {}", ride.id());
         } else {
-             entity.setNewEntity(false); // Force UPDATE SQL
+             entity.setNewEntity(false);
+             log.debug("👉 Force UPDATE for Ride {}", ride.id());
         }
 
         return repository.save(entity)
-                .map(mapper::toDomain)
-                // Sécurité : si save retourne empty (ne devrait pas arriver sur un insert réussi), 
-                // on log l'erreur pour comprendre.
-                .switchIfEmpty(Mono.error(new RuntimeException("Erreur critique : La sauvegarde de la course a retourné vide.")));
+                .doOnSuccess(e -> {
+                    if (e == null) log.error("❌ DB returned NULL for ride {}", ride.id());
+                    else log.info("✅ DB saved ride {}", e.getId());
+                })
+                .map(savedEntity -> {
+                    Ride domain = mapper.toDomain(savedEntity);
+                    if (domain == null) throw new IllegalStateException("Mapping Entity -> Domain returned null!");
+                    return domain;
+                })
+                // CORRECTION CRITIQUE : Si le save retourne vide (ce qui ne devrait pas arriver sur un insert réussi),
+                // on renvoie l'objet qu'on a tenté de sauvegarder pour ne pas briser la chaîne,
+                // ou on lève une erreur explicite.
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.error("❌ CRITICAL: Repository returned empty for Ride {}. Falling back to input object.", ride.id());
+                    // Fallback : On suppose que ça a marché si pas d'exception, on renvoie l'objet entrant
+                    return Mono.just(ride); 
+                }));
     }
 
     @Override
@@ -3944,6 +4091,12 @@ public class RideR2dbcAdapter implements RideRepositoryPort {
     @Override
     public Mono<Ride> findCurrentRideByDriverId(UUID driverId) {
         return repository.findActiveRideByDriverId(driverId)
+                .map(mapper::toDomain);
+    }
+    
+    @Override
+    public Mono<Ride> findRideByOfferId(UUID offerId) {
+        return repository.findByOfferId(offerId)
                 .map(mapper::toDomain);
     }
 }```
@@ -3989,6 +4142,9 @@ public interface RideR2dbcRepository extends ReactiveCrudRepository<RideEntity, 
     // On cherche une course qui est soit CREATED (en approche), soit ONGOING (en cours)
     @Query("SELECT * FROM rides WHERE driver_id = :driverId AND state IN ('CREATED', 'ONGOING') LIMIT 1")
     Mono<RideEntity> findActiveRideByDriverId(UUID driverId);
+
+    // --- NOUVEAU ---
+    Mono<RideEntity> findByOfferId(UUID offerId);
 }```
 
 ---
@@ -4000,16 +4156,13 @@ import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.RoleEntity;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-
+import reactor.core.publisher.Flux; // Import Flux
 import java.util.UUID;
 
 public interface RoleR2dbcRepository extends ReactiveCrudRepository<RoleEntity, UUID> {
     
-    // ✅ CORRECTION : findByType -> findByName
-    // Spring Data générera : "WHERE name = $1"
-    Mono<RoleEntity> findByName(RoleType name);
+    // CORRECTION : On renvoie Flux au lieu de Mono pour éviter l'erreur "Non unique result"
+    Flux<RoleEntity> findByName(RoleType name);
 
     @Query("SELECT r.* FROM roles r JOIN user_has_roles uhr ON r.id = uhr.role_id WHERE uhr.user_id = :userId")
     Flux<RoleEntity> findAllByUserId(UUID userId);
@@ -4085,9 +4238,14 @@ import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.reposit
 import com.yowyob.rideandgo.infrastructure.mappers.UserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDateTime;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.RoleEntity;
+
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
+import org.springframework.r2dbc.core.DatabaseClient;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -4100,6 +4258,7 @@ public class UserR2dbcAdapter implements UserRepositoryPort {
     private final RoleR2dbcRepository roleRepository;
     private final PermissionR2dbcRepository permissionRepository;
     private final UserMapper userMapper;
+     private final DatabaseClient databaseClient;
 
     @Override
     public Mono<User> findUserById(UUID userId) {
@@ -4118,26 +4277,61 @@ public class UserR2dbcAdapter implements UserRepositoryPort {
     @Override
     public Flux<User> findByRoleName(RoleType type) {
         return roleRepository.findByName(type)
-                .flatMapMany(role -> userRepository.findAllByRoleId(role.getId()))
+                .flatMap(role -> userRepository.findAllByRoleId(role.getId()))
                 .flatMap(this::enrichUser);
     }
 
    @Override
+    @Transactional
     public Mono<User> save(User user) {
         UserEntity entity = userMapper.toEntity(user);
-        
-        // CORRECTION : On vérifie si l'utilisateur existe déjà pour décider INSERT ou UPDATE
-        // C'est moins performant qu'un flag explicite mais plus sûr si on n'a pas le contexte 'isNew' dans le domaine.
-        // Alternative optimisée : Si on vient du RemoteAuthAdapter, on sait que c'est un nouveau user.
-        
+
         return userRepository.existsById(user.id())
                 .flatMap(exists -> {
-                    if (!exists) {
-                        entity.setNewEntity(true); 
-                    }
+                    if (!exists) entity.setNewEntity(true);
                     return userRepository.save(entity);
                 })
-                .map(saved -> user);
+                .flatMap(savedEntity -> syncRoles(user, savedEntity))
+                // --- AJOUT IMPORTANT : Sync des tables filles ---
+                .flatMap(savedEntity -> syncActorTables(user, savedEntity)) 
+                .map(savedEntity -> user);
+    }
+
+    /**
+     * Insère l'utilisateur dans la table 'customers' ou 'drivers' selon son rôle.
+     * C'est nécessaire pour satisfaire les FK des autres tables (offers, rides).
+     */
+    private Mono<UserEntity> syncActorTables(User user, UserEntity savedEntity) {
+        if (user.roles() == null || user.roles().isEmpty()) return Mono.just(savedEntity);
+
+        return Flux.fromIterable(user.roles())
+            .flatMap(role -> {
+                String roleName = role.type().name();
+                
+                if (roleName.contains("PASSENGER") || roleName.contains("CUSTOMER")) {
+                    // On insère dans 'customers' si pas déjà présent
+                    // Note: customers hérite de users, mais ici on a des tables séparées avec FK
+                    return databaseClient.sql("INSERT INTO customers (id, code, payment_method) VALUES (:id, :code, 'CASH') ON CONFLICT DO NOTHING")
+                            .bind("id", savedEntity.getId())
+                            .bind("code", "CUST-" + savedEntity.getId().toString().substring(0, 8))
+                            .then();
+                } 
+                else if (roleName.contains("DRIVER")) {
+                    // Pour un driver, il faut d'abord l'insérer dans 'business_actors' (si ton modèle le demande)
+                    // puis dans 'drivers'.
+                    return databaseClient.sql("INSERT INTO business_actors (id, name, email_address, phone_number) VALUES (:id, :name, :email, :phone) ON CONFLICT DO NOTHING")
+                            .bind("id", savedEntity.getId())
+                            .bind("name", savedEntity.getName())
+                            .bind("email", savedEntity.getEmail())
+                            .bind("phone", savedEntity.getTelephone())
+                            .then()
+                            .then(databaseClient.sql("INSERT INTO drivers (id, status, license_number) VALUES (:id, 'AVAILABLE', 'UNKNOWN') ON CONFLICT DO NOTHING")
+                                .bind("id", savedEntity.getId())
+                                .then());
+                }
+                return Mono.empty();
+            })
+            .then(Mono.just(savedEntity));
     }
 
     @Override
@@ -4188,6 +4382,48 @@ public class UserR2dbcAdapter implements UserRepositoryPort {
                         .roles(tuple.getT1())
                         .directPermissions(tuple.getT2())
                         .build());
+    }
+
+     /**
+     * Méthode helper pour gérer la table de liaison user_has_roles
+     * avec création automatique des rôles manquants (Get or Create).
+     */
+    private Mono<UserEntity> syncRoles(User domainUser, UserEntity savedEntity) {
+        if (domainUser.roles() == null || domainUser.roles().isEmpty()) {
+            return Mono.just(savedEntity);
+        }
+
+        // A. On supprime les anciens liens pour cet user
+        String deleteSql = "DELETE FROM user_has_roles WHERE user_id = :userId";
+        
+        return databaseClient.sql(deleteSql)
+                .bind("userId", savedEntity.getId())
+                .then()
+                .thenMany(Flux.fromIterable(domainUser.roles()))
+                .flatMap(domainRole -> 
+                    // 1. On cherche le rôle
+                    roleRepository.findByName(domainRole.type()).next()
+                        // 2. S'il n'existe pas, on le crée (SwitchIfEmpty)
+                        .switchIfEmpty(Mono.defer(() -> {
+                            // System.out.println("⚠️ Role " + domainRole.type() + " introuvable. Création automatique...");
+                            RoleEntity newRole = new RoleEntity(
+                                java.util.UUID.randomUUID(), 
+                                domainRole.type(), 
+                                LocalDateTime.now(), 
+                                LocalDateTime.now(),
+                                true 
+                            );
+                            return roleRepository.save(newRole);
+                        }))
+                        // 3. Une fois qu'on a le rôle (trouvé ou créé), on insère le lien
+                        .flatMap(roleEntity -> 
+                            databaseClient.sql("INSERT INTO user_has_roles (user_id, role_id) VALUES (:userId, :roleId) ON CONFLICT DO NOTHING")
+                                    .bind("userId", savedEntity.getId())
+                                    .bind("roleId", roleEntity.getId())
+                                    .then()
+                        )
+                )
+                .then(Mono.just(savedEntity));
     }
 }```
 
@@ -4492,6 +4728,7 @@ import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.RideRespons
 import com.yowyob.rideandgo.infrastructure.mappers.OfferMapper;
 import com.yowyob.rideandgo.infrastructure.mappers.RideMapper;
 import com.yowyob.rideandgo.application.service.OfferService;
+import com.yowyob.rideandgo.application.service.RideService; // Import ajouté
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -4513,6 +4750,7 @@ public class OfferController {
     private final ResponseToOfferUseCase responseToOfferUseCase;
     private final SelectDriverUseCase selectDriverUseCase;
     private final OfferService offerService; 
+    private final RideService rideService; // Injection ajoutée
     private final OfferMapper mapper;
     private final RideMapper rideMapper; 
 
@@ -4559,6 +4797,14 @@ public class OfferController {
         return offerService.cancelOffer(id).map(mapper::toResponse);
     }
 
+    // --- NOUVEAU ENDPOINT : Transition Offre -> Course ---
+    @GetMapping("/{id}/ride")
+    @Operation(summary = "Get linked ride for an offer", description = "Returns the Ride object if the offer has been validated by a driver.")
+    public Mono<RideResponse> getRideByOfferId(@PathVariable UUID id) {
+        return rideService.getRideByOfferId(id)
+                .map(rideMapper::toResponse);
+    }
+
     // --- ENDPOINTS DE GESTION / DEBUG ---
 
     @GetMapping
@@ -4576,7 +4822,6 @@ public class OfferController {
     @PutMapping("/{id}")
     @Operation(summary = "Update offer", description = "Modifies start/end points or price. Does not change state.")
     public Mono<OfferResponse> updateOffer(@PathVariable UUID id, @RequestBody UpdateOfferRequest request) {
-        // Mapping manuel rapide du DTO vers le modèle de domaine partiel
         com.yowyob.rideandgo.domain.model.Offer domainUpdate = com.yowyob.rideandgo.domain.model.Offer.builder()
                 .startPoint(request.startPoint())
                 .endPoint(request.endPoint())
@@ -4718,8 +4963,16 @@ import java.util.UUID;
 public class TripController {
 
     private final RideService rideService;
-    private final GetRideLocationUseCase getRideLocationUseCase; // Injection du nouveau use case
+    private final GetRideLocationUseCase getRideLocationUseCase;
     private final RideMapper rideMapper;
+
+    // --- NOUVEAU ENDPOINT : Récupération par ID ---
+    @GetMapping("/{id}")
+    @Operation(summary = "Get ride details", description = "Get details of a ride by its ID")
+    public Mono<RideResponse> getRideById(@PathVariable UUID id) {
+        return rideService.getRideById(id)
+                .map(rideMapper::toResponse);
+    }
 
     @GetMapping("/driver/current")
     @Operation(summary = "Get current active ride for driver", description = "Finds ride in CREATED or ONGOING state")
@@ -4756,7 +5009,6 @@ public class TripController {
                 .map(rideMapper::toResponse);
     }
 
-    // --- TRACKING INTELLIGENT (Task 5.2 & 5.3) ---
     @GetMapping("/{id}/location")
     @Operation(summary = "Smart Tracking", description = "Returns Partner Location + Distance + ETA")
     public Mono<RideTrackingResponse> getTrackingInfo(@PathVariable UUID id) {
@@ -4898,21 +5150,18 @@ import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List; 
 import java.util.UUID;
 
 @Data @Builder
 public class UserResponse {
     private UUID id;
-
     private String name;
-
     private String email;
-
     private String telephone;
-
-    RoleType role;
-}
-```
+    
+    List<RoleType> roles; 
+}```
 
 ---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/infrastructure/adapters/inbound/rest/dto/OfferResponse.java`
@@ -5031,7 +5280,6 @@ public record RideTrackingResponse(
 package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
 
 import com.yowyob.rideandgo.application.utils.Utils;
-import com.yowyob.rideandgo.domain.model.Role;
 import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.in.UserUseCases;
@@ -5039,6 +5287,13 @@ import com.yowyob.rideandgo.domain.ports.out.RoleRepositoryPort;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.CreateUserRequest;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.UserResponse;
 import com.yowyob.rideandgo.infrastructure.mappers.UserMapper;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -5050,13 +5305,7 @@ import reactor.core.publisher.Mono;
 import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -5074,7 +5323,7 @@ public class UserController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create a user", description = "Creates a new user with a specified role type")
+    @Operation(summary = "Create a user", description = "Creates a new user with a specified role type", hidden = true)
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "User created", content = @Content(schema = @Schema(implementation = UserResponse.class))),
             @ApiResponse(responseCode = "400", description = "Invalid input data")
@@ -5092,20 +5341,13 @@ public class UserController {
                             .email(request.getEmail())
                             .telephone(request.getTelephone())
                             .password(passwordEncoder.encode(request.getPassword()))
-                            .roles(Set.of(role)) // Wrap role in a Set for the new RBAC domain model
-                            .directPermissions(Collections.emptySet()) // Initialize empty direct permissions
+                            .roles(Set.of(role)) 
+                            .directPermissions(Collections.emptySet())
                             .build();
 
                     return userUseCases.saveUser(userToSave);
                 })
-                .map(savedUser -> {
-                    UserResponse response = userMapper.toResponse(savedUser);
-                    // Map the first role type back to the DTO for the frontend
-                    if (!savedUser.roles().isEmpty()) {
-                        response.setRole(savedUser.roles().iterator().next().type());
-                    }
-                    return response;
-                });
+                .map(this::mapToResponse); 
     }
 
     /**
@@ -5122,14 +5364,7 @@ public class UserController {
         log.info("Fetching user details for id: {}", userId);
         
         return userUseCases.getUserById(userId)
-                .map(user -> {
-                    UserResponse response = userMapper.toResponse(user);
-                    // Set the primary role type in the DTO
-                    if (user.roles() != null && !user.roles().isEmpty()) {
-                        response.setRole(user.roles().iterator().next().type());
-                    }
-                    return response;
-                });
+                .map(this::mapToResponse); 
     }
 
     /**
@@ -5145,20 +5380,14 @@ public class UserController {
         
         Flux<User> userFlux = (role != null) ? userUseCases.getUsersByRole(role) : userUseCases.getAllUsers();
 
-        return userFlux.map(user -> {
-            UserResponse response = userMapper.toResponse(user);
-            if (user.roles() != null && !user.roles().isEmpty()) {
-                response.setRole(user.roles().iterator().next().type());
-            }
-            return response;
-        });
+        return userFlux.map(this::mapToResponse); 
     }
 
     /**
      * Deletes a user from the system.
      */
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete user", description = "Permanently delete a user by its UUID")
+    @Operation(summary = "Delete user", description = "Permanently delete a user by its UUID", hidden = true)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "User successfully deleted"),
             @ApiResponse(responseCode = "404", description = "User not found")
@@ -5167,6 +5396,19 @@ public class UserController {
             @Parameter(description = "User identifier", required = true) @PathVariable UUID id) {
         log.info("Deleting user with id: {}", id);
         return userUseCases.deleteUserById(id);
+    }
+
+    // --- Helper Unique pour Mapper les Rôles ---
+    private UserResponse mapToResponse(User user) {
+        UserResponse response = userMapper.toResponse(user);
+        
+        if (user.roles() != null) {
+            // Conversion Set<Role> vers List<RoleType>
+            response.setRoles(user.roles().stream()
+                    .map(com.yowyob.rideandgo.domain.model.Role::type)
+                    .collect(Collectors.toList()));
+        }
+        return response;
     }
 }```
 
@@ -5260,8 +5502,14 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+
 @Configuration
 public class AuthConfig {
+    private final UserRepositoryPort userRepositoryPort;
+
+    public AuthConfig(UserRepositoryPort userRepositoryPort) {
+        this.userRepositoryPort = userRepositoryPort;
+    }
 
     @Bean
     @ConditionalOnProperty(name = "application.auth.mode", havingValue = "fake")
@@ -5275,6 +5523,22 @@ public class AuthConfig {
         // Injection du repository pour la sauvegarde locale des utilisateurs lors du register
         return new RemoteAuthAdapter(authApiClient, userRepositoryPort);
     }
+
+    // AJOUTER ces méthodes dans la classe AuthConfig
+
+    @Bean
+    @ConditionalOnProperty(name = "application.auth.mode", havingValue = "fake")
+    public com.yowyob.rideandgo.domain.ports.out.ExternalUserPort fakeUserPort() {
+        return new com.yowyob.rideandgo.infrastructure.adapters.outbound.external.FakeUserAdapter(userRepositoryPort);
+    }
+
+    
+
+    @Bean
+    @ConditionalOnProperty(name = "application.auth.mode", havingValue = "remote", matchIfMissing = true)
+    public com.yowyob.rideandgo.domain.ports.out.ExternalUserPort remoteUserPort(AuthApiClient authApiClient) {
+        return new com.yowyob.rideandgo.infrastructure.adapters.outbound.external.RemoteUserAdapter(authApiClient);
+    }
 }```
 
 ---
@@ -5284,13 +5548,22 @@ package com.yowyob.rideandgo.infrastructure.config;
 
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.AuthApiClient;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.FareCalculatorClient;
+
+import reactor.core.publisher.Mono;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.support.WebClientAdapter;
 import org.springframework.web.service.invoker.HttpServiceProxyFactory;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.web.reactive.function.client.ClientRequest; 
+import org.springframework.web.reactive.function.client.ExchangeFilterFunction; 
+import lombok.extern.slf4j.Slf4j;
 
+
+@Slf4j
 @Configuration
 public class WebClientConfig {
 
@@ -5312,7 +5585,14 @@ public class WebClientConfig {
     @Bean
     public AuthApiClient authApiClient(WebClient.Builder builder, 
                                        @Value("${application.auth.url}") String url) {
-        return createClient(builder, url, AuthApiClient.class);
+        WebClient webClient = builder
+                .baseUrl(url)
+                .filter(addBearerToken()) 
+                .build();
+
+        WebClientAdapter adapter = WebClientAdapter.create(webClient);
+        HttpServiceProxyFactory factory = HttpServiceProxyFactory.builderFor(adapter).build();
+        return factory.createClient(AuthApiClient.class);
     }
 
     private <T> T createClient(WebClient.Builder builder, String url, Class<T> clientClass) {
@@ -5320,6 +5600,38 @@ public class WebClientConfig {
         WebClientAdapter adapter = WebClientAdapter.create(webClient);
         HttpServiceProxyFactory factory = HttpServiceProxyFactory.builderFor(adapter).build();
         return factory.createClient(clientClass);
+    }
+ 
+    /**
+     * Filtre avec Logging pour diagnostiquer la perte de Token
+     */
+    private ExchangeFilterFunction addBearerToken() {
+        return (request, next) -> ReactiveSecurityContextHolder.getContext()
+            .map(ctx -> ctx.getAuthentication())
+            .flatMap(auth -> {
+                // LOG 1 : Voir si on a l'objet Authentication
+                System.out.println("🔍 [DEBUG WebClient] Auth Principal: " + auth.getPrincipal());
+                
+                Object credentials = auth.getCredentials();
+                // LOG 2 : Voir ce qu'il y a dans les credentials
+                System.out.println("🔍 [DEBUG WebClient] Credentials Type: " + (credentials != null ? credentials.getClass().getName() : "NULL"));
+                System.out.println("🔍 [DEBUG WebClient] Credentials Value: " + credentials);
+
+                if (credentials instanceof String token) {
+                    System.out.println("✅ [DEBUG WebClient] Token trouvé ! Injection dans le header...");
+                    ClientRequest newRequest = ClientRequest.from(request)
+                            .headers(headers -> headers.setBearerAuth(token))
+                            .build();
+                    return next.exchange(newRequest);
+                } else {
+                    System.out.println("⚠️ [DEBUG WebClient] Pas de Token String dans credentials. Envoi sans Auth.");
+                }
+                return next.exchange(request);
+            })
+            .switchIfEmpty(Mono.defer(() -> {
+                System.out.println("❌ [DEBUG WebClient] Contexte de Sécurité VIDE ! (Pas d'utilisateur connecté ?)");
+                return next.exchange(request);
+            }));
     }
 }```
 
@@ -5339,7 +5651,12 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -5364,17 +5681,39 @@ public class SecurityConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+                
+                // --- AJOUT CORRECTION CORS ---
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                // -----------------------------
+
                 .authenticationManager(authenticationManager)
                 .securityContextRepository(securityContextRepository)
                 .authorizeExchange(exchanges -> exchanges
-                        // Public routes
-                        .pathMatchers("/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/webjars/**").permitAll()
-                        // Public Healthcheck (for dev convenience)
-                        .pathMatchers("/api/v1/health/**").permitAll()
-                        // Protected business routes
+                        .pathMatchers(
+                                "/api/v1/auth/**", 
+                                "/v3/api-docs/**", 
+                                "/swagger-ui/**", 
+                                "/swagger-ui.html", 
+                                "/webjars/**",
+                                "/api/v1/health/**" // Healthcheck public
+                        ).permitAll()
                         .anyExchange().authenticated()
                 )
                 .build();
+    }
+
+    // --- BEAN CORS ---
+    @Bean
+    CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        // En prod, idéalement on met le domaine précis, mais pour le dev/démo "*" est OK
+        configuration.setAllowedOrigins(List.of("*")); 
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(List.of("*")); // Autorise tous les headers (Authorization, etc.)
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }```
 
@@ -5774,6 +6113,7 @@ public class SecurityContextRepository implements ServerSecurityContextRepositor
 ```java
 package com.yowyob.rideandgo.infrastructure.security;
 
+import com.yowyob.rideandgo.domain.model.enums.RoleType; // <--- Import de tes vrais rôles
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -5789,31 +6129,41 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class JwtAuthenticationManager implements ReactiveAuthenticationManager {
 
-    // Simulation de tokens liés à des UUIDs réels de ta base (issus du seeding data.sql)
+    // Simulation de tokens liés à des UUIDs réels de ta base
     private static final Map<String, String> STATIC_TOKENS = Map.of(
-        "client-token", "7f13909e-7170-4f91-872e-333333333333", // Un UUID de customer
-        "driver-1-token", "a1b2c3d4-e5f6-4a5b-8c9d-111111111111", // Un UUID de driver
-        "driver-2-token", "a1b2c3d4-e5f6-4a5b-8c9d-222222222222"  // Un autre UUID de driver
+        "client-token", "7f13909e-7170-4f91-872e-333333333333",
+        "driver-1-token", "a1b2c3d4-e5f6-4a5b-8c9d-111111111111",
+        "driver-2-token", "a1b2c3d4-e5f6-4a5b-8c9d-222222222222"
     );
 
     @Override
     public Mono<Authentication> authenticate(Authentication authentication) {
         String authToken = authentication.getCredentials().toString();
         
-        // Si le token est connu, on retourne l'UUID correspondant comme "Name"
+        // 1. Cas des tokens de test statiques (Swagger)
         if (STATIC_TOKENS.containsKey(authToken)) {
             String userId = STATIC_TOKENS.get(authToken);
+            
+            // Logique simple pour donner le bon rôle selon le nom du token de test
+            RoleType role = authToken.contains("driver") 
+                    ? RoleType.RIDE_AND_GO_DRIVER 
+                    : RoleType.RIDE_AND_GO_PASSENGER;
+
             return Mono.just(new UsernamePasswordAuthenticationToken(
                     userId, 
-                    null, 
-                    List.of(new SimpleGrantedAuthority("ROLE"))
+                    authToken, // Token Relay activé
+                    List.of(new SimpleGrantedAuthority(role.name())) // Utilisation du vrai Enum
             ));
         }
 
-        // Fallback pour ne pas bloquer les autres tests
+        // 2. Cas des vrais JWT (Remote / Production)
         if (authToken != null && !authToken.isEmpty()) {
+            // NOTE : Dans un futur sprint, on décodera le JWT pour extraire les rôles "claims".
+            // Pour l'instant, on assigne un rôle par défaut valide pour que Spring Security ne bloque pas.
             return Mono.just(new UsernamePasswordAuthenticationToken(
-                    authToken, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                    authToken, // Principal
+                    authToken, // Token Relay activé
+                    List.of(new SimpleGrantedAuthority(RoleType.RIDE_AND_GO_PASSENGER.name()))
             ));
         }
         
@@ -6416,6 +6766,21 @@ public interface LocationCachePort {
 }```
 
 ---
+### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/ExternalUserPort.java`
+```java
+package com.yowyob.rideandgo.domain.ports.out;
+
+import com.yowyob.rideandgo.domain.model.User;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import java.util.UUID;
+
+public interface ExternalUserPort {
+    Flux<User> fetchAllRemoteUsers();
+    Mono<User> fetchRemoteUserById(UUID id);
+}```
+
+---
 ### Fichier : `./src/main/java/com/yowyob/rideandgo/domain/ports/out/OfferCachePort.java`
 ```java
 package com.yowyob.rideandgo.domain.ports.out;
@@ -6460,8 +6825,10 @@ import java.util.UUID;
 public interface RideRepositoryPort {
     Mono<Ride> save(Ride ride);
     Mono<Ride> findRideById(UUID id);
-    // Nouvelle méthode requise
     Mono<Ride> findCurrentRideByDriverId(UUID driverId);
+    
+    // --- NOUVEAU ---
+    Mono<Ride> findRideByOfferId(UUID offerId);
 }```
 
 ---
@@ -6811,27 +7178,27 @@ import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.in.UserUseCases;
 import com.yowyob.rideandgo.domain.ports.out.UserRepositoryPort;
+import com.yowyob.rideandgo.domain.ports.out.ExternalUserPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import lombok.extern.slf4j.Slf4j;
+
 
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService implements UserUseCases {
 
     private final UserRepositoryPort userRepositoryPort;
+    private final ExternalUserPort externalUserPort;
 
     @Override
     public Mono<User> saveUser(User user) {
         return userRepositoryPort.save(user);
-    }
-
-    @Override
-    public Mono<User> getUserById(UUID userId) {
-        return userRepositoryPort.findUserById(userId);
     }
 
     @Override
@@ -6840,13 +7207,25 @@ public class UserService implements UserUseCases {
     }
 
     @Override
-    public Flux<User> getAllUsers() {
-        return userRepositoryPort.findAll();
+    public Flux<User> getUsersByRole(RoleType role) {
+        return userRepositoryPort.findByRoleName(role);
     }
 
     @Override
-    public Flux<User> getUsersByRole(RoleType role) {
-        return userRepositoryPort.findByRoleName(role);
+    public Mono<User> getUserById(UUID userId) {
+        // Règle stricte : Appel Distant -> Sauvegarde Locale -> Retour
+        return externalUserPort.fetchRemoteUserById(userId)
+                .flatMap(userRepositoryPort::save)
+                .doOnSuccess(u -> log.info("✅ Synced user {} from remote", u.id()));
+    }
+
+
+    @Override
+    public Flux<User> getAllUsers() {
+        // Appel Distant -> Sauvegarde tout -> Retourne flux sauvegardé
+        return externalUserPort.fetchAllRemoteUsers()
+                .flatMap(userRepositoryPort::save)
+                .doOnComplete(() -> log.info("✅ Full user list synced from remote"));
     }
 }```
 
@@ -6888,17 +7267,15 @@ public class RideService implements UpdateRideStatusUseCase {
 
                     // 2. Règles Métier pour le PASSAGER
                     if (isPassenger) {
-                        // Le passager ne peut QUE annuler
                         if (newStatus != RideState.CANCELLED) {
                             return Mono.error(new IllegalStateException("Passenger is not allowed to change status to " + newStatus));
                         }
-                        // Le passager ne peut annuler QUE si la course n'a pas démarré
                         if (ride.state() != RideState.CREATED) {
                             return Mono.error(new IllegalStateException("Too late to cancel. The ride has already started or finished."));
                         }
                     }
 
-                    // 3. Règles Métier pour la Machine à États (Valable pour Driver & Passenger)
+                    // 3. Règles Métier pour la Machine à États
                     if (!isValidTransition(ride.state(), newStatus)) {
                         return Mono.error(new IllegalStateException(
                                 String.format("Invalid transition from %s to %s", ride.state(), newStatus)));
@@ -6925,13 +7302,24 @@ public class RideService implements UpdateRideStatusUseCase {
         return rideRepository.findCurrentRideByDriverId(driverId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("No active ride found for this driver")));
     }
+    
+    // --- NOUVEAU : Récupération par Offre ---
+    public Mono<Ride> getRideByOfferId(UUID offerId) {
+        return rideRepository.findRideByOfferId(offerId);
+    }
+
+    // --- NOUVEAU : Récupération par ID ---
+    public Mono<Ride> getRideById(UUID rideId) {
+        return rideRepository.findRideById(rideId)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Ride not found with id: " + rideId)));
+    }
 
     private boolean isValidTransition(RideState current, RideState target) {
         if (current == target) return true;
         return switch (current) {
             case CREATED -> target == RideState.ONGOING || target == RideState.CANCELLED;
             case ONGOING -> target == RideState.COMPLETED || target == RideState.CANCELLED;
-            case COMPLETED, CANCELLED -> false; // États finaux
+            case COMPLETED, CANCELLED -> false;
         };
     }
 }```

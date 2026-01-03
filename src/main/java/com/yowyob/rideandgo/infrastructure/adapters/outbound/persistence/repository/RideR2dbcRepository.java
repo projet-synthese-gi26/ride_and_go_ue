@@ -11,4 +11,7 @@ public interface RideR2dbcRepository extends ReactiveCrudRepository<RideEntity, 
     // On cherche une course qui est soit CREATED (en approche), soit ONGOING (en cours)
     @Query("SELECT * FROM rides WHERE driver_id = :driverId AND state IN ('CREATED', 'ONGOING') LIMIT 1")
     Mono<RideEntity> findActiveRideByDriverId(UUID driverId);
+
+    // --- NOUVEAU ---
+    Mono<RideEntity> findByOfferId(UUID offerId);
 }

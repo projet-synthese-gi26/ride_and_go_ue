@@ -26,8 +26,16 @@ import java.util.UUID;
 public class TripController {
 
     private final RideService rideService;
-    private final GetRideLocationUseCase getRideLocationUseCase; // Injection du nouveau use case
+    private final GetRideLocationUseCase getRideLocationUseCase;
     private final RideMapper rideMapper;
+
+    // --- NOUVEAU ENDPOINT : Récupération par ID ---
+    @GetMapping("/{id}")
+    @Operation(summary = "Get ride details", description = "Get details of a ride by its ID")
+    public Mono<RideResponse> getRideById(@PathVariable UUID id) {
+        return rideService.getRideById(id)
+                .map(rideMapper::toResponse);
+    }
 
     @GetMapping("/driver/current")
     @Operation(summary = "Get current active ride for driver", description = "Finds ride in CREATED or ONGOING state")
@@ -64,7 +72,6 @@ public class TripController {
                 .map(rideMapper::toResponse);
     }
 
-    // --- TRACKING INTELLIGENT (Task 5.2 & 5.3) ---
     @GetMapping("/{id}/location")
     @Operation(summary = "Smart Tracking", description = "Returns Partner Location + Distance + ETA")
     public Mono<RideTrackingResponse> getTrackingInfo(@PathVariable UUID id) {

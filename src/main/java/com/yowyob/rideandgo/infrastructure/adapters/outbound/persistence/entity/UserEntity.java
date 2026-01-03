@@ -25,7 +25,7 @@ public class UserEntity implements Persistable<UUID> { // <--- Implémente Persi
     @Column("phone_number") 
     private String telephone;
 
-    // Le mot de passe est géré à distance, mais on garde le champ pour la compatibilité schéma
+    @Transient 
     private String password; 
 
     // --- Gestion Insert/Update (Magie R2DBC) ---

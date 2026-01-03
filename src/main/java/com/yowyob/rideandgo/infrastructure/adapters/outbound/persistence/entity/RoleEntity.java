@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable; 
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -17,7 +19,7 @@ import java.util.UUID;
 @NoArgsConstructor 
 @AllArgsConstructor
 @Table("roles")
-public class RoleEntity {
+public class RoleEntity implements Persistable<UUID> { 
     @Id
     private UUID id;
 
@@ -31,4 +33,18 @@ public class RoleEntity {
     @LastModifiedDate
     @Column("updated_at")
     private LocalDateTime lastModifiedDate;
+
+    // --- Gestion Insert/Update ---
+    @Transient
+    private boolean newEntity = false;
+
+    @Override
+    @Transient
+    public boolean isNew() {
+        return this.newEntity || id == null;
+    }
+
+    public void setNewEntity(boolean newEntity) {
+        this.newEntity = newEntity;
+    }
 }

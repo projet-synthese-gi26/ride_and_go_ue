@@ -7,6 +7,7 @@ import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.RideRespons
 import com.yowyob.rideandgo.infrastructure.mappers.OfferMapper;
 import com.yowyob.rideandgo.infrastructure.mappers.RideMapper;
 import com.yowyob.rideandgo.application.service.OfferService;
+import com.yowyob.rideandgo.application.service.RideService; // Import ajouté
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class OfferController {
     private final ResponseToOfferUseCase responseToOfferUseCase;
     private final SelectDriverUseCase selectDriverUseCase;
     private final OfferService offerService; 
+    private final RideService rideService; // Injection ajoutée
     private final OfferMapper mapper;
     private final RideMapper rideMapper; 
 
@@ -74,6 +76,14 @@ public class OfferController {
         return offerService.cancelOffer(id).map(mapper::toResponse);
     }
 
+    // --- NOUVEAU ENDPOINT : Transition Offre -> Course ---
+    @GetMapping("/{id}/ride")
+    @Operation(summary = "Get linked ride for an offer", description = "Returns the Ride object if the offer has been validated by a driver.")
+    public Mono<RideResponse> getRideByOfferId(@PathVariable UUID id) {
+        return rideService.getRideByOfferId(id)
+                .map(rideMapper::toResponse);
+    }
+
     // --- ENDPOINTS DE GESTION / DEBUG ---
 
     @GetMapping
@@ -91,7 +101,6 @@ public class OfferController {
     @PutMapping("/{id}")
     @Operation(summary = "Update offer", description = "Modifies start/end points or price. Does not change state.")
     public Mono<OfferResponse> updateOffer(@PathVariable UUID id, @RequestBody UpdateOfferRequest request) {
-        // Mapping manuel rapide du DTO vers le modèle de domaine partiel
         com.yowyob.rideandgo.domain.model.Offer domainUpdate = com.yowyob.rideandgo.domain.model.Offer.builder()
                 .startPoint(request.startPoint())
                 .endPoint(request.endPoint())

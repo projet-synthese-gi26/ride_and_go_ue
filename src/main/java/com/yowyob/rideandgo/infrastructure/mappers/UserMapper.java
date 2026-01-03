@@ -21,6 +21,6 @@ public interface UserMapper {
     @Mapping(target = "directPermissions", ignore = true)
     User toDomain(CreateUserRequest request);
 
-    @Mapping(target = "role", ignore = true)
+    @Mapping(target = "roles", ignore = true) 
     UserResponse toResponse(User domain);
 }

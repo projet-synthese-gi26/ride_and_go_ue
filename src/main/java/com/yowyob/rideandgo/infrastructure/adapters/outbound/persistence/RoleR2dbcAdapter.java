@@ -23,8 +23,7 @@ public class RoleR2dbcAdapter implements RoleRepositoryPort {
 
     @Override
     public Mono<Role> findByRoleName(RoleType type) {
-        // ✅ CORRECTION : Appel de findByName
-        return roleRepository.findByName(type)
+        return roleRepository.findByName(type).next()
                 .flatMap(this::enrichRole);
     }
 
