@@ -10,11 +10,11 @@ import org.springframework.web.service.annotation.HttpExchange;
 import org.springframework.web.service.annotation.PostExchange;
 import org.springframework.web.service.annotation.PutExchange;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import java.util.List;
+import java.util.UUID;
 
 @HttpExchange("/api")
 public interface AuthApiClient {
@@ -74,7 +74,9 @@ public interface AuthApiClient {
                         String service,
                         List<String> roles,
                         List<String> permissions,
-                        String photoId) {
+                        UUID photoId,
+                        String photoUri
+                        ) {
         }
 
         record UpdateProfileDto(String firstName, String lastName, String phone) {
