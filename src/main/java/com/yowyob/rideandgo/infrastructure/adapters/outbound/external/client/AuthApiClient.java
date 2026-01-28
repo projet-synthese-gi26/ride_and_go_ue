@@ -1,6 +1,9 @@
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import org.springframework.http.HttpEntity;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.service.annotation.GetExchange;
@@ -17,7 +20,7 @@ public interface AuthApiClient {
         Mono<TraMaSysResponse> login(@RequestBody LoginRequest request);
 
         @PostExchange("/auth/register")
-        Mono<TraMaSysResponse> register(@RequestBody RegisterRequest request);
+        Mono<TraMaSysResponse> register(@RequestBody MultiValueMap<String,HttpEntity<?>> request);
 
         @GetExchange("/users/service/{serviceName}")
         Flux<UserDetail> getUsersByService(@PathVariable String serviceName);
