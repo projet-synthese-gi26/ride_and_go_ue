@@ -90,6 +90,9 @@ application:
       ride-cancelled: 5   # ID template: Course annulée
       admin-validation: 7 # ID template: admin a validé le profil du driver
 
+  vehicle:
+    url: https://vehicule-service.pynfi.com
+
   kafka:
     topics:
       notification-service-create-topic: notification-create-topic
