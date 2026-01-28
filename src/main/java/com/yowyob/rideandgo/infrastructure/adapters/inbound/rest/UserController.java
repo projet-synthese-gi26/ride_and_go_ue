@@ -44,6 +44,14 @@ public class UserController {
                 .map(this::mapToResponse);
     }
 
+    @GetMapping("/me")
+    @Operation(summary = "Get my profile", description = "Retrieve the profile of the currently authenticated user based on JWT.")
+    public Mono<UserResponse> getCurrentUser() {
+        return getCurrentUserId()
+                .flatMap(userUseCases::getUserById)
+                .map(this::mapToResponse);
+    }
+
     // --- GESTION PROFIL (SELF) ---
 
     @PutMapping("/profile") // Préférable de ne pas passer l'ID dans l'URL pour la sécurité (utilise le
