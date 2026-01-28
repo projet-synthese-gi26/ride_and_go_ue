@@ -18,6 +18,8 @@ spring:
     driver-class-name: org.postgresql.Driver
 
   liquibase:
+    user: ${DB_USERNAME:master}
+    password: ${DB_PASSWORD:Azerty1234*}
     enabled: true
     change-log: classpath:db/changelog/db.changelog-master.yaml
     default-schema: ride_and_go
