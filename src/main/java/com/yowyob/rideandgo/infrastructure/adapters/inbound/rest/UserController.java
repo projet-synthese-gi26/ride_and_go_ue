@@ -2,8 +2,6 @@ package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
 
 import com.yowyob.rideandgo.application.service.UserService;
 import com.yowyob.rideandgo.domain.model.User;
-import com.yowyob.rideandgo.domain.model.Vehicle;
-import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.in.UserUseCases;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.BecomeDriverRequest;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.ChangePasswordRequest;
@@ -54,8 +52,7 @@ public class UserController {
 
     // --- GESTION PROFIL (SELF) ---
 
-    @PutMapping("/profile") // Préférable de ne pas passer l'ID dans l'URL pour la sécurité (utilise le
-                            // token)
+    @PutMapping("/profile") // Préférable de ne pas passer l'ID dans l'URL pour la sécurité (utilise le token)
     @Operation(summary = "Update my profile")
     public Mono<UserResponse> updateProfile(@RequestBody UpdateUserProfileRequest request) {
         return getCurrentUserId()
