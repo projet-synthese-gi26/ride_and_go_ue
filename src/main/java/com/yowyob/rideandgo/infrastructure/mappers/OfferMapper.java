@@ -18,10 +18,11 @@ public interface OfferMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "bids", ignore = true)
     @Mapping(target = "version", ignore = true)
-    @Mapping(target = "selectedDriverId", ignore = true) // Pas de driver à la création
+    @Mapping(target = "passengerId", ignore = true)     // Géré manuellement
+    @Mapping(target = "state", ignore = true)           // Géré par le service (PENDING)
+    @Mapping(target = "selectedDriverId", ignore = true)
     Offer toDomain(CreateOfferRequest request);
 
-    // MapStruct mappera automatiquement selectedDriverId -> selectedDriverId
     OfferResponse toResponse(Offer domain);
 
     @Mapping(target = "agreements", ignore = true) 

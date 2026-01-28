@@ -2,6 +2,8 @@ package com.yowyob.rideandgo.infrastructure.config;
 
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.AuthApiClient;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.FareCalculatorClient;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.NotificationApiClient;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.VehicleApiClient;
 
 import reactor.core.publisher.Mono;
 
@@ -26,7 +28,6 @@ public class WebClientConfig {
                                          @Value("${application.fare.url}") String url,
                                          @Value("${application.fare.api-key}") String apiKey) {
         
-        // Configuration pour API Key (Header standard)
         WebClient webClient = builder
                 .baseUrl(url)
                 .defaultHeader("Authorization", "ApiKey " + apiKey) 
@@ -43,48 +44,46 @@ public class WebClientConfig {
                 .baseUrl(url)
                 .filter(addBearerToken()) 
                 .build();
-
+                                
         WebClientAdapter adapter = WebClientAdapter.create(webClient);
         HttpServiceProxyFactory factory = HttpServiceProxyFactory.builderFor(adapter).build();
         return factory.createClient(AuthApiClient.class);
     }
 
-    private <T> T createClient(WebClient.Builder builder, String url, Class<T> clientClass) {
-        WebClient webClient = builder.baseUrl(url).build();
+    @Bean
+    public NotificationApiClient notificationApiClient(WebClient.Builder builder,
+                                                       @Value("${application.notification.url}") String url,
+                                                       @Value("${application.notification.service-token}") String serviceToken) {
+        // Configuration pour le service de notification avec X-Service-Token
+        WebClient webClient = builder
+                .baseUrl(url)
+                .defaultHeader("X-Service-Token", serviceToken)
+                .build();
+
         WebClientAdapter adapter = WebClientAdapter.create(webClient);
-        HttpServiceProxyFactory factory = HttpServiceProxyFactory.builderFor(adapter).build();
-        return factory.createClient(clientClass);
+        return HttpServiceProxyFactory.builderFor(adapter).build().createClient(NotificationApiClient.class);
+    }
+
+    @Bean
+    public VehicleApiClient vehicleApiClient(WebClient.Builder builder, @Value("${application.vehicle.url}") String url) {
+        WebClient webClient = builder.baseUrl(url).filter(addBearerToken()).build();
+        WebClientAdapter adapter = WebClientAdapter.create(webClient);
+        return HttpServiceProxyFactory.builderFor(adapter).build().createClient(VehicleApiClient.class);
     }
  
-    /**
-     * Filtre avec Logging pour diagnostiquer la perte de Token
-     */
     private ExchangeFilterFunction addBearerToken() {
         return (request, next) -> ReactiveSecurityContextHolder.getContext()
             .map(ctx -> ctx.getAuthentication())
             .flatMap(auth -> {
-                // LOG 1 : Voir si on a l'objet Authentication
-                System.out.println("🔍 [DEBUG WebClient] Auth Principal: " + auth.getPrincipal());
-                
                 Object credentials = auth.getCredentials();
-                // LOG 2 : Voir ce qu'il y a dans les credentials
-                System.out.println("🔍 [DEBUG WebClient] Credentials Type: " + (credentials != null ? credentials.getClass().getName() : "NULL"));
-                System.out.println("🔍 [DEBUG WebClient] Credentials Value: " + credentials);
-
                 if (credentials instanceof String token) {
-                    System.out.println("✅ [DEBUG WebClient] Token trouvé ! Injection dans le header...");
                     ClientRequest newRequest = ClientRequest.from(request)
                             .headers(headers -> headers.setBearerAuth(token))
                             .build();
                     return next.exchange(newRequest);
-                } else {
-                    System.out.println("⚠️ [DEBUG WebClient] Pas de Token String dans credentials. Envoi sans Auth.");
                 }
                 return next.exchange(request);
             })
-            .switchIfEmpty(Mono.defer(() -> {
-                System.out.println("❌ [DEBUG WebClient] Contexte de Sécurité VIDE ! (Pas d'utilisateur connecté ?)");
-                return next.exchange(request);
-            }));
+            .switchIfEmpty(Mono.defer(() -> next.exchange(request)));
     }
 }

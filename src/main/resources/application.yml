@@ -12,7 +12,7 @@ spring:
 
   # POSTGRESQL (R2DBC)
   r2dbc:
-    url: r2dbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:yowyob_db}
+    url: r2dbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:yowyob_db}?schema=ride_and_go
     username: ${DB_USERNAME:fleet_admin}
     password: ${DB_PASSWORD:fleet_password}
     pool:
@@ -24,9 +24,26 @@ spring:
       acquire-retry: 3
       max-acquire-time: 30s
       validation-query: SELECT 1
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:yowyob_db}?currentSchema=ride_and_go
+    username: ${DB_USERNAME:fleet_admin}
+    password: ${DB_PASSWORD:fleet_password}
+    driver-class-name: org.postgresql.Driver
+
+# Liquibase
+  liquibase:
+    enabled: true
+    user: fleet_admin
+    password: fleet_password
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+    default-schema: ride_and_go # Force Liquibase à travailler dans ce schéma
+    liquibase-schema: ride_and_go # Stocke les tables de gestion Liquibase ici aussi
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:yowyob_db}
+
   sql:
     init:
-      mode: never
+      mode: never 
 
   # REDIS CLUSTER 
   data:
@@ -56,28 +73,32 @@ application:
   auth:
     mode: remote # 'fake' pour ton dev local, 'remote' pour le serveur réel
     url: https://auth-service.pynfi.com
+
   fare:
     mode: remote # 'fake' pour ton dev local, 'remote' pour le serveur réel
     url: https://fare-calculator-service.pynfi.com
     api-key: 974e9428-6ce2-48e7-b74b-93f572007ef8
+    
+  notification:
+    mode: http # 'http' ou 'kafka'
+    url: https://notification-service.pynfi.com # URL du Swagger fourni
+    service-token: "a77599d3-8de7-4d52-b9d0-2202b2e13a9e" # Token récupéré après enregistrement du service
+    templates:
+      new-offer: 1        # ID template: Nouvelle offre pour les chauffeurs
+      driver-applied: 2   # ID template: Un chauffeur a postulé (pour le client)
+      driver-selected: 3  # ID template: Vous avez été choisi (pour le chauffeur)
+      ride-confirmed: 4   # ID template: Le chauffeur arrive (pour le client)
+      ride-cancelled: 5   # ID template: Course annulée
+      admin-validation: 7 # ID template: admin a validé le profil du driver
+
+  vehicle:
+    url: https://vehicule-service.pynfi.com
 
   kafka:
     topics:
       notification-service-create-topic: notification-create-topic
       offer-created: offer-created-topic
       offer-send: notification-send-topic
-    notification-registration:
-      name: "Ride and Go"
-      email:
-        host: ${SMTP_HOST:smtp.gmail.com}
-        port: ${SMTP_PORT:587}
-        username: ${SMTP_USERNAME}
-        password: ${SMTP_PASSWORD}
-    notification-service:
-      token: token-topic
-      template:
-        new-offer-id: 1001
-        accepted-offer-id: 1002
 
 management:
   endpoints:
@@ -100,17 +121,25 @@ management:
 resilience4j:
   circuitbreaker:
     instances:
+
       # Config pour le service de prix
       fare-calculator-service:
         failureRateThreshold: 50
         waitDurationInOpenState: 10s
         slidingWindowSize: 10
         permittedNumberOfCallsInHalfOpenState: 3
+
       # Config pour le service auth (si besoin)
       auth-service:
         failureRateThreshold: 50
         waitDurationInOpenState: 5s
         slidingWindowSize: 5
+
+      notification-service:
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        slidingWindowSize: 10
+
   timelimiter:
     instances:
       fare-calculator-service:

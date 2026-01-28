@@ -20,48 +20,83 @@ public class RemoteUserAdapter implements ExternalUserPort {
     private final AuthApiClient client;
     private static final String SERVICE_NAME = "RIDE_AND_GO";
 
+    // --- READ ---
+
     @Override
     public Flux<User> fetchAllRemoteUsers() {
-        return client.getUsersByService(SERVICE_NAME).map(this::mapToDomain);
+        return getUsersByService(SERVICE_NAME);
+    }
+
+    @Override
+    public Flux<User> fetchAllRemoteUsersByService(String serviceName) {
+        return getUsersByService(serviceName);
+    }
+
+    private Flux<User> getUsersByService(String service) {
+        return client.getUsersByService(service).map(this::mapToDomain);
     }
 
     @Override
     public Mono<User> fetchRemoteUserById(UUID id) {
-        // STRATÉGIE DE CONTOURNEMENT :
-        // La route directe /users/{id} renvoie 401.
-        // On utilise la route de liste (qui marche) et on filtre nous-même.
-        return client.getUsersByService(SERVICE_NAME)
-                .filter(u -> u.id().equals(id.toString())) // On cherche l'utilisateur dans la liste
-                .next() // On prend le premier (Mono)
+        return client.getUserById(id.toString())
                 .map(this::mapToDomain)
-                // Si on ne le trouve pas dans la liste, on renvoie empty
-                .switchIfEmpty(Mono.empty());
+                .onErrorResume(e -> {
+                    log.warn("User {} not found via direct ID call, trying list filter...", id);
+                    return fetchAllRemoteUsers()
+                            .filter(u -> u.id().equals(id))
+                            .next();
+                });
     }
 
+    // --- WRITE (Propagation) ---
+
+    @Override
+    public Mono<Void> addRole(UUID userId, String roleName) {
+        log.info("🌍 Propagating ADD ROLE {} for user {} to Auth Service", roleName, userId);
+        return client.addRole(userId.toString(), roleName);
+    }
+
+    @Override
+    public Mono<Void> removeRole(UUID userId, String roleName) {
+        log.info("🌍 Propagating REMOVE ROLE {} for user {} to Auth Service", roleName, userId);
+        return client.removeRole(userId.toString(), roleName);
+    }
+
+    @Override
+    public Mono<User> updateProfile(UUID userId, String firstName, String lastName, String phone) {
+        log.info("🌍 Propagating UPDATE PROFILE for user {} to Auth Service", userId);
+        return client.updateProfile(userId.toString(), new AuthApiClient.UpdateProfileDto(firstName, lastName, phone))
+                .map(this::mapToDomain);
+    }
+
+    @Override
+    public Mono<Void> changePassword(UUID userId, String currentPassword, String newPassword) {
+        log.info("🌍 Propagating PASSWORD CHANGE for user {} to Auth Service", userId);
+        return client.changePassword(userId.toString(),
+                new AuthApiClient.ChangePasswordDto(currentPassword, newPassword));
+    }
+
+    // --- MAPPER ---
+
     private User mapToDomain(AuthApiClient.UserDetail dto) {
-        // 1. Conversion des rôles String -> Domain Role
-        Set<Role> roles = dto.roles().stream()
+        Set<Role> roles = dto.roles() != null ? dto.roles().stream()
                 .filter(roleStr -> {
                     try {
-                        // On filtre pour ne garder que les rôles connus de notre Enum
                         RoleType.valueOf(roleStr);
                         return true;
                     } catch (IllegalArgumentException e) {
-                        return false; 
+                        return false;
                     }
                 })
-                .map(roleStr -> Role.builder()
-                        .type(RoleType.valueOf(roleStr))
-                        // On ne connait pas l'ID du rôle ici, c'est la persistence qui le trouvera via le type
-                        .build()) 
-                .collect(Collectors.toSet());
+                .map(roleStr -> Role.builder().type(RoleType.valueOf(roleStr)).build())
+                .collect(Collectors.toSet()) : Collections.emptySet();
 
         return User.builder()
                 .id(UUID.fromString(dto.id()))
-                .name(dto.username())
+                .name(dto.username()) // Username est utilisé comme name ici, ou on concatène First/Last
                 .email(dto.email())
                 .telephone(dto.phone())
-                .roles(roles) // <--- ON PASSE LES RÔLES ICI
+                .roles(roles)
                 .directPermissions(Collections.emptySet())
                 .build();
     }

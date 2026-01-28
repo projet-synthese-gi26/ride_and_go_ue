@@ -5,4 +5,4 @@ public enum RoleType {
     RIDE_AND_GO_PASSENGER,
     RIDE_AND_GO_DRIVER,
     RIDE_AND_GO_ADMIN
-}
+} 

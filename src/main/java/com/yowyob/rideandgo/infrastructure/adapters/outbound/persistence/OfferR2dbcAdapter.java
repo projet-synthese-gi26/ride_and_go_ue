@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Collections;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -31,47 +32,52 @@ public class OfferR2dbcAdapter implements OfferRepositoryPort {
     @Override
     @Transactional
     public Mono<Offer> save(Offer offer) {
+        log.info("💾 SAVE OFFER: ID={}, Bids Count={}", offer.id(), (offer.bids() != null ? offer.bids().size() : "null"));
+        
         OfferEntity entity = offerMapper.toEntity(offer);
         
         return offerRepository.existsById(offer.id())
                 .flatMap(exists -> {
-                    if (!exists) {
-                        entity.setNewEntity(true); // Force INSERT
-                    }
+                    if (!exists) entity.setNewEntity(true);
                     return offerRepository.save(entity);
                 })
-                .flatMap(savedEntity -> {
-                    // OPTIMISATION : Si la liste des bids est vide (ex: création) ou null, on ne fait rien sur la table de liaison.
-                    // Si on est dans un Update de statut (ex: SELECT_DRIVER), on ne touche pas aux bids non plus ici, 
-                    // car ils ont été insérés lors du 'Apply'.
-                    // On ne sauvegarde les bids que si c'est explicitement demandé par le cas d'usage (ex: ResponseToOffer).
-                    
+                .flatMap(savedOffer -> {
                     if (offer.bids() == null || offer.bids().isEmpty()) {
-                        return Mono.just(savedEntity);
+                        log.info("⚠️ No bids to save for offer {}", offer.id());
+                        return Mono.just(savedOffer);
                     }
 
-                    // On ne traite les bids que s'ils ne sont pas déjà liés.
-                    // Pour éviter les conflits SQL lors d'un update global, on utilise insert-ignore logique via 'switchIfEmpty'
                     return Flux.fromIterable(offer.bids())
-                            .flatMap(bid -> offerAgreementRepository
-                                    .findByOfferIdAndDriverId(savedEntity.getId(), bid.driverId())
-                                    .switchIfEmpty(Mono.defer(() -> offerAgreementRepository.save(
-                                            new OfferAgreementEntity(
-                                                Utils.generateUUID(), 
-                                                bid.driverId(), 
-                                                savedEntity.getId(),
-                                                null, 
-                                                null, 
-                                                true // Force INSERT
-                                            )
-                                    ))))
-                            .collectList()
-                            .map(agreements -> {
-                                savedEntity.setAgreements(agreements);
-                                return savedEntity;
+                            .flatMap(bid -> {
+                                log.debug("Processing bid for driver {}", bid.driverId());
+                                return offerAgreementRepository
+                                    .findByOfferIdAndDriverId(savedOffer.getId(), bid.driverId())
+                                    .doOnNext(found -> log.debug("Bid already exists for driver {}", bid.driverId()))
+                                    .switchIfEmpty(
+                                        Mono.defer(() -> {
+                                            log.info("➕ INSERTING BID: Driver {} -> Offer {}", bid.driverId(), savedOffer.getId());
+                                            OfferAgreementEntity link = new OfferAgreementEntity();
+                                            link.setId(Utils.generateUUID());
+                                            link.setOfferId(savedOffer.getId());
+                                            link.setDriverId(bid.driverId());
+                                            link.asNew();
+                                            return offerAgreementRepository.save(link)
+                                                    .doOnSuccess(s -> log.info("✅ Inserted link ID: {}", s.getId()))
+                                                    .doOnError(e -> log.error("❌ Failed to insert link: {}", e.getMessage()));
+                                        })
+                                    );
+                            })
+                            .collectList() // Force l'exécution
+                            .map(links -> {
+                                log.info("🔄 Processed {} links", links.size());
+                                return savedOffer;
                             });
                 })
-                .map(this::mapToDomainManual);
+                .flatMap(savedOffer -> {
+                    // Force reload pour vérifier ce qui a été persisté
+                    return findById(savedOffer.getId())
+                           .doOnSuccess(o -> log.info("🔍 Reloaded Offer: Bids Count={}", (o.bids() != null ? o.bids().size() : 0)));
+                });
     }
 
     @Override
@@ -92,26 +98,27 @@ public class OfferR2dbcAdapter implements OfferRepositoryPort {
         return offerAgreementRepository.findByOfferId(entity.getId())
                 .collectList()
                 .map(agreements -> {
-                    entity.setAgreements(agreements);
+                    entity.setAgreements(agreements != null ? agreements : Collections.emptyList());
+                    // Log debug pour voir si on récupère bien de la base
+                    // if (!entity.getAgreements().isEmpty()) log.debug("DB returned {} agreements for offer {}", entity.getAgreements().size(), entity.getId());
                     return entity;
                 });
     }
 
     private Offer mapToDomainManual(OfferEntity entity) {
         Offer domain = offerMapper.toDomain(entity);
-        if (entity.getAgreements() != null) {
+        if (entity.getAgreements() != null && !entity.getAgreements().isEmpty()) {
             return domain.withBids(entity.getAgreements().stream()
                     .map(a -> Bid.builder().driverId(a.getDriverId()).build())
                     .collect(Collectors.toList()));
+        } else {
+            return domain.withBids(Collections.emptyList());
         }
-        return domain;
     }
 
     @Override
     public Mono<Boolean> delete(Offer offer) {
-        return offerRepository.delete(offerMapper.toEntity(offer))
-                .thenReturn(true)
-                .onErrorReturn(false);
+        return offerRepository.delete(offerMapper.toEntity(offer)).thenReturn(true);
     }
 
     @Override

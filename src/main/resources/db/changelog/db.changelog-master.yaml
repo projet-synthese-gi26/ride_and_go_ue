@@ -1,0 +1,23 @@
+
+databaseChangeLog:
+
+  - include:
+      file: db/changelog/changes/000-initial-schema.sql
+
+  - include:
+      file: db/changelog/changes/001-update-drivers-schema.sql
+
+  - include:
+      file: db/changelog/changes/002-create-user-devices.sql
+      
+  - include:
+      file: db/changelog/changes/003-create-notification-settings.sql
+
+  - include:
+      file: db/changelog/changes/004-create-notifications-history.sql
+
+  - include:
+      file: db/changelog/changes/005-alter-notifications-json-to-text.sql
+
+  - include:
+      file: db/changelog/changes/006-update-drivers-vehicle.sql

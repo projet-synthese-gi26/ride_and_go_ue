@@ -23,4 +23,5 @@ public interface UserRepositoryPort {
 
     Flux<User> findAll();
 
+    Mono<Void> addRoleToUser(UUID userId, RoleType role);
 }

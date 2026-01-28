@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.RoleEntity;
 
-
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import org.springframework.r2dbc.core.DatabaseClient;
@@ -30,15 +29,15 @@ public class UserR2dbcAdapter implements UserRepositoryPort {
     private final RoleR2dbcRepository roleRepository;
     private final PermissionR2dbcRepository permissionRepository;
     private final UserMapper userMapper;
-     private final DatabaseClient databaseClient;
+    private final DatabaseClient databaseClient;
+
+    private static final String SCHEMA = "ride_and_go"; // Nom du schéma
 
     @Override
     public Mono<User> findUserById(UUID userId) {
         return userRepository.findById(userId)
                 .flatMap(this::enrichUser);
     }
-
-  
 
     @Override
     public Flux<User> findAll() {
@@ -53,57 +52,66 @@ public class UserR2dbcAdapter implements UserRepositoryPort {
                 .flatMap(this::enrichUser);
     }
 
-   @Override
+    @Override
     @Transactional
     public Mono<User> save(User user) {
         UserEntity entity = userMapper.toEntity(user);
 
         return userRepository.existsById(user.id())
                 .flatMap(exists -> {
-                    if (!exists) entity.setNewEntity(true);
+                    if (!exists)
+                        entity.setNewEntity(true);
                     return userRepository.save(entity);
                 })
                 .flatMap(savedEntity -> syncRoles(user, savedEntity))
-                // --- AJOUT IMPORTANT : Sync des tables filles ---
-                .flatMap(savedEntity -> syncActorTables(user, savedEntity)) 
+                .flatMap(savedEntity -> syncActorTables(user, savedEntity))
                 .map(savedEntity -> user);
     }
 
     /**
      * Insère l'utilisateur dans la table 'customers' ou 'drivers' selon son rôle.
      * C'est nécessaire pour satisfaire les FK des autres tables (offers, rides).
+     * CORRECTION: Ajout du préfixe de schéma.
      */
     private Mono<UserEntity> syncActorTables(User user, UserEntity savedEntity) {
-        if (user.roles() == null || user.roles().isEmpty()) return Mono.just(savedEntity);
+        if (user.roles() == null || user.roles().isEmpty())
+            return Mono.just(savedEntity);
 
         return Flux.fromIterable(user.roles())
-            .flatMap(role -> {
-                String roleName = role.type().name();
-                
-                if (roleName.contains("PASSENGER") || roleName.contains("CUSTOMER")) {
-                    // On insère dans 'customers' si pas déjà présent
-                    // Note: customers hérite de users, mais ici on a des tables séparées avec FK
-                    return databaseClient.sql("INSERT INTO customers (id, code, payment_method) VALUES (:id, :code, 'CASH') ON CONFLICT DO NOTHING")
-                            .bind("id", savedEntity.getId())
-                            .bind("code", "CUST-" + savedEntity.getId().toString().substring(0, 8))
-                            .then();
-                } 
-                else if (roleName.contains("DRIVER")) {
-                    // Pour un driver, il faut d'abord l'insérer dans 'business_actors' (si ton modèle le demande)
-                    // puis dans 'drivers'.
-                    return databaseClient.sql("INSERT INTO business_actors (id, name, email_address, phone_number) VALUES (:id, :name, :email, :phone) ON CONFLICT DO NOTHING")
-                            .bind("id", savedEntity.getId())
-                            .bind("name", savedEntity.getName())
-                            .bind("email", savedEntity.getEmail())
-                            .bind("phone", savedEntity.getTelephone())
-                            .then()
-                            .then(databaseClient.sql("INSERT INTO drivers (id, status, license_number) VALUES (:id, 'AVAILABLE', 'UNKNOWN') ON CONFLICT DO NOTHING")
+                .flatMap(role -> {
+                    String roleName = role.type().name();
+
+                    if (roleName.contains("PASSENGER") || roleName.contains("CUSTOMER")) {
+                        String sql = String.format(
+                                "INSERT INTO %s.customers (id, code, payment_method) VALUES (:id, :code, 'CASH') ON CONFLICT DO NOTHING",
+                                SCHEMA);
+                        return databaseClient.sql(sql)
                                 .bind("id", savedEntity.getId())
-                                .then());
-                }
-                return Mono.empty();
-            })
-            .then(Mono.just(savedEntity));
+                                .bind("code", "CUST-" + savedEntity.getId().toString().substring(0, 8))
+                                .then();
+                    } else if (roleName.contains("DRIVER")) {
+                        // Pour un driver, il faut d'abord l'insérer dans 'business_actors' puis dans
+                        // 'drivers'.
+                        String sqlBA = String.format(
+                                "INSERT INTO %s.business_actors (id, name, email_address, phone_number) VALUES (:id, :name, :email, :phone) ON CONFLICT DO NOTHING",
+                                SCHEMA);
+                        String sqlDriver = String.format(
+                                "INSERT INTO %s.drivers (id, status, license_number) VALUES (:id, 'AVAILABLE', 'UNKNOWN') ON CONFLICT DO NOTHING",
+                                SCHEMA);
+
+                        return databaseClient.sql(sqlBA)
+                                .bind("id", savedEntity.getId())
+                                .bind("name", savedEntity.getName())
+                                .bind("email", savedEntity.getEmail())
+                                .bind("phone", savedEntity.getTelephone())
+                                .then()
+                                .then(databaseClient.sql(sqlDriver)
+                                        .bind("id", savedEntity.getId())
+                                        .then());
+                    }
+                    return Mono.empty();
+                })
+                .then(Mono.just(savedEntity));
     }
 
     @Override
@@ -121,23 +129,33 @@ public class UserR2dbcAdapter implements UserRepositoryPort {
         return userRepository.existsById(user.id());
     }
 
-    /**
-     * Aggregates Roles and Permissions into a complete Domain User object.
-     * Uses parallel fetching to optimize performance.
-     */
+    // --- NOUVELLE IMPLEMENTATION : ADD ROLE ---
+    @Override
+    public Mono<Void> addRoleToUser(UUID userId, RoleType roleType) {
+        return roleRepository.findByName(roleType).next()
+                .flatMap(roleEntity -> {
+                    String sql = String.format(
+                            "INSERT INTO %s.user_has_roles (user_id, role_id) VALUES (:userId, :roleId) ON CONFLICT DO NOTHING",
+                            SCHEMA);
+                    return databaseClient.sql(sql)
+                            .bind("userId", userId)
+                            .bind("roleId", roleEntity.getId())
+                            .then();
+                });
+    }
+
     private Mono<User> enrichUser(UserEntity entity) {
         // Fetch Roles and their specific permissions
         Mono<Set<Role>> rolesMono = roleRepository.findAllByUserId(entity.getId())
-                .flatMap(roleEntity -> 
-                    permissionRepository.findAllByRoleId(roleEntity.getId())
+                .flatMap(roleEntity -> permissionRepository.findAllByRoleId(roleEntity.getId())
                         .map(p -> new Permission(p.getId(), p.getName()))
                         .collect(Collectors.toSet())
                         .map(perms -> Role.builder()
                                 .id(roleEntity.getId())
                                 .type(roleEntity.getName())
                                 .permissions(perms)
-                                .build())
-                ).collect(Collectors.toSet());
+                                .build()))
+                .collect(Collectors.toSet());
 
         // Fetch permissions assigned directly to the user
         Mono<Set<Permission>> directPermsMono = permissionRepository.findDirectPermissionsByUserId(entity.getId())
@@ -156,45 +174,39 @@ public class UserR2dbcAdapter implements UserRepositoryPort {
                         .build());
     }
 
-     /**
+    /**
      * Méthode helper pour gérer la table de liaison user_has_roles
-     * avec création automatique des rôles manquants (Get or Create).
      */
     private Mono<UserEntity> syncRoles(User domainUser, UserEntity savedEntity) {
         if (domainUser.roles() == null || domainUser.roles().isEmpty()) {
             return Mono.just(savedEntity);
         }
 
-        // A. On supprime les anciens liens pour cet user
-        String deleteSql = "DELETE FROM user_has_roles WHERE user_id = :userId";
-        
-        return databaseClient.sql(deleteSql)
+        String sqlDelete = String.format("DELETE FROM %s.user_has_roles WHERE user_id = :userId", SCHEMA);
+
+        return databaseClient.sql(sqlDelete)
                 .bind("userId", savedEntity.getId())
                 .then()
                 .thenMany(Flux.fromIterable(domainUser.roles()))
-                .flatMap(domainRole -> 
-                    // 1. On cherche le rôle
-                    roleRepository.findByName(domainRole.type()).next()
-                        // 2. S'il n'existe pas, on le crée (SwitchIfEmpty)
+                .flatMap(domainRole -> roleRepository.findByName(domainRole.type()).next()
                         .switchIfEmpty(Mono.defer(() -> {
-                            // System.out.println("⚠️ Role " + domainRole.type() + " introuvable. Création automatique...");
                             RoleEntity newRole = new RoleEntity(
-                                java.util.UUID.randomUUID(), 
-                                domainRole.type(), 
-                                LocalDateTime.now(), 
-                                LocalDateTime.now(),
-                                true 
-                            );
+                                    java.util.UUID.randomUUID(),
+                                    domainRole.type(),
+                                    LocalDateTime.now(),
+                                    LocalDateTime.now(),
+                                    true);
                             return roleRepository.save(newRole);
                         }))
-                        // 3. Une fois qu'on a le rôle (trouvé ou créé), on insère le lien
-                        .flatMap(roleEntity -> 
-                            databaseClient.sql("INSERT INTO user_has_roles (user_id, role_id) VALUES (:userId, :roleId) ON CONFLICT DO NOTHING")
+                        .flatMap(roleEntity -> {
+                            String sqlInsert = String.format(
+                                    "INSERT INTO %s.user_has_roles (user_id, role_id) VALUES (:userId, :roleId) ON CONFLICT DO NOTHING",
+                                    SCHEMA);
+                            return databaseClient.sql(sqlInsert)
                                     .bind("userId", savedEntity.getId())
                                     .bind("roleId", roleEntity.getId())
-                                    .then()
-                        )
-                )
+                                    .then();
+                        }))
                 .then(Mono.just(savedEntity));
     }
 }

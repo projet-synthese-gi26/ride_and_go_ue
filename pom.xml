@@ -48,18 +48,23 @@
             <artifactId>spring-boot-starter-data-r2dbc</artifactId>
         </dependency>
         
-        <!-- CORRECTION CRITIQUE : Enlever le scope runtime pour r2dbc-postgresql -->
+        <!-- JDBC Driver requis pour Liquibase -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+        </dependency>
+        
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>r2dbc-postgresql</artifactId>
         </dependency>
         
+        <!-- LIQUIBASE (Migration DB) -->
         <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
         </dependency>
-        
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
@@ -94,7 +99,7 @@
             <version>${mapstruct.version}</version>
         </dependency>
         
-        <!-- Docker Compose Auto-setup -->
+        <!-- Docker Compose -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-docker-compose</artifactId>
@@ -114,20 +119,18 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Documentation API (Swagger/OpenAPI) -->
+        <!-- Documentation API -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
             <version>2.5.0</version>
         </dependency>
         
-        <!-- SPRING SECURITY REACTIVE -->
+        <!-- SPRING SECURITY -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
-
-        <!-- SECURITY TESTING -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>

@@ -11,6 +11,10 @@ import com.yowyob.rideandgo.application.service.RideService; // Import ajouté
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -35,43 +39,68 @@ public class OfferController {
 
     @PostMapping
     @Operation(summary = "Publish an offer (Passenger)")
+    @PreAuthorize("hasAuthority('RIDE_AND_GO_PASSENGER')") 
     public Mono<OfferResponse> createOffer(@RequestBody CreateOfferRequest request) {
-        return createOfferUseCase.createOffer(mapper.toDomain(request), request.passengerId())
+        // Extraction sécurisée de l'ID du passager depuis le token
+        return ReactiveSecurityContextHolder.getContext()
+                .map(SecurityContext::getAuthentication)
+                .flatMap(auth -> {
+                    try {
+                        System.err.println(auth.getName());
+                        UUID passengerId = UUID.fromString(auth.getName());
+                        return createOfferUseCase.createOffer(mapper.toDomain(request), passengerId);
+                    } catch (Exception e) {
+                        return Mono.error(new IllegalStateException("Invalid User ID in Token"));
+                    }
+                })
                 .map(mapper::toResponse);
     }
 
     @GetMapping("/available")
     @Operation(summary = "List pending offers (Driver)")
+    @PreAuthorize("hasAuthority('RIDE_AND_GO_DRIVER')")
     public Flux<OfferResponse> getAvailable() {
         return getAvailableOffersUseCase.getAvailableOffers().map(mapper::toResponse);
     }
 
     @PostMapping("/{id}/apply")
     @Operation(summary = "Apply to an offer (Driver)")
-    public Mono<OfferResponse> apply(@PathVariable UUID id, @RequestParam UUID driverId) {
-        return responseToOfferUseCase.responseToOffer(id, driverId).map(mapper::toResponse);
+    @PreAuthorize("hasAuthority('RIDE_AND_GO_DRIVER')")
+    public Mono<OfferResponse> apply(@PathVariable UUID id) {
+        // On récupère aussi le driverId depuis le token, plus besoin de param
+        return ReactiveSecurityContextHolder.getContext()
+                .map(SecurityContext::getAuthentication)
+                .flatMap(auth -> {
+                    UUID driverId = UUID.fromString(auth.getName());
+                    return responseToOfferUseCase.responseToOffer(id, driverId);
+                })
+                .map(mapper::toResponse);
     }
 
     @GetMapping("/{id}/bids")
     @Operation(summary = "Review enriched bidders (Passenger)")
+    @PreAuthorize("hasAuthority('RIDE_AND_GO_PASSENGER')")
     public Mono<OfferResponse> getBids(@PathVariable UUID id) {
         return offerService.getOfferWithEnrichedBids(id).map(mapper::toResponse);
     }
 
     @PatchMapping("/{id}/select-driver")
     @Operation(summary = "1. Passenger selects driver", description = "Offer state -> DRIVER_SELECTED")
+    @PreAuthorize("hasAuthority('RIDE_AND_GO_PASSENGER')")
     public Mono<OfferResponse> select(@PathVariable UUID id, @RequestParam UUID driverId) {
         return selectDriverUseCase.selectDriver(id, driverId).map(mapper::toResponse);
     }
 
     @PostMapping("/{id}/accept")
     @Operation(summary = "2. Driver confirms pickup", description = "Offer state -> VALIDATED. Creates Ride.")
+    @PreAuthorize("hasAuthority('RIDE_AND_GO_DRIVER')")
     public Mono<RideResponse> driverAccepts(@PathVariable UUID id, @RequestParam UUID driverId) {
         return offerService.driverAcceptsOffer(id, driverId).map(rideMapper::toResponse);
     }
 
     @PostMapping("/{id}/cancel")
     @Operation(summary = "Cancel offer (Passenger)")
+    @PreAuthorize("hasAuthority('RIDE_AND_GO_PASSENGER')")
     public Mono<OfferResponse> cancel(@PathVariable UUID id) {
         return offerService.cancelOffer(id).map(mapper::toResponse);
     }
@@ -88,6 +117,7 @@ public class OfferController {
 
     @GetMapping
     @Operation(summary = "Get all offers (Admin/Debug)", description = "Retrieves all offers regardless of status")
+    @PreAuthorize("hasAuthority('RIDE_AND_GO_ADMIN')")
     public Flux<OfferResponse> getAllOffers() {
         return offerService.getAllOffers().map(mapper::toResponse);
     }

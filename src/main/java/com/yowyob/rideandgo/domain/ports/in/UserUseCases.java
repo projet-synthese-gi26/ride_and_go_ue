@@ -1,7 +1,10 @@
 package com.yowyob.rideandgo.domain.ports.in;
 
 import com.yowyob.rideandgo.domain.model.User;
+import com.yowyob.rideandgo.domain.model.Vehicle; // Import
 import com.yowyob.rideandgo.domain.model.enums.RoleType;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.BecomeDriverRequest;
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -17,4 +20,14 @@ public interface UserUseCases {
     Flux<User> getAllUsers();
 
     Flux<User> getUsersByRole(RoleType role);
+
+    Mono<Void> upgradeToDriver(UUID userId); // Legacy
+
+    Mono<Void> upgradeToDriverComplete(UUID userId, BecomeDriverRequest request);
+
+    Mono<User> updateProfile(UUID userId, String firstName, String lastName, String phone);
+
+    Mono<Void> changePassword(UUID userId, String currentPassword, String newPassword);
+
+    Flux<User> getAllRemoteUsersByService(String serviceName);
 }

@@ -5,9 +5,7 @@ import com.yowyob.rideandgo.domain.model.enums.OfferState;
 import java.util.UUID;
 
 public record CreateOfferRequest(
-        UUID passengerId,
-        String startPoint,
-        String endPoint,
-        double price,
-        OfferState state
+    String startPoint,
+    String endPoint,
+    double price
 ) {}

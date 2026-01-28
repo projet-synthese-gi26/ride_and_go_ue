@@ -30,7 +30,7 @@ public class AuthController {
         // Gestion par défaut : Si aucune liste n'est fournie, on assigne PASSENGER
         List<RoleType> rolesToAssign = (dto.roles() != null && !dto.roles().isEmpty()) 
                 ? dto.roles() 
-                : List.of(RoleType.RIDE_AND_GO_PASSENGER);
+                : List.of(RoleType.RIDE_AND_GO_PASSENGER); // dto.roles(); 
 
         return authUseCase.register(
             dto.username(), dto.password(), dto.email(), 
