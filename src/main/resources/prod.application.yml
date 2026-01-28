@@ -11,9 +11,23 @@ spring:
   application:
     name: ride-and-go
 
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:168.119.122.86}:${DB_PORT:5432}/${DB_NAME:yowyob}?currentSchema=ride_and_go
+    username: ${DB_USERNAME:master}
+    password: ${DB_PASSWORD:Azerty1234*}
+    driver-class-name: org.postgresql.Driver
+
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+    default-schema: ride_and_go
+    liquibase-schema: ride_and_go
+    url: jdbc:postgresql://${DB_HOST:168.119.122.86}:${DB_PORT:5432}/${DB_NAME:yowyob}
+
+
   # DATABASE CONFIGURATION (REACTIVE R2DBC)
   r2dbc:
-    url: r2dbc:postgresql://${DB_HOST:168.119.122.86}:${DB_PORT:5432}/${DB_NAME:yowyob}
+    url: r2dbc:postgresql://${DB_HOST:168.119.122.86}:${DB_PORT:5432}/${DB_NAME:yowyob}?schema=ride_and_go
     username: ${DB_USERNAME:master}
     password: ${DB_PASSWORD:Azerty1234*}
     pool:
@@ -54,13 +68,27 @@ spring:
 
 # CUSTOM BUSINESS SERVICES CONFIGURATION
 application:
+
   auth:
     mode: remote # 'fake' pour ton dev local, 'remote' pour le serveur réel
     url: https://auth-service.pynfi.com
+
   fare:
     mode: remote # 'fake' pour ton dev local, 'remote' pour le serveur réel
     url: https://fare-calculator-service.pynfi.com
     api-key: 974e9428-6ce2-48e7-b74b-93f572007ef8
+
+  notification:
+    mode: http
+    url: https://notification-service.pynfi.com
+    service-token: ${NOTIFICATION_SERVICE_TOKEN}
+    templates:
+      new-offer: 1        # ID template: Nouvelle offre pour les chauffeurs
+      driver-applied: 2   # ID template: Un chauffeur a postulé (pour le client)
+      driver-selected: 3  # ID template: Vous avez été choisi (pour le chauffeur)
+      ride-confirmed: 4   # ID template: Le chauffeur arrive (pour le client)
+      ride-cancelled: 5   # ID template: Course annulée
+      admin-validation: 7 # ID template: admin a validé le profil du driver
 
   kafka:
     topics:
@@ -74,11 +102,6 @@ application:
         port: ${SMTP_PORT:587}
         username: ${SMTP_USERNAME}
         password: ${SMTP_PASSWORD}
-    notification-service:
-      token: token-topic
-      template:
-        new-offer-id: 1001
-        accepted-offer-id: 1002
 
 # MONITORING & HEALTH CHECK (ACTUATOR)
 management:
