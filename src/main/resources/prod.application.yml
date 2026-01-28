@@ -102,6 +102,11 @@ application:
         port: ${SMTP_PORT:587}
         username: ${SMTP_USERNAME}
         password: ${SMTP_PASSWORD}
+    notification-service:
+      token: token-topic
+      template:
+        new-offer-id: 1001
+        accepted-offer-id: 1002
 
 # MONITORING & HEALTH CHECK (ACTUATOR)
 management:
