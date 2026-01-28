@@ -61,16 +61,9 @@ public interface AuthApiClient {
                         String firstName, String lastName, String service, List<String> roles) {
         }
 
-        // Structure de réponse standard du service Auth
-        // On ignore les champs inconnus pour éviter de casser si l'API change
-        @JsonIgnoreProperties(ignoreUnknown = true)
-        record TraMaSysResponse(
-                        String accessToken,
-                        String refreshToken,
-                        UserDetail user) {
+        record TraMaSysResponse(String accessToken, String refreshToken, UserDetail user) {
         }
 
-        @JsonIgnoreProperties(ignoreUnknown = true)
         record UserDetail(
                         String id,
                         String username,
@@ -81,8 +74,6 @@ public interface AuthApiClient {
                         String service,
                         List<String> roles,
                         List<String> permissions,
-                        // On peut ajouter photoId ici si nécessaire, mais ignoreUnknown suffit pour
-                        // fixer l'erreur
                         String photoId) {
         }
 
