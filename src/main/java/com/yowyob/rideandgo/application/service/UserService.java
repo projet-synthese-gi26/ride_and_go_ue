@@ -15,14 +15,13 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import lombok.extern.slf4j.Slf4j;
-
 import java.util.UUID;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService implements UserUseCases {
-
+    
     private final UserRepositoryPort userRepositoryPort;
     private final ExternalUserPort externalUserPort;
     private final DriverRepositoryPort driverRepositoryPort;
@@ -45,12 +44,18 @@ public class UserService implements UserUseCases {
 
     @Override
     public Mono<User> getUserById(UUID userId) {
-        return externalUserPort.fetchRemoteUserById(userId).flatMap(userRepositoryPort::save);
+        // Règle stricte : Appel Distant -> Sauvegarde Locale -> Retour
+        return externalUserPort.fetchRemoteUserById(userId)
+                .flatMap(userRepositoryPort::save)
+                .doOnSuccess(u -> log.info("✅ Synced user {} from remote", u.id()));
     }
 
     @Override
     public Flux<User> getAllUsers() {
-        return externalUserPort.fetchAllRemoteUsers().flatMap(userRepositoryPort::save);
+        // Appel Distant -> Sauvegarde tout -> Retourne flux sauvegardé
+        return externalUserPort.fetchAllRemoteUsers()
+                .flatMap(userRepositoryPort::save)
+                .doOnComplete(() -> log.info("✅ Full user list synced from remote"));
     }
 
     @Override
@@ -72,7 +77,7 @@ public class UserService implements UserUseCases {
         return externalUserPort.fetchAllRemoteUsersByService(serviceName).flatMap(userRepositoryPort::save);
     }
 
-    // Ancien
+    // Ancien (Legacy)
     @Override
     public Mono<Void> upgradeToDriver(UUID userId) {
         return driverRepositoryPort.createDriver(userId)
@@ -81,28 +86,31 @@ public class UserService implements UserUseCases {
                 .then();
     }
 
-    // Nouveau
+    // Nouveau (Complet avec Véhicule imbriqué)
     public Mono<Void> upgradeToDriverComplete(UUID userId, BecomeDriverRequest request) {
         log.info("🚀 Starting Driver Onboarding for User {}", userId);
 
+        // Extraction des données du sous-objet vehicle
+        var vInfo = request.vehicle();
+
         Vehicle vehicleDomain = Vehicle.builder()
-                .vehicleMakeId(request.vehicleMakeName())
-                .vehicleModelId(request.vehicleModelName())
-                .transmissionTypeId(request.transmissionTypeName())
-                .manufacturerId(request.manufacturerName())
-                .vehicleSizeId(request.vehicleSizeName())
-                .vehicleTypeId(request.vehicleTypeName())
-                .fuelTypeId(request.fuelTypeName())
-                .vehicleSerialNumber(request.vehicleSerialNumber())
-                .registrationNumber(request.registrationNumber())
-                .tankCapacity(request.tankCapacity())
-                .luggageMaxCapacity(request.luggageMaxCapacity())
-                .totalSeatNumber(request.totalSeatNumber())
-                .averageFuelConsumptionPerKm(request.averageFuelConsumptionPerKm())
-                .mileageAtStart(request.mileageAtStart())
-                .mileageSinceCommissioning(request.mileageSinceCommissioning())
-                .vehicleAgeAtStart(request.vehicleAgeAtStart())
-                .brand(request.vehicleMakeName()) // La marque et le fabricant sont souvent les mêmes
+                .vehicleMakeId(vInfo.vehicleMakeName())
+                .vehicleModelId(vInfo.vehicleModelName())
+                .transmissionTypeId(vInfo.transmissionTypeName())
+                .manufacturerId(vInfo.manufacturerName())
+                .vehicleSizeId(vInfo.vehicleSizeName())
+                .vehicleTypeId(vInfo.vehicleTypeName())
+                .fuelTypeId(vInfo.fuelTypeName())
+                .vehicleSerialNumber(vInfo.vehicleSerialNumber())
+                .registrationNumber(vInfo.registrationNumber())
+                .tankCapacity(vInfo.tankCapacity())
+                .luggageMaxCapacity(vInfo.luggageMaxCapacity())
+                .totalSeatNumber(vInfo.totalSeatNumber())
+                .averageFuelConsumptionPerKm(vInfo.averageFuelConsumptionPerKm())
+                .mileageAtStart(vInfo.mileageAtStart())
+                .mileageSinceCommissioning(vInfo.mileageSinceCommissioning())
+                .vehicleAgeAtStart(vInfo.vehicleAgeAtStart())
+                .brand(vInfo.vehicleMakeName()) // La marque et le fabricant sont souvent les mêmes
                 .build();
 
         return vehicleRepositoryPort.createVehicle(vehicleDomain)
@@ -111,7 +119,7 @@ public class UserService implements UserUseCases {
                     Driver newDriver = Driver.builder()
                             .id(userId)
                             .status("OFFLINE")
-                            .licenseNumber(request.licenseNumber())
+                            .licenseNumber(request.licenseNumber()) // Info chauffeur
                             .hasCar(true)
                             .isOnline(false)
                             .isProfileCompleted(true)
