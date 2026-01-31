@@ -4,10 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.rideandgo.application.utils.Utils;
 import com.yowyob.rideandgo.domain.exception.OfferNotFoundException;
 import com.yowyob.rideandgo.domain.exception.OfferStatutNotMatchException;
-import com.yowyob.rideandgo.domain.model.Bid;
-import com.yowyob.rideandgo.domain.model.Notification;
-import com.yowyob.rideandgo.domain.model.Offer;
-import com.yowyob.rideandgo.domain.model.Ride;
+import com.yowyob.rideandgo.domain.model.*;
 import com.yowyob.rideandgo.domain.model.enums.OfferState;
 import com.yowyob.rideandgo.domain.model.enums.RideState;
 import com.yowyob.rideandgo.domain.ports.in.*;
@@ -16,13 +13,17 @@ import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.Notificatio
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.SendNotificationRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 @Service
@@ -34,24 +35,25 @@ public class OfferService implements
         SelectDriverUseCase,
         OfferManagementUseCase {
 
-    private final OfferCachePort cache;
     private final OfferRepositoryPort repository;
     private final UserRepositoryPort userRepositoryPort;
     private final SendNotificationPort sendNotificationPort;
     private final RideRepositoryPort rideRepositoryPort;
     private final LocationCachePort locationCachePort;
     private final EtaCalculatorService etaCalculatorService;
-
-    // Nouveaux ports pour la gestion avancée des notifications
     private final DriverRepositoryPort driverRepositoryPort;
-    private final UserDeviceRepositoryPort userDeviceRepositoryPort;
+    private final VehicleRepositoryPort vehicleRepositoryPort;
+    private final PaymentPort paymentPort;
     private final NotificationSettingsRepositoryPort settingsRepositoryPort;
     private final NotificationHistoryRepositoryPort historyRepositoryPort;
+    private final UserDeviceRepositoryPort userDeviceRepositoryPort;
+    private final ExternalUserPort externalUserPort;
+    private final OfferCachePort cache;
     private final ObjectMapper objectMapper;
 
-    private final ExternalUserPort externalUserPort;
+    @Value("${application.payment.commission-rate:0.10}")
+    private double commissionRate;
 
-    // IDs des Templates (Injectés depuis application.yml)
     @Value("${application.notification.templates.new-offer:1}")
     private int tmplNewOffer;
     @Value("${application.notification.templates.driver-applied:2}")
@@ -63,23 +65,11 @@ public class OfferService implements
     @Value("${application.notification.templates.ride-cancelled:5}")
     private int tmplRideCancelled;
 
-    // Données de démo pour l'UI (Simulation Véhicules)
-    private record DemoVehicle(String model, String color, String plate, String image) {
-    }
-
-    private static final List<DemoVehicle> FAKE_FLEET = List.of(
-            new DemoVehicle("Toyota Yaris", "Grise", "LT-882-AF", "https://randomuser.me/api/portraits/men/32.jpg"),
-            new DemoVehicle("Hyundai Elantra", "Blanche", "CE-102-ZZ",
-                    "https://randomuser.me/api/portraits/men/45.jpg"),
-            new DemoVehicle("Peugeot 301", "Noire", "LT-440-GG", "https://randomuser.me/api/portraits/men/22.jpg"));
-
     // ==================================================================================
     // 1. CRÉATION D'OFFRE (PASSAGER)
     // ==================================================================================
     @Override
     public Mono<Offer> createOffer(Offer request, UUID passengerId) {
-        // ÉTAPE CRITIQUE : S'assurer que le passager existe localement avant de créer
-        // l'offre
         return ensureUserExistsLocally(passengerId)
                 .flatMap(user -> {
                     Offer offer = Offer.builder()
@@ -95,20 +85,18 @@ public class OfferService implements
                     return repository.save(offer)
                             .flatMap(saved -> cache.saveInCache(saved).thenReturn(saved))
                             .flatMap(saved -> {
-                                notifyOnlineDrivers(saved).subscribe();
+                                // Notification filtrée par le solde et le statut des chauffeurs
+                                notifyEligibleDriversWithBalance(saved).subscribe();
                                 return Mono.just(saved);
                             })
                             .doOnSuccess(o -> log.info("Offer created: {}", o.id()));
                 });
     }
 
-    private Mono<com.yowyob.rideandgo.domain.model.User> ensureUserExistsLocally(UUID userId) {
+    private Mono<User> ensureUserExistsLocally(UUID userId) {
         return userRepositoryPort.findUserById(userId)
-                .switchIfEmpty(Mono.defer(() -> {
-                    log.info("User {} not found locally. Syncing from Remote Auth...", userId);
-                    return externalUserPort.fetchRemoteUserById(userId)
-                            .flatMap(userRepositoryPort::save);
-                }));
+                .switchIfEmpty(Mono.defer(() -> externalUserPort.fetchRemoteUserById(userId)
+                        .flatMap(userRepositoryPort::save)));
     }
 
     // ==================================================================================
@@ -127,19 +115,26 @@ public class OfferService implements
     public Mono<Offer> responseToOffer(UUID offerId, UUID driverId) {
         return ensureUserExistsLocally(driverId)
                 .flatMap(driver -> repository.findById(offerId)
+                        .flatMap(offer -> paymentPort.getWalletByOwnerId(driverId)
+                                .flatMap(wallet -> {
+                                    // VÉRIFICATION : prix de l'offre * commission-rate < balance
+                                    double estimatedCommission = offer.price() * commissionRate;
+                                    if (wallet.balance() < estimatedCommission) {
+                                        return Mono.error(new IllegalStateException(
+                                                "Insufficient wallet balance to cover commission. Balance: "
+                                                        + wallet.balance()));
+                                    }
+                                    return Mono.just(offer);
+                                }))
                         .flatMap(offer -> {
                             if (offer.hasDriverApplied(driverId))
                                 return Mono.just(offer);
 
-                            // CORRECTION : Gestion robuste de la liste (null-safe et mutable)
-                            List<Bid> currentBids = offer.bids() != null
-                                    ? new ArrayList<>(offer.bids())
+                            List<Bid> currentBids = offer.bids() != null ? new ArrayList<>(offer.bids())
                                     : new ArrayList<>();
-
                             currentBids.add(Bid.builder().driverId(driverId).build());
 
-                            log.info("🚀 Driver {} applying to Offer {}. Total bids: {}", driverId, offerId,
-                                    currentBids.size());
+                            log.info("🚀 Driver {} applying to Offer {}.", driverId, offerId);
 
                             return repository.save(offer.withBids(currentBids).withState(OfferState.BID_RECEIVED))
                                     .flatMap(s -> cache.saveInCache(s).thenReturn(s))
@@ -161,19 +156,15 @@ public class OfferService implements
     // ==================================================================================
     @Override
     public Mono<Offer> selectDriver(UUID offerId, UUID driverId) {
-        log.info("Client selecting driver {} for offer {}", driverId, offerId);
         return repository.findById(offerId)
                 .flatMap(offer -> {
                     if (!offer.hasDriverApplied(driverId)) {
                         return Mono.error(new IllegalArgumentException("Driver has not applied."));
                     }
-
                     Offer updated = offer.withDriverSelected(driverId);
-
                     return repository.save(updated)
                             .flatMap(saved -> cache.saveInCache(saved).thenReturn(saved))
                             .flatMap(saved -> {
-                                // Save & Dispatch Notification
                                 saveAndDispatch(
                                         driverId,
                                         tmplDriverSelected,
@@ -182,17 +173,13 @@ public class OfferService implements
                                         Map.of("offerId", offerId.toString(), "price", String.valueOf(offer.price())))
                                         .subscribe();
                                 return Mono.just(saved);
-                            })
-                            .doOnSuccess(saved -> log.info("Offer {} updated to DRIVER_SELECTED for driver {}",
-                                    saved.id(), driverId));
+                            });
                 });
     }
 
     // ==================================================================================
     // 5. CONFIRMATION & CRÉATION TRIP (CHAUFFEUR)
     // ==================================================================================
-    // Note: Cette méthode est appelée directement par le Controller pour la
-    // validation.
     public Mono<Ride> driverAcceptsOffer(UUID offerId, UUID driverId) {
         return repository.findById(offerId)
                 .flatMap(offer -> {
@@ -202,7 +189,11 @@ public class OfferService implements
                     if (offer.selectedDriverId() == null || !offer.selectedDriverId().equals(driverId)) {
                         return Mono.error(new IllegalStateException("Access Denied: You are not the selected driver."));
                     }
-                    return repository.save(offer.withState(OfferState.VALIDATED));
+
+                    // PAIEMENT : On crée la transaction de paiement basée sur le prix de l'offre
+                    return paymentPort.getWalletByOwnerId(driverId)
+                            .flatMap(wallet -> paymentPort.processPayment(wallet.id(), offer.price()))
+                            .then(repository.save(offer.withState(OfferState.VALIDATED)));
                 })
                 .flatMap(offer -> {
                     Ride ride = Ride.builder()
@@ -215,7 +206,6 @@ public class OfferService implements
 
                     return rideRepositoryPort.save(ride)
                             .flatMap(savedRide -> {
-                                // Save & Dispatch Notification
                                 saveAndDispatch(
                                         offer.passengerId(),
                                         tmplRideConfirmed,
@@ -225,8 +215,7 @@ public class OfferService implements
                                         .subscribe();
                                 return Mono.just(savedRide);
                             });
-                })
-                .doOnSuccess(r -> log.info("Driver accepted. Ride created: {}", r.id()));
+                });
     }
 
     // ==================================================================================
@@ -236,13 +225,9 @@ public class OfferService implements
         return repository.findById(offerId)
                 .flatMap(offer -> {
                     if (offer.state() == OfferState.VALIDATED) {
-                        return Mono.error(
-                                new IllegalStateException("Cannot cancel a validated offer. Cancel the ride instead."));
+                        return Mono.error(new IllegalStateException("Cannot cancel validated offer."));
                     }
-
                     Mono<Offer> savedOperation = repository.save(offer.withState(OfferState.CANCELLED));
-
-                    // Si un chauffeur était déjà sélectionné, il faut le prévenir
                     if (offer.selectedDriverId() != null) {
                         saveAndDispatch(
                                 offer.selectedDriverId(),
@@ -251,30 +236,54 @@ public class OfferService implements
                                 "Le client a annulé la course.",
                                 Map.of("offerId", offerId.toString())).subscribe();
                     }
-
                     return savedOperation;
                 });
     }
 
     // ==================================================================================
-    // CENTRALISATION : SAUVEGARDE EN BD + ENVOI PUSH/EMAIL
+    // CENTRALISATION : NOTIFICATIONS ET HISTORIQUE
     // ==================================================================================
 
     /**
-     * Sauvegarde la notification dans l'historique utilisateur (DB) PUIS déclenche
-     * l'envoi externe.
+     * NOTIFICATION FILTRÉE : Chauffeurs en ligne, complets, validés ET avec solde
+     * suffisant.
      */
+    private Mono<Void> notifyEligibleDriversWithBalance(Offer offer) {
+        log.info("📢 Notifying eligible drivers for offer {} (Price: {})", offer.id(), offer.price());
+
+        double requiredBalance = offer.price() * commissionRate;
+
+        return driverRepositoryPort.findAll()
+                .filter(d -> d.isOnline() && d.isProfileCompleted() && d.isProfileValidated())
+                .flatMap(driver -> paymentPort.getWalletByOwnerId(driver.id())
+                        .filter(wallet -> wallet.balance() >= requiredBalance)
+                        .flatMap(wallet -> userRepositoryPort.findUserById(driver.id()))
+                        .map(User::email))
+                .collectList()
+                .flatMap(emails -> {
+                    if (emails.isEmpty())
+                        return Mono.empty();
+
+                    Map<String, String> data = Map.of(
+                            "offerId", offer.id().toString(),
+                            "price", String.valueOf(offer.price()),
+                            "start", offer.startPoint(),
+                            "end", offer.endPoint());
+
+                    return send(NotificationType.EMAIL, tmplNewOffer, emails, data);
+                })
+                .then();
+    }
+
     private Mono<Void> saveAndDispatch(UUID userId, int templateId, String title, String message,
-            Map<String, Object> data) {
-        // 1. Conversion de la map 'data' en JSON String pour stockage DB
+            Map<String, String> data) {
         String json = "{}";
         try {
             json = objectMapper.writeValueAsString(data);
         } catch (Exception e) {
-            log.warn("Failed to serialize notification data", e);
+            log.warn("Serialization failed", e);
         }
 
-        // 2. Création de l'objet Notification (Domaine)
         Notification history = Notification.builder()
                 .id(Utils.generateUUID())
                 .userId(userId)
@@ -285,132 +294,79 @@ public class OfferService implements
                 .dataJson(json)
                 .build();
 
-        // 3. Sauvegarde puis envoi
-        return historyRepositoryPort.save(history)
-                .then(dispatchNotification(userId, templateId, data));
+        return historyRepositoryPort.save(history).then(dispatchNotification(userId, templateId, data));
     }
 
-    /**
-     * Envoie la notification à un utilisateur spécifique en respectant ses
-     * préférences (Settings).
-     */
-    private Mono<Void> dispatchNotification(UUID userId, int templateId, Map<String, Object> data) {
-        // 1. On récupère les préférences de l'utilisateur (ou les défauts)
+    private Mono<Void> dispatchNotification(UUID userId, int templateId, Map<String, String> data) {
         return settingsRepositoryPort.getSettings(userId)
                 .flatMap(settings -> {
                     List<Mono<Boolean>> sendingTasks = new ArrayList<>();
-
-                    // 2. Canal PUSH (Prioritaire)
                     if (settings.pushEnabled()) {
-                        sendingTasks.add(
-                                userDeviceRepositoryPort.findDeviceTokenByUserId(userId)
-                                        .flatMap(token -> send(NotificationType.PUSH, templateId, List.of(token), data))
-                                        // Si pas de token, on ignore silencieusement (ne fait pas planter le flux)
-                                        .defaultIfEmpty(false));
+                        sendingTasks.add(userDeviceRepositoryPort.findDeviceTokenByUserId(userId)
+                                .flatMap(token -> send(NotificationType.PUSH, templateId, List.of(token), data))
+                                .defaultIfEmpty(false));
                     }
-
-                    // 3. Canal EMAIL
                     if (settings.emailEnabled()) {
-                        sendingTasks.add(
-                                userRepositoryPort.findUserById(userId)
-                                        .flatMap(user -> send(NotificationType.EMAIL, templateId, List.of(user.email()),
-                                                data)));
+                        sendingTasks.add(userRepositoryPort.findUserById(userId)
+                                .flatMap(
+                                        user -> send(NotificationType.EMAIL, templateId, List.of(user.email()), data)));
                     }
-
-                    // 4. Canal SMS
-                    if (settings.smsEnabled()) {
-                        sendingTasks.add(
-                                userRepositoryPort.findUserById(userId)
-                                        .flatMap(user -> send(NotificationType.SMS, templateId,
-                                                List.of(user.telephone()), data)));
-                    }
-
-                    // 5. Canal WHATSAPP
-                    if (settings.whatsappEnabled()) {
-                        sendingTasks.add(
-                                userRepositoryPort.findUserById(userId)
-                                        .flatMap(user -> send(NotificationType.WHATSAPP, templateId,
-                                                List.of(user.telephone()), data)));
-                    }
-
-                    // Exécution parallèle de tous les envois
                     return Flux.merge(sendingTasks).then();
                 });
     }
 
-    /**
-     * Helper générique pour appeler le port de notification.
-     */
-    private Mono<Boolean> send(NotificationType type, int tmpl, List<String> to, Map<String, Object> data) {
+    private Mono<Boolean> send(NotificationType type, int tmpl, List<String> to, Map<String, String> data) {
         return sendNotificationPort.sendNotification(
                 SendNotificationRequest.builder()
                         .notificationType(type)
                         .templateId(tmpl)
                         .to(to)
-                        .data(data)
+                        .data(new HashMap<>(data))
                         .build());
     }
 
-    /**
-     * Cas spécial : Notification de masse aux chauffeurs en ligne.
-     * Pour l'instant on envoie en PUSH uniquement (Broadcast) sans historisation
-     * individuelle.
-     */
-    private Mono<Void> notifyOnlineDrivers(Offer offer) {
-        return driverRepositoryPort.findDeviceTokensOfOnlineDrivers()
-                .flatMap(token -> send(NotificationType.PUSH, tmplNewOffer, List.of(token), Map.of(
-                        "offerId", offer.id().toString(),
-                        "price", String.valueOf(offer.price()),
-                        "start", offer.startPoint(),
-                        "end", offer.endPoint())))
-                .then();
-    }
-
     // ==================================================================================
-    // UTILITAIRES & ENRICHISSEMENT (POUR UI)
+    // ENRICHISSEMENT (UI) AVEC DONNÉES RÉELLES
     // ==================================================================================
 
-    // Pas d'Override car méthode utilitaire spécifique utilisée par le Controller
     public Mono<Offer> getOfferWithEnrichedBids(UUID offerId) {
         return repository.findById(offerId)
                 .flatMap(offer -> {
-                    log.info("here is the first log");
                     if (offer.bids() == null || offer.bids().isEmpty())
                         return Mono.just(offer);
 
-                    log.info("here is the second log");
                     return Flux.fromIterable(offer.bids())
                             .flatMap(bid -> Mono.zip(
                                     userRepositoryPort.findUserById(bid.driverId()),
+                                    driverRepositoryPort.findById(bid.driverId()),
                                     locationCachePort.getLocation(bid.driverId())
                                             .defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0)))
-                                    .flatMap(tuple -> etaCalculatorService
-                                            .calculateEta(tuple.getT2().latitude(), tuple.getT2().longitude(), 0.0, 0.0)
-                                            .map(eta -> {
-                                                // Injection de Fake Data pour la démo UI (Plaque, Modèle)
-                                                DemoVehicle fakeCar = FAKE_FLEET
-                                                        .get(ThreadLocalRandom.current().nextInt(FAKE_FLEET.size()));
+                                    .flatMap(tuple -> {
+                                        var user = tuple.getT1();
+                                        var driver = tuple.getT2();
+                                        var loc = tuple.getT3();
 
-                                                return Bid.builder()
-                                                        .driverId(tuple.getT1().id())
-                                                        .driverName(tuple.getT1().name())
-                                                        .latitude(tuple.getT2().latitude())
-                                                        .longitude(tuple.getT2().longitude())
-                                                        .eta(eta)
-                                                        .rating(4.5 + (Math.random() * 0.5))
-                                                        .carModel(fakeCar.model())
-                                                        .carColor(fakeCar.color())
-                                                        .licensePlate(fakeCar.plate())
-                                                        .driverImage(fakeCar.image())
-                                                        .build();
-                                            })))
+                                        return vehicleRepositoryPort.getVehicleById(driver.vehicleId())
+                                                .flatMap(v -> etaCalculatorService
+                                                        .calculateEta(loc.latitude(), loc.longitude(), 0.0, 0.0)
+                                                        .map(eta -> Bid.builder()
+                                                                .driverId(user.id())
+                                                                .driverName(user.name())
+                                                                .latitude(loc.latitude())
+                                                                .longitude(loc.longitude())
+                                                                .eta(eta)
+                                                                .rating(4.8)
+                                                                .carModel(v.brand() + " " + v.vehicleModelId())
+                                                                .licensePlate(v.registrationNumber())
+                                                                .build()));
+                                    }))
                             .collectList()
                             .map(offer::withBids);
                 });
     }
 
     // ==================================================================================
-    // CRUD STANDARD (OfferManagementUseCase)
+    // CRUD ET GESTION
     // ==================================================================================
 
     @Override

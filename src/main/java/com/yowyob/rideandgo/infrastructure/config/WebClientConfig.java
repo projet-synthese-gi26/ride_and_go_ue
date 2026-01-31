@@ -3,6 +3,7 @@ package com.yowyob.rideandgo.infrastructure.config;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.AuthApiClient;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.FareCalculatorClient;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.NotificationApiClient;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.PaymentApiClient;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.SyndicateApiClient;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.VehicleApiClient;
 
@@ -24,6 +25,14 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Configuration
 public class WebClientConfig {
+
+    @Bean
+    public PaymentApiClient paymentApiClient(WebClient.Builder builder,
+            @Value("${application.payment.url}") String url) {
+        WebClient webClient = builder.baseUrl(url).build();
+        WebClientAdapter adapter = WebClientAdapter.create(webClient);
+        return HttpServiceProxyFactory.builderFor(adapter).build().createClient(PaymentApiClient.class);
+    }
 
     @Bean
     public FareCalculatorClient fareCalculatorClient(WebClient.Builder builder,

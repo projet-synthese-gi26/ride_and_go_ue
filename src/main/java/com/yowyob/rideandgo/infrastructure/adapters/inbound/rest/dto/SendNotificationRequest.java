@@ -10,5 +10,5 @@ public record SendNotificationRequest(
         NotificationType notificationType,
         int templateId,
         List<String> to,
-        Map<String, Object> data
+        Map<String, String> data
 ) {}

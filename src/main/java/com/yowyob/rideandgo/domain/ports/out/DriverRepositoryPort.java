@@ -10,14 +10,17 @@ public interface DriverRepositoryPort {
 
     Flux<String> findDeviceTokensOfOnlineDrivers();
 
+    Flux<String> findEmailsOfEligibleDrivers();
+
     Mono<Driver> createDriver(UUID userId);
 
     Mono<Driver> save(Driver driver);
 
     Mono<Driver> findById(UUID driverId);
 
-    // --- NOUVEAU ---
+    Flux<Driver> findAll();
+
     Mono<Driver> validateProfile(UUID driverId);
 
-    Flux<Driver> findAllPendingValidation(); // Pour le dashboard admin
+    Flux<Driver> findAllPendingValidation();
 }

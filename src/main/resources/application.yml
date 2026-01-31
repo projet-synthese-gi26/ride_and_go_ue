@@ -85,18 +85,22 @@ application:
     url: https://notification-service.pynfi.com # URL du Swagger fourni
     service-token: "a77599d3-8de7-4d52-b9d0-2202b2e13a9e" # Token récupéré après enregistrement du service
     templates:
-      new-offer: 1        # ID template: Nouvelle offre pour les chauffeurs
-      driver-applied: 2   # ID template: Un chauffeur a postulé (pour le client)
-      driver-selected: 3  # ID template: Vous avez été choisi (pour le chauffeur)
-      ride-confirmed: 4   # ID template: Le chauffeur arrive (pour le client)
-      ride-cancelled: 5   # ID template: Course annulée
-      admin-validation: 7 # ID template: admin a validé le profil du driver
+      new-offer: 12        # ID template: Nouvelle offre pour les chauffeurs
+      driver-applied: 13   # ID template: Un chauffeur a postulé (pour le client)
+      driver-selected: 14  # ID template: Vous avez été choisi (pour le chauffeur)
+      ride-confirmed: 15   # ID template: Le chauffeur arrive (pour le client)
+      ride-cancelled: 16   # ID template: Course annulée
+      admin-validation: 17 # ID template: admin a validé le profil du driver
 
   vehicle:
     url: https://vehicule-service.pynfi.com
 
   syndicate:
     url: https://ugate.pynfi.com
+
+  payment:
+    url: https://payment-service.pynfi.com
+    commission-rate: 0.10
 
   kafka:
     topics:

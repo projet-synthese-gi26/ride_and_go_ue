@@ -9,14 +9,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
 import java.util.UUID;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class DriverR2dbcAdapter implements DriverRepositoryPort {
-
     private final DriverR2dbcRepository driverRepository;
 
     @Override
@@ -27,7 +25,6 @@ public class DriverR2dbcAdapter implements DriverRepositoryPort {
                         log.warn("⛔ Driver {} blocked: Profile not validated by admin.", driverId);
                         return Mono.just(false);
                     }
-
                     driver.setOnline(isOnline);
                     driver.setNewEntity(false);
                     return driverRepository.save(driver);
@@ -42,53 +39,35 @@ public class DriverR2dbcAdapter implements DriverRepositoryPort {
     }
 
     @Override
+    public Flux<String> findEmailsOfEligibleDrivers() {
+        return driverRepository.findEmailsOfEligibleDrivers();
+    }
+
+    @Override
     public Mono<Driver> createDriver(UUID userId) {
-        // Logique Legacy simple (initialisation vide)
         return driverRepository.findById(userId)
                 .switchIfEmpty(Mono.defer(() -> {
-                    log.info("🚀 Creating new Driver profile for User {}", userId);
                     DriverEntity newEntity = new DriverEntity();
                     newEntity.setId(userId);
                     newEntity.setStatus("OFFLINE");
                     newEntity.setOnline(false);
                     newEntity.setProfileCompleted(false);
                     newEntity.setLicenseNumber("PENDING");
-                    newEntity.setNewEntity(true); // Force Insert
+                    newEntity.setNewEntity(true);
                     return driverRepository.save(newEntity);
                 }))
                 .map(this::mapToDomain);
     }
 
-    // --- IMPLEMENTATION ROBUSTE DU SAVE (UPSERT) ---
     @Override
     public Mono<Driver> save(Driver driver) {
-        // On mappe le domaine vers l'entité
         DriverEntity entity = new DriverEntity(
-                driver.id(),
-                driver.status(),
-                driver.licenseNumber(),
-                driver.hasCar(),
-                driver.isOnline(),
-                driver.isProfileCompleted(),
-                driver.vehicleId(),
-                driver.isProfileValidated(),
-                false, 
-                false // Par défaut false
-        );
-
-        // Vérification explicite : Est-ce que cet ID existe déjà dans la table drivers
-        // ?
+                driver.id(), driver.status(), driver.licenseNumber(), driver.hasCar(),
+                driver.isOnline(), driver.isProfileCompleted(), driver.vehicleId(),
+                driver.isProfileValidated(), driver.isSyndicated(), false);
         return driverRepository.existsById(driver.id())
                 .flatMap(exists -> {
-                    if (!exists) {
-                        // Si n'existe pas -> C'est un INSERT
-                        entity.setNewEntity(true);
-                        log.debug("Inserting new driver profile {}", driver.id());
-                    } else {
-                        // Si existe -> C'est un UPDATE
-                        entity.setNewEntity(false);
-                        log.debug("Updating existing driver profile {}", driver.id());
-                    }
+                    entity.setNewEntity(!exists);
                     return driverRepository.save(entity);
                 })
                 .map(this::mapToDomain);
@@ -97,6 +76,11 @@ public class DriverR2dbcAdapter implements DriverRepositoryPort {
     @Override
     public Mono<Driver> findById(UUID driverId) {
         return driverRepository.findById(driverId).map(this::mapToDomain);
+    }
+
+    @Override
+    public Flux<Driver> findAll() {
+        return driverRepository.findAll().map(this::mapToDomain);
     }
 
     private Driver mapToDomain(DriverEntity entity) {
@@ -108,6 +92,7 @@ public class DriverR2dbcAdapter implements DriverRepositoryPort {
                 .isOnline(entity.isOnline())
                 .isProfileCompleted(entity.isProfileCompleted())
                 .isProfileValidated(entity.isProfileValidated())
+                .isSyndicated(entity.isSyndicated())
                 .vehicleId(entity.getVehicleId())
                 .build();
     }
@@ -125,8 +110,6 @@ public class DriverR2dbcAdapter implements DriverRepositoryPort {
 
     @Override
     public Flux<Driver> findAllPendingValidation() {
-        // Il faut ajouter cette méthode findByIsProfileValidatedFalse dans le Repository interface
         return driverRepository.findByIsProfileValidatedFalse().map(this::mapToDomain);
     }
-
 }

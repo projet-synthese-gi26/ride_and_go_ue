@@ -25,6 +25,7 @@ public class UserService implements UserUseCases {
     private final DriverRepositoryPort driverRepositoryPort;
     private final VehicleRepositoryPort vehicleRepositoryPort;
     private final SyndicatePort syndicatePort;
+    private final PaymentPort paymentPort; // Injection
 
     @Override
     public Mono<User> saveUser(User user) {
@@ -43,16 +44,12 @@ public class UserService implements UserUseCases {
 
     @Override
     public Mono<User> getUserById(UUID userId) {
-        return externalUserPort.fetchRemoteUserById(userId)
-                .flatMap(userRepositoryPort::save)
-                .doOnSuccess(u -> log.info("✅ Synced user {} from remote", u.id()));
+        return externalUserPort.fetchRemoteUserById(userId).flatMap(userRepositoryPort::save);
     }
 
     @Override
     public Flux<User> getAllUsers() {
-        return externalUserPort.fetchAllRemoteUsers()
-                .flatMap(userRepositoryPort::save)
-                .doOnComplete(() -> log.info("✅ Full user list synced from remote"));
+        return externalUserPort.fetchAllRemoteUsers().flatMap(userRepositoryPort::save);
     }
 
     @Override
@@ -85,7 +82,7 @@ public class UserService implements UserUseCases {
     @Override
     public Mono<DriverProfileResponse> upgradeToDriverComplete(UUID userId, BecomeDriverRequest request,
             FilePart regPhoto, FilePart serialPhoto) {
-        log.info("🚀 Starting Driver Onboarding for User {} (Syndicate-Aware Flow)", userId);
+        log.info("🚀 Starting Driver Onboarding for User {}", userId);
 
         return userRepositoryPort.findUserById(userId)
                 .flatMap(user -> {
@@ -138,6 +135,9 @@ public class UserService implements UserUseCases {
                                         .build();
 
                                 return driverRepositoryPort.save(newDriver)
+                                        // CRÉATION DU WALLET ICI
+                                        .flatMap(savedDriver -> paymentPort.createWallet(userId, user.name())
+                                                .thenReturn(savedDriver))
                                         .map(savedDriver -> new DriverProfileResponse(
                                                 savedDriver.id(),
                                                 savedDriver.status(),
@@ -162,8 +162,6 @@ public class UserService implements UserUseCases {
 
     @Override
     public Mono<DriverProfileResponse> verifySyndicateStatus(UUID userId) {
-        log.info("🛠 Verifying Syndicate status for Driver {}", userId);
-
         return syndicatePort.checkIsSyndicated(userId)
                 .flatMap(isVerified -> driverRepositoryPort.findById(userId)
                         .flatMap(driver -> {

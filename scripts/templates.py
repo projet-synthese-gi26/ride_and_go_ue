@@ -44,17 +44,17 @@ templates_to_create = [
             "description": "Notification aux chauffeurs pour une nouvelle course disponible",
             "type": "EMAIL",
             "fromEmail": "noreply@rideandgo.com",
-            "subject": "🚗 Nouvelle course disponible : {{start}} -> {{end}}",
+            "subject": "Nouvelle course disponible : {{{{start}}}} -> {{{{end}}}}",
             "message": "Nouvelle course disponible", # Fallback texte brut
             "bodyHtml": get_html_wrapper("Nouvelle Opportunité", """
                 <p>Bonjour,</p>
                 <p>Une nouvelle course correspondant à votre zone est disponible !</p>
                 <div style="{CARD_STYLE}">
-                    <p><strong>Départ :</strong> {{start}}</p>
-                    <p><strong>Arrivée :</strong> {{end}}</p>
-                    <p><strong>Prix :</strong> <span style="color: #4CAF50; font-weight: bold;">{{price}} FCFA</span></p>
+                    <p><strong>Départ :</strong> {{{{start}}}}</p>
+                    <p><strong>Arrivée :</strong> {{{{end}}}}</p>
+                    <p><strong>Prix :</strong> <span style="color: #4CAF50; font-weight: bold;">{{{{price}}}} FCFA</span></p>
                 </div>
-                <div style="text-align: center;"><a href="rideandgo://offers/{{offerId}}" style="{BUTTON_STYLE}">Voir l'offre</a></div>
+                <div style="text-align: center;"><a href="rideandgo://offers/{{{{offerId}}}}" style="{BUTTON_STYLE}">Voir l'offre</a></div>
             """.format(CARD_STYLE=CARD_STYLE, BUTTON_STYLE=BUTTON_STYLE))
         }
     },
@@ -68,8 +68,8 @@ templates_to_create = [
             "subject": "👋 Un chauffeur est intéressé !",
             "message": "Un chauffeur a postulé à votre offre",
             "bodyHtml": get_html_wrapper("Candidature Reçue", """
-                <p><strong>{{driverName}}</strong> est disponible pour effectuer votre course.</p>
-                <div style="text-align: center;"><a href="rideandgo://offers/{{offerId}}/bids" style="{BUTTON_STYLE}">Voir le chauffeur</a></div>
+                <p><strong>{{{{driverName}}}}</strong> est disponible pour effectuer votre course.</p>
+                <div style="text-align: center;"><a href="rideandgo://offers/{{{{offerId}}}}/bids" style="{BUTTON_STYLE}">Voir le chauffeur</a></div>
             """.format(BUTTON_STYLE=BUTTON_STYLE))
         }
     },
@@ -83,8 +83,8 @@ templates_to_create = [
             "subject": "🎉 Vous avez été sélectionné !",
             "message": "Le client vous a choisi",
             "bodyHtml": get_html_wrapper("Félicitations !", """
-                <p>Le client a accepté votre candidature pour <strong>{{price}} FCFA</strong>.</p>
-                <div style="text-align: center;"><a href="rideandgo://offers/{{offerId}}/confirm" style="{BUTTON_STYLE}">Confirmer la course</a></div>
+                <p>Le client a accepté votre candidature pour <strong>{{{{price}}}} FCFA</strong>.</p>
+                <div style="text-align: center;"><a href="rideandgo://offers/{{{{offerId}}}}/confirm" style="{BUTTON_STYLE}">Confirmer la course</a></div>
             """.format(BUTTON_STYLE=BUTTON_STYLE))
         }
     },
@@ -99,7 +99,7 @@ templates_to_create = [
             "message": "Votre chauffeur arrive",
             "bodyHtml": get_html_wrapper("Chauffeur Confirmé", """
                 <p>Votre chauffeur a confirmé la prise en charge et se dirige vers vous.</p>
-                <div style="text-align: center;"><a href="rideandgo://rides/{{rideId}}/track" style="{BUTTON_STYLE}">Suivre mon chauffeur</a></div>
+                <div style="text-align: center;"><a href="rideandgo://rides/{{{{rideId}}}}/track" style="{BUTTON_STYLE}">Suivre mon chauffeur</a></div>
             """.format(BUTTON_STYLE=BUTTON_STYLE))
         }
     },
