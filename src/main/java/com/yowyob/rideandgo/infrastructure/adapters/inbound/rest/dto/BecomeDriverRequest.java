@@ -3,31 +3,35 @@ package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * DTO structuré pour la demande "Devenir Chauffeur".
- * Regroupe les infos du véhicule sous une clé "vehicle".
+ * DTO pour l'onboarding chauffeur.
+ * Utilise les NOMS (ex: "Toyota") au lieu des IDs, conformément à l'API Vehicle
+ * Simplified.
+ * Les photos seront uploadées dans une étape ultérieure via l'API Vehicle.
  */
 public record BecomeDriverRequest(
         String licenseNumber,
         @JsonProperty("vehicle") VehicleInfo vehicle) {
     public record VehicleInfo(
-            // Informations du véhicule (noms lisibles, pas IDs)
-            String vehicleMakeName, // ex: "Toyota"
-            String vehicleModelName, // ex: "Yaris"
-            String vehicleTypeName, // ex: "CAR"
-            String transmissionTypeName, // ex: "Manual"
-            String fuelTypeName, // ex: "Petrol"
-            String vehicleSizeName, // ex: "Standard"
-            String manufacturerName, // ex: "Toyota Motors"
-
-            // Détails spécifiques du véhicule
-            String vehicleSerialNumber,
+            // Identifiants textuels (Noms)
+            String makeName, // ex: "Toyota"
+            String modelName, // ex: "Corolla Hybride"
+            String transmissionType, // ex: "Automatique"
+            String manufacturerName, // ex: "Toyota Factory"
+            String sizeName, // ex: "Berline Compacte"
+            String typeName, // ex: "Personnel"
+            String fuelTypeName, // ex: "Hybride Essence"
+            
+            // Données physiques
+            String vehicleSerialNumber, // VIN
             String registrationNumber, // Plaque
+
+            // Caractéristiques techniques
             int tankCapacity,
             int luggageMaxCapacity,
             int totalSeatNumber,
             double averageFuelConsumptionPerKm,
             int mileageAtStart,
-            int mileageSinceCommissioning,
-            int vehicleAgeAtStart) {
+            double mileageSinceCommissioning,
+            double vehicleAgeAtStart) {
     }
 }

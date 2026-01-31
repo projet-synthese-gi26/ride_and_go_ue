@@ -10,7 +10,11 @@ import com.yowyob.rideandgo.domain.ports.out.ExternalUserPort;
 import com.yowyob.rideandgo.domain.ports.out.DriverRepositoryPort;
 import com.yowyob.rideandgo.domain.ports.out.VehicleRepositoryPort;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.BecomeDriverRequest; // Import
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.DriverProfileResponse;
+
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -21,7 +25,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class UserService implements UserUseCases {
-    
+
     private final UserRepositoryPort userRepositoryPort;
     private final ExternalUserPort externalUserPort;
     private final DriverRepositoryPort driverRepositoryPort;
@@ -86,51 +90,92 @@ public class UserService implements UserUseCases {
                 .then();
     }
 
-    // Nouveau (Complet avec Véhicule imbriqué)
-    public Mono<Void> upgradeToDriverComplete(UUID userId, BecomeDriverRequest request) {
-        log.info("🚀 Starting Driver Onboarding for User {}", userId);
+    @Override
+    public Mono<DriverProfileResponse> upgradeToDriverComplete(UUID userId, BecomeDriverRequest request,
+            FilePart regPhoto, FilePart serialPhoto) {
+        log.info("🚀 Starting Driver Onboarding for User {} (Full Flow)", userId);
 
-        // Extraction des données du sous-objet vehicle
-        var vInfo = request.vehicle();
+        // 1. Vérifier d'abord si l'utilisateur a déjà le rôle DRIVER
+        return userRepositoryPort.findUserById(userId)
+                .flatMap(user -> {
+                    boolean alreadyHasRole = user.roles() != null && user.roles().stream()
+                            .anyMatch(r -> r.type() == RoleType.RIDE_AND_GO_DRIVER);
 
-        Vehicle vehicleDomain = Vehicle.builder()
-                .vehicleMakeId(vInfo.vehicleMakeName())
-                .vehicleModelId(vInfo.vehicleModelName())
-                .transmissionTypeId(vInfo.transmissionTypeName())
-                .manufacturerId(vInfo.manufacturerName())
-                .vehicleSizeId(vInfo.vehicleSizeName())
-                .vehicleTypeId(vInfo.vehicleTypeName())
-                .fuelTypeId(vInfo.fuelTypeName())
-                .vehicleSerialNumber(vInfo.vehicleSerialNumber())
-                .registrationNumber(vInfo.registrationNumber())
-                .tankCapacity(vInfo.tankCapacity())
-                .luggageMaxCapacity(vInfo.luggageMaxCapacity())
-                .totalSeatNumber(vInfo.totalSeatNumber())
-                .averageFuelConsumptionPerKm(vInfo.averageFuelConsumptionPerKm())
-                .mileageAtStart(vInfo.mileageAtStart())
-                .mileageSinceCommissioning(vInfo.mileageSinceCommissioning())
-                .vehicleAgeAtStart(vInfo.vehicleAgeAtStart())
-                .brand(vInfo.vehicleMakeName()) // La marque et le fabricant sont souvent les mêmes
-                .build();
+                    if (alreadyHasRole) {
+                        log.info("ℹ️ User {} already has DRIVER role. Proceeding with vehicle update/creation.",
+                                userId);
+                    }
 
-        return vehicleRepositoryPort.createVehicle(vehicleDomain)
-                .flatMap(createdVehicle -> {
-                    log.info("✅ Vehicle created with ID: {}", createdVehicle.id());
-                    Driver newDriver = Driver.builder()
-                            .id(userId)
-                            .status("OFFLINE")
-                            .licenseNumber(request.licenseNumber()) // Info chauffeur
-                            .hasCar(true)
-                            .isOnline(false)
-                            .isProfileCompleted(true)
-                            .isProfileValidated(false)
-                            .vehicleId(createdVehicle.id())
+                    // 2. Logique de création du véhicule
+                    var vInfo = request.vehicle();
+                    Vehicle vehicleDomain = Vehicle.builder()
+                            .vehicleMakeId(vInfo.makeName())
+                            .vehicleModelId(vInfo.modelName())
+                            .transmissionTypeId(vInfo.transmissionType())
+                            .manufacturerId(vInfo.manufacturerName())
+                            .vehicleSizeId(vInfo.sizeName())
+                            .vehicleTypeId(vInfo.typeName())
+                            .fuelTypeId(vInfo.fuelTypeName())
+                            .vehicleSerialNumber(vInfo.vehicleSerialNumber())
+                            .registrationNumber(vInfo.registrationNumber())
+                            .tankCapacity(vInfo.tankCapacity())
+                            .luggageMaxCapacity(vInfo.luggageMaxCapacity())
+                            .totalSeatNumber(vInfo.totalSeatNumber())
+                            .averageFuelConsumptionPerKm(vInfo.averageFuelConsumptionPerKm())
+                            .mileageAtStart(vInfo.mileageAtStart())
+                            .mileageSinceCommissioning((int) vInfo.mileageSinceCommissioning())
+                            .vehicleAgeAtStart((int) vInfo.vehicleAgeAtStart())
+                            .brand(vInfo.makeName())
                             .build();
-                    return driverRepositoryPort.save(newDriver);
-                })
-                .flatMap(d -> externalUserPort.addRole(userId, RoleType.RIDE_AND_GO_DRIVER.name()))
-                .flatMap(v -> userRepositoryPort.addRoleToUser(userId, RoleType.RIDE_AND_GO_DRIVER))
-                .doOnSuccess(v -> log.info("🏁 Onboarding Complete for User {}", userId))
-                .then();
+
+                    return vehicleRepositoryPort.createVehicle(vehicleDomain)
+                            .flatMap(createdVehicle -> {
+                                log.info("✅ Vehicle created/updated with ID: {}", createdVehicle.id());
+
+                                Mono<Vehicle> chain = Mono.just(createdVehicle);
+                                if (regPhoto != null) {
+                                    chain = chain.flatMap(
+                                            v -> vehicleRepositoryPort.uploadRegistrationDocument(v.id(), regPhoto));
+                                }
+                                if (serialPhoto != null) {
+                                    chain = chain.flatMap(
+                                            v -> vehicleRepositoryPort.uploadSerialDocument(v.id(), serialPhoto));
+                                }
+                                return chain;
+                            })
+                            .flatMap(finalVehicle -> {
+                                // 3. Création / Mise à jour du profil Chauffeur
+                                Driver newDriver = Driver.builder()
+                                        .id(userId)
+                                        .status("OFFLINE")
+                                        .licenseNumber(request.licenseNumber())
+                                        .hasCar(true)
+                                        .isOnline(false)
+                                        .isProfileCompleted(true)
+                                        .isProfileValidated(false)
+                                        .vehicleId(finalVehicle.id())
+                                        .build();
+
+                                return driverRepositoryPort.save(newDriver)
+                                        .map(savedDriver -> new DriverProfileResponse(
+                                                savedDriver.id(),
+                                                savedDriver.status(),
+                                                savedDriver.licenseNumber(),
+                                                savedDriver.isOnline(),
+                                                savedDriver.isProfileValidated(),
+                                                finalVehicle));
+                            })
+                            .flatMap(response -> {
+                                // 4. Assignation du rôle (Seulement si pas déjà présent)
+                                if (!alreadyHasRole) {
+                                    return externalUserPort.addRole(userId, RoleType.RIDE_AND_GO_DRIVER.name())
+                                            .then(userRepositoryPort.addRoleToUser(userId, RoleType.RIDE_AND_GO_DRIVER))
+                                            .doOnSuccess(v -> log.info("🔑 Role DRIVER assigned to user {}", userId))
+                                            .thenReturn(response);
+                                } else {
+                                    return Mono.just(response);
+                                }
+                            });
+                });
     }
 }

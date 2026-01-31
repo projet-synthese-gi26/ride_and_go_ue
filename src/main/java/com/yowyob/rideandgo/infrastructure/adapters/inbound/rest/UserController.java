@@ -2,9 +2,11 @@ package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
 
 import com.yowyob.rideandgo.application.service.UserService;
 import com.yowyob.rideandgo.domain.model.User;
+import com.yowyob.rideandgo.domain.model.Vehicle;
 import com.yowyob.rideandgo.domain.ports.in.UserUseCases;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.BecomeDriverRequest;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.ChangePasswordRequest;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.DriverProfileResponse;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.UpdateUserProfileRequest;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.UserResponse;
 import com.yowyob.rideandgo.infrastructure.mappers.UserMapper;
@@ -12,13 +14,14 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -27,7 +30,6 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/v1/users")
 @Tag(name = "Users", description = "User management")
 public class UserController {
-
     private final UserUseCases userUseCases;
     private final UserMapper userMapper;
     private final UserService userService;
@@ -42,6 +44,8 @@ public class UserController {
                 .map(this::mapToResponse);
     }
 
+    // --- GESTION PROFIL (SELF) ---
+
     @GetMapping("/me")
     @Operation(summary = "Get my profile", description = "Retrieve the profile of the currently authenticated user based on JWT.")
     public Mono<UserResponse> getCurrentUser() {
@@ -50,9 +54,7 @@ public class UserController {
                 .map(this::mapToResponse);
     }
 
-    // --- GESTION PROFIL (SELF) ---
-
-    @PutMapping("/profile") // Préférable de ne pas passer l'ID dans l'URL pour la sécurité (utilise le token)
+    @PutMapping("/profile")
     @Operation(summary = "Update my profile")
     public Mono<UserResponse> updateProfile(@RequestBody UpdateUserProfileRequest request) {
         return getCurrentUserId()
@@ -69,14 +71,18 @@ public class UserController {
                         request.newPassword()));
     }
 
-    @PostMapping("/driver")
+    @PostMapping(value = "/driver", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Become a Driver (Onboarding)", description = "Creates Driver profile, registers Vehicle, and assigns Role.")
-    public Mono<Void> becomeDriver(@RequestBody BecomeDriverRequest request) {
+    @Operation(summary = "Become a Driver (Full)", description = "Registers vehicle, uploads docs, creates driver profile and assigns role.")
+    public Mono<DriverProfileResponse> becomeDriver(
+            @RequestPart("data") BecomeDriverRequest request,
+            @RequestPart(name = "registrationPhoto", required = false) FilePart registrationPhoto,
+            @RequestPart(name = "serialPhoto", required = false) FilePart serialPhoto
+    ) {
         return getCurrentUserId()
-                .flatMap(userId -> userService.upgradeToDriverComplete(userId, request));
+                .flatMap(userId -> userService.upgradeToDriverComplete(userId, request, registrationPhoto, serialPhoto));
     }   
-    
+
     // --- LECTURE STANDARD ---
 
     @GetMapping("/{userId}")

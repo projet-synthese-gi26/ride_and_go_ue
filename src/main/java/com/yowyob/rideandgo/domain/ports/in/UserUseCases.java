@@ -4,11 +4,14 @@ import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.domain.model.Vehicle; // Import
 import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.BecomeDriverRequest;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.DriverProfileResponse;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+
+import org.springframework.http.codec.multipart.FilePart;
 
 public interface UserUseCases {
     Mono<User> saveUser(User user);
@@ -23,7 +26,8 @@ public interface UserUseCases {
 
     Mono<Void> upgradeToDriver(UUID userId); // Legacy
 
-    Mono<Void> upgradeToDriverComplete(UUID userId, BecomeDriverRequest request);
+    Mono<DriverProfileResponse> upgradeToDriverComplete(UUID userId, BecomeDriverRequest request, FilePart regPhoto,
+            FilePart serialPhoto);
 
     Mono<User> updateProfile(UUID userId, String firstName, String lastName, String phone);
 

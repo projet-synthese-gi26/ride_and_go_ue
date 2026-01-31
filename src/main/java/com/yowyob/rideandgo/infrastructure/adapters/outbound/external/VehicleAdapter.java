@@ -6,9 +6,14 @@ import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.Veh
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.reactive.function.BodyInserters;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
 import java.time.Duration;
 import java.util.UUID;
 
@@ -16,70 +21,123 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 public class VehicleAdapter implements VehicleRepositoryPort {
-
     private final VehicleApiClient client;
     private final ReactiveRedisTemplate<String, Object> redisTemplate;
-    
+
     private static final String CACHE_KEY = "vehicle:";
     private static final Duration TTL = Duration.ofHours(1);
 
+    // --- CREATE ---
+
     @Override
     public Mono<Vehicle> createVehicle(Vehicle domain) {
-        log.info("🚗 Orchestrating vehicle creation for: {}", domain.registrationNumber());
+        log.info("🚗 Creating vehicle via Simplified API for: {}", domain.registrationNumber());
 
-        return resolveMake(domain.vehicleMakeId()) // Le domaine contient les noms, pas les IDs. Je corrige.
-            .flatMap(makeId -> 
-                resolveModel(domain.vehicleModelId(), makeId)
-                .flatMap(modelId ->
-                    Mono.zip(
-                        resolveType(domain.vehicleTypeId()),
-                        resolveTransmission(domain.transmissionTypeId()),
-                        resolveManufacturer(domain.manufacturerId()),
-                        resolveSize(domain.vehicleSizeId()),
-                        resolveFuel(domain.fuelTypeId())
-                    ).flatMap(tuple -> {
-                        var request = new VehicleApiClient.CreateVehicleRequest(
-                            makeId, modelId, tuple.getT2(), tuple.getT3(), tuple.getT4(),
-                            tuple.getT1(), tuple.getT5(), domain.vehicleSerialNumber(),
-                            domain.vehicleSerialPhoto(), domain.registrationNumber(),
-                            domain.registrationPhoto(), domain.tankCapacity(), domain.luggageMaxCapacity(),
-                            domain.totalSeatNumber(), domain.averageFuelConsumptionPerKm(),
-                            domain.mileageAtStart(), domain.mileageSinceCommissioning(),
-                            domain.vehicleAgeAtStart(), domain.brand()
-                        );
-                        
-                        return client.createVehicle(request)
-                                .map(this::mapResponseToDomain);
-                    })
-                )
-            )
-            .flatMap(created -> cacheVehicle(created).thenReturn(created));
+        var request = new VehicleApiClient.SimplifiedVehicleRequest(
+                domain.vehicleMakeId(),
+                domain.vehicleModelId(),
+                domain.transmissionTypeId(),
+                domain.manufacturerId(),
+                domain.vehicleSizeId(),
+                domain.vehicleTypeId(),
+                domain.fuelTypeId(),
+                domain.vehicleSerialNumber(),
+                domain.vehicleSerialPhoto(),
+                domain.registrationNumber(),
+                domain.registrationPhoto(),
+                null,
+                domain.tankCapacity(),
+                domain.luggageMaxCapacity(),
+                domain.totalSeatNumber(),
+                domain.averageFuelConsumptionPerKm(),
+                domain.mileageAtStart(),
+                (double) domain.mileageSinceCommissioning(),
+                (double) domain.vehicleAgeAtStart(),
+                domain.brand());
+
+        return client.createVehicleSimplified(request)
+                .map(this::mapResponseToDomain)
+                .flatMap(created -> cacheVehicle(created).thenReturn(created))
+                .doOnSuccess(v -> log.info("✅ Vehicle created with ID: {}", v.id()));
     }
+
+    // --- READ ---
 
     @Override
     public Mono<Vehicle> getVehicleById(UUID vehicleId) {
         String key = CACHE_KEY + vehicleId;
         return redisTemplate.opsForValue().get(key)
                 .cast(Vehicle.class)
-                .switchIfEmpty(fetchAndEnrich(vehicleId.toString()));
+                .switchIfEmpty(fetchAndCache(vehicleId.toString()));
     }
 
-    private Mono<Vehicle> fetchAndEnrich(String id) {
+    // --- PATCH ---
+
+    @Override
+    public Mono<Vehicle> patchVehicle(UUID vehicleId, Vehicle partial) {
+        log.info("🔧 Patching vehicle {}", vehicleId);
+
+        var request = new VehicleApiClient.UpdateVehicleRequest(
+                partial.vehicleMakeId(),
+                partial.vehicleModelId(),
+                partial.transmissionTypeId(),
+                partial.manufacturerId(),
+                partial.vehicleSizeId(),
+                partial.vehicleTypeId(),
+                partial.fuelTypeId(),
+                partial.vehicleSerialNumber(),
+                partial.vehicleSerialPhoto(),
+                partial.registrationNumber(),
+                partial.registrationPhoto(),
+                null, // Expiry
+                partial.tankCapacity() > 0 ? partial.tankCapacity() : null,
+                partial.luggageMaxCapacity() > 0 ? partial.luggageMaxCapacity() : null,
+                partial.totalSeatNumber() > 0 ? partial.totalSeatNumber() : null,
+                partial.averageFuelConsumptionPerKm() > 0 ? partial.averageFuelConsumptionPerKm() : null,
+                partial.mileageAtStart() > 0 ? partial.mileageAtStart() : null,
+                partial.mileageSinceCommissioning() > 0 ? (double) partial.mileageSinceCommissioning() : null,
+                partial.vehicleAgeAtStart() > 0 ? (double) partial.vehicleAgeAtStart() : null,
+                partial.brand());
+
+        return client.patchVehicle(vehicleId.toString(), request)
+                .map(this::mapResponseToDomain)
+                .flatMap(updated -> cacheVehicle(updated).thenReturn(updated));
+    }
+
+    // --- DOCUMENTS & IMAGES ---
+
+    @Override
+    public Mono<Vehicle> uploadRegistrationDocument(UUID vehicleId, FilePart file) {
+        return client.uploadRegistrationDocument(vehicleId.toString(), buildMultipart(file, "file"))
+                .map(this::mapResponseToDomain)
+                .flatMap(v -> cacheVehicle(v).thenReturn(v));
+    }
+
+    @Override
+    public Mono<Vehicle> uploadSerialDocument(UUID vehicleId, FilePart file) {
+        return client.uploadSerialDocument(vehicleId.toString(), buildMultipart(file, "file"))
+                .map(this::mapResponseToDomain)
+                .flatMap(v -> cacheVehicle(v).thenReturn(v));
+    }
+
+    @Override
+    public Mono<String> uploadVehicleImage(UUID vehicleId, FilePart file) {
+        return client.uploadVehicleImage(vehicleId.toString(), buildMultipart(file, "file"))
+                .map(VehicleApiClient.VehicleImageResponse::imagePath);
+    }
+
+    @Override
+    public Flux<String> getVehicleImages(UUID vehicleId) {
+        return client.getVehicleImages(vehicleId.toString())
+                .map(VehicleApiClient.VehicleImageResponse::imagePath);
+    }
+
+    // --- HELPERS ---
+
+    private Mono<Vehicle> fetchAndCache(String id) {
         return client.getVehicleById(id)
-            .flatMap(res -> Mono.zip(
-                client.getMakeById(res.vehicleMakeId()).map(VehicleApiClient.MakeResponse::makeName).defaultIfEmpty("N/A"),
-                client.getModelById(res.vehicleModelId()).map(VehicleApiClient.ModelResponse::modelName).defaultIfEmpty("N/A"),
-                client.getTypeById(res.vehicleTypeId()).map(VehicleApiClient.TypeResponse::typeName).defaultIfEmpty("N/A")
-            ).map(tuple -> new Vehicle(
-                    UUID.fromString(res.vehicleId()),
-                    res.vehicleMakeId(), res.vehicleModelId(), res.transmissionTypeId(), res.manufacturerId(),
-                    res.vehicleSizeId(), res.vehicleTypeId(), res.fuelTypeId(),
-                    res.vehicleSerialNumber(), res.vehicleSerialPhoto(), res.registrationNumber(), res.registrationPhoto(),
-                    res.tankCapacity(), res.luggageMaxCapacity(), res.totalSeatNumber(),
-                    res.averageFuelConsumptionPerKm(), res.mileageAtStart(), res.mileageSinceCommissioning(),
-                    res.vehicleAgeAtStart(), res.brand()
-            )))
-            .flatMap(v -> cacheVehicle(v).thenReturn(v));
+                .map(this::mapResponseToDomain)
+                .flatMap(v -> cacheVehicle(v).thenReturn(v));
     }
 
     @Override
@@ -87,51 +145,33 @@ public class VehicleAdapter implements VehicleRepositoryPort {
         return redisTemplate.opsForValue().set(CACHE_KEY + vehicle.id(), vehicle, TTL).then();
     }
 
-    private Mono<String> resolveMake(String name) {
-        String safeName = (name == null || name.isEmpty()) ? "Unknown" : name;
-        return client.getAllMakes().filter(m -> m.makeName().equalsIgnoreCase(safeName)).next().map(VehicleApiClient.MakeResponse::vehicleMakeId)
-            .switchIfEmpty(Mono.defer(() -> client.createMake(new VehicleApiClient.MakeRequest(safeName)).map(VehicleApiClient.MakeResponse::vehicleMakeId)));
-    }
-    private Mono<String> resolveModel(String name, String makeId) {
-        String safeName = (name == null || name.isEmpty()) ? "Unknown" : name;
-        return client.getAllModels().filter(m -> m.modelName().equalsIgnoreCase(safeName)).next().map(VehicleApiClient.ModelResponse::vehicleModelId)
-            .switchIfEmpty(Mono.defer(() -> client.createModel(new VehicleApiClient.ModelRequest(makeId, safeName)).map(VehicleApiClient.ModelResponse::vehicleModelId)));
-    }
-    private Mono<String> resolveType(String name) {
-        String safeName = (name == null || name.isEmpty()) ? "CAR" : name;
-        return client.getAllTypes().filter(t -> t.typeName().equalsIgnoreCase(safeName)).next().map(VehicleApiClient.TypeResponse::vehicleTypeId)
-            .switchIfEmpty(Mono.defer(() -> client.createType(new VehicleApiClient.TypeRequest(safeName)).map(VehicleApiClient.TypeResponse::vehicleTypeId)));
-    }
-    private Mono<String> resolveTransmission(String name) {
-        String safeName = (name == null || name.isEmpty()) ? "Manual" : name;
-        return client.getAllTransmissions().filter(t -> t.typeName().equalsIgnoreCase(safeName)).next().map(VehicleApiClient.TransmissionResponse::transmissionTypeId)
-            .switchIfEmpty(Mono.defer(() -> client.createTransmission(new VehicleApiClient.TransmissionRequest(safeName)).map(VehicleApiClient.TransmissionResponse::transmissionTypeId)));
-    }
-    private Mono<String> resolveManufacturer(String name) {
-        String safeName = (name == null || name.isEmpty()) ? "Unknown" : name;
-        return client.getAllManufacturers().filter(m -> m.manufacturerName().equalsIgnoreCase(safeName)).next().map(VehicleApiClient.ManufacturerResponse::manufacturerId)
-            .switchIfEmpty(Mono.defer(() -> client.createManufacturer(new VehicleApiClient.ManufacturerRequest(safeName)).map(VehicleApiClient.ManufacturerResponse::manufacturerId)));
-    }
-    private Mono<String> resolveSize(String name) {
-        String safeName = (name == null || name.isEmpty()) ? "Standard" : name;
-        return client.getAllSizes().filter(s -> s.sizeName().equalsIgnoreCase(safeName)).next().map(VehicleApiClient.SizeResponse::vehicleSizeId)
-            .switchIfEmpty(Mono.defer(() -> client.createSize(new VehicleApiClient.SizeRequest(safeName)).map(VehicleApiClient.SizeResponse::vehicleSizeId)));
-    }
-    private Mono<String> resolveFuel(String name) {
-        String safeName = (name == null || name.isEmpty()) ? "Petrol" : name;
-        return client.getAllFuels().filter(f -> f.fuelTypeName().equalsIgnoreCase(safeName)).next().map(VehicleApiClient.FuelResponse::fuelTypeId)
-            .switchIfEmpty(Mono.defer(() -> client.createFuel(new VehicleApiClient.FuelRequest(safeName)).map(VehicleApiClient.FuelResponse::fuelTypeId)));
-    }
-    
     private Vehicle mapResponseToDomain(VehicleApiClient.VehicleResponse res) {
         return new Vehicle(
-            UUID.fromString(res.vehicleId()),
-            res.vehicleMakeId(), res.vehicleModelId(), res.transmissionTypeId(), res.manufacturerId(),
-            res.vehicleSizeId(), res.vehicleTypeId(), res.fuelTypeId(),
-            res.vehicleSerialNumber(), res.vehicleSerialPhoto(), res.registrationNumber(), res.registrationPhoto(),
-            res.tankCapacity(), res.luggageMaxCapacity(), res.totalSeatNumber(),
-            res.averageFuelConsumptionPerKm(), res.mileageAtStart(), res.mileageSinceCommissioning(),
-            res.vehicleAgeAtStart(), res.brand()
-        );
+                UUID.fromString(res.vehicleId()),
+                res.vehicleMakeId(),
+                res.vehicleModelId(),
+                res.transmissionTypeId(),
+                res.manufacturerId(),
+                res.vehicleSizeId(),
+                res.vehicleTypeId(),
+                res.fuelTypeId(),
+                res.vehicleSerialNumber(),
+                res.vehicleSerialPhoto(),
+                res.registrationNumber(),
+                res.registrationPhoto(),
+                res.tankCapacity(),
+                res.luggageMaxCapacity(),
+                res.totalSeatNumber(),
+                res.averageFuelConsumptionPerKm(),
+                res.mileageAtStart(),
+                (int) res.mileageSinceCommissioning(),
+                (int) res.vehicleAgeAtStart(),
+                res.brand());
+    }
+
+    private MultiValueMap<String, ?> buildMultipart(FilePart file, String keyName) {
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+        builder.part(keyName, file);
+        return builder.build();
     }
 }

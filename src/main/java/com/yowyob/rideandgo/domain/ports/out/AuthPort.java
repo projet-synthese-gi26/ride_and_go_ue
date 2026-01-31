@@ -6,6 +6,8 @@ import java.util.List;
 
 public interface AuthPort {
     Mono<AuthResponse> login(String email, String password);
+
+    Mono<AuthResponse> refreshToken(String refreshToken);
     
     Mono<Void> forgotPassword(String email);
 

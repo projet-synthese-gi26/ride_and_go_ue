@@ -1,5 +1,6 @@
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.external;
 
+import com.yowyob.rideandgo.domain.exception.UserAlreadyExistsException;
 import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.out.AuthPort;
@@ -7,6 +8,8 @@ import com.yowyob.rideandgo.domain.ports.out.UserRepositoryPort;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.AuthApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -24,8 +27,9 @@ public class RemoteAuthAdapter implements AuthPort {
     private final AuthApiClient client;
     private final UserRepositoryPort userRepository;
 
-    // Selon votre capture d'écran, le service attend bien "RIDE_AND_GO" (avec les underscores)
-    private static final String SERVICE_NAME = "RIDE_AND_GO"; 
+    // Selon votre capture d'écran, le service attend bien "RIDE_AND_GO" (avec les
+    // underscores)
+    private static final String SERVICE_NAME = "RIDE_AND_GO";
 
     @Override
     public Mono<AuthResponse> login(String identifier, String password) {
@@ -36,7 +40,8 @@ public class RemoteAuthAdapter implements AuthPort {
     }
 
     @Override
-    public Mono<AuthResponse> register(String username, String email, String password, String phone, String firstName, String lastName, List<RoleType> roles) {
+    public Mono<AuthResponse> register(String username, String email, String password, String phone, String firstName,
+            String lastName, List<RoleType> roles) {
         log.info("🌐 REMOTE AUTH : Register Multipart pour {} (Service: {})", username, SERVICE_NAME);
 
         // 1. Préparation des données (JSON Object)
@@ -45,25 +50,27 @@ public class RemoteAuthAdapter implements AuthPort {
                 .toList();
 
         AuthApiClient.RegisterRequest registerDto = new AuthApiClient.RegisterRequest(
-            username, 
-            password, 
-            email, 
-            phone, 
-            firstName, 
-            lastName,
-            SERVICE_NAME, 
-            rolesToSend
-        );
+                username,
+                password,
+                email,
+                phone,
+                firstName,
+                lastName,
+                SERVICE_NAME,
+                rolesToSend);
 
         // 2. Construction du corps Multipart
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
-        
-        // Partie 'data' : Le JSON (Important: spécifier le MediaType pour que le backend distant sache le parser)
+
+        // Partie 'data' : Le JSON (Important: spécifier le MediaType pour que le
+        // backend distant sache le parser)
         builder.part("data", registerDto, MediaType.APPLICATION_JSON);
-        
-        // Partie 'file' : Optionnelle. 
-        // Si l'API plante sans fichier, on peut décommenter la ligne suivante pour envoyer un fichier vide "dummy"
-        // builder.part("file", new byte[0], MediaType.APPLICATION_OCTET_STREAM).filename("empty.png");
+
+        // Partie 'file' : Optionnelle.
+        // Si l'API plante sans fichier, on peut décommenter la ligne suivante pour
+        // envoyer un fichier vide "dummy"
+        // builder.part("file", new byte[0],
+        // MediaType.APPLICATION_OCTET_STREAM).filename("empty.png");
 
         // 3. Appel du client avec le build() qui retourne une MultiValueMap
         return client.register(builder.build())
@@ -83,14 +90,29 @@ public class RemoteAuthAdapter implements AuthPort {
                             .thenReturn(mapToDomain(response));
                 })
                 .onErrorResume(WebClientResponseException.class, ex -> {
-                    log.error("❌ Register Failed (Remote): {} - Body: {}", ex.getStatusCode(), ex.getResponseBodyAsString());
+                    log.error("❌ Register Failed (Remote): {} - Body: {}", ex.getStatusCode(),
+                            ex.getResponseBodyAsString());
+
+                    if (ex.getStatusCode() == HttpStatus.CONFLICT) {
+                        return Mono.error(new UserAlreadyExistsException(
+                                "Un utilisateur existe déjà avec cet email ou ce nom d'utilisateur."));
+                    }
+
                     return Mono.error(new RuntimeException("Erreur inscription : " + ex.getResponseBodyAsString()));
                 });
     }
 
     @Override
+    public Mono<AuthResponse> refreshToken(String refreshToken) {
+        log.debug("🌐 REMOTE AUTH : Refresh Token requested");
+        return client.refresh(new AuthApiClient.RefreshTokenRequest(refreshToken))
+                .map(this::mapToDomain)
+                .doOnError(e -> log.error("Refresh Token failed: {}", e.getMessage()));
+    }
+
+    @Override
     public Mono<Void> forgotPassword(String email) {
-        return Mono.empty(); 
+        return Mono.empty();
     }
 
     private AuthResponse mapToDomain(AuthApiClient.TraMaSysResponse res) {
@@ -106,11 +128,10 @@ public class RemoteAuthAdapter implements AuthPort {
                 .collect(Collectors.toList());
 
         return new AuthResponse(
-            res.accessToken(),
-            res.refreshToken(),
-            res.user().username(),
-            filteredRoles,
-            res.user().permissions()
-        );
+                res.accessToken(),
+                res.refreshToken(),
+                res.user().username(),
+                filteredRoles,
+                res.user().permissions());
     }
 }

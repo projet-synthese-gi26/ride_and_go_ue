@@ -28,26 +28,34 @@ public class AuthController {
     @Operation(summary = "Inscription Multi-Rôles")
     public Mono<AuthPort.AuthResponse> register(@RequestBody RegisterDto dto) {
         // Gestion par défaut : Si aucune liste n'est fournie, on assigne PASSENGER
-        List<RoleType> rolesToAssign = (dto.roles() != null && !dto.roles().isEmpty()) 
-                ? dto.roles() 
-                : List.of(RoleType.RIDE_AND_GO_PASSENGER); // dto.roles(); 
+        List<RoleType> rolesToAssign = (dto.roles() != null && !dto.roles().isEmpty())
+                ? dto.roles()
+                : List.of(RoleType.RIDE_AND_GO_PASSENGER); // dto.roles();
 
         return authUseCase.register(
-            dto.username(), dto.password(), dto.email(), 
-            dto.phone(), dto.firstName(), dto.lastName(),
-            rolesToAssign
-        );
+                dto.username(), dto.password(), dto.email(),
+                dto.phone(), dto.firstName(), dto.lastName(),
+                rolesToAssign);
     }
 
-    public record LoginRequest(String identifier, String password) {}
-    
+    @PostMapping("/refresh")
+    @Operation(summary = "Refresh Token", description = "Uses a valid Refresh Token to generate a new Access Token.")
+    public Mono<AuthPort.AuthResponse> refresh(@RequestBody RefreshTokenDto request) {
+        return authUseCase.refreshToken(request.refreshToken());
+    }
+
+    public record LoginRequest(String identifier, String password) {
+    }
+
+    public record RefreshTokenDto(String refreshToken) {}
+
     public record RegisterDto(
-        String username, 
-        String password, 
-        String email, 
-        String phone, 
-        String firstName, 
-        String lastName,
-        List<RoleType> roles 
-    ) {}
+            String username,
+            String password,
+            String email,
+            String phone,
+            String firstName,
+            String lastName,
+            List<RoleType> roles) {
+    }
 }

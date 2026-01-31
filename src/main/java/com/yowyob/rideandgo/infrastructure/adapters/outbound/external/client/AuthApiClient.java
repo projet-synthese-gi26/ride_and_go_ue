@@ -10,7 +10,6 @@ import org.springframework.web.service.annotation.HttpExchange;
 import org.springframework.web.service.annotation.PostExchange;
 import org.springframework.web.service.annotation.PutExchange;
 
-
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import java.util.List;
@@ -25,6 +24,9 @@ public interface AuthApiClient {
 
         @PostExchange(url = "/auth/register", contentType = MediaType.MULTIPART_FORM_DATA_VALUE)
         Mono<TraMaSysResponse> register(@RequestBody MultiValueMap<String, ?> parts);
+
+        @PostExchange("/auth/refresh")
+        Mono<TraMaSysResponse> refresh(@RequestBody RefreshTokenRequest request);
 
         // --- USERS READ ---
         @GetExchange("/users/service/{serviceName}")
@@ -61,6 +63,8 @@ public interface AuthApiClient {
                         String firstName, String lastName, String service, List<String> roles) {
         }
 
+        record RefreshTokenRequest(String refreshToken) {}
+
         record TraMaSysResponse(String accessToken, String refreshToken, UserDetail user) {
         }
 
@@ -75,8 +79,7 @@ public interface AuthApiClient {
                         List<String> roles,
                         List<String> permissions,
                         UUID photoId,
-                        String photoUri
-                        ) {
+                        String photoUri) {
         }
 
         record UpdateProfileDto(String firstName, String lastName, String phone) {

@@ -20,6 +20,11 @@ public class AuthService implements AuthUseCase {
     }
 
     @Override
+    public Mono<AuthPort.AuthResponse> refreshToken(String refreshToken) {
+        return authPort.refreshToken(refreshToken);
+    }
+
+    @Override
     public Mono<AuthPort.AuthResponse> register(String username, String email, String password, String phone, String firstName, String lastName, List<RoleType> roles) {
         return authPort.register(username, password, email, phone, firstName, lastName, roles);
     }

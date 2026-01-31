@@ -7,6 +7,8 @@ import java.util.List;
 
 public interface AuthUseCase {
     Mono<AuthPort.AuthResponse> login(String identifier, String password);
+
+    Mono<AuthPort.AuthResponse> refreshToken(String refreshToken);
     
     Mono<Void> resetPassword(String email);
 
