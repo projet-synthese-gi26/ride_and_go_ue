@@ -3,14 +3,12 @@ package com.yowyob.rideandgo.infrastructure.adapters.outbound.cache;
 import com.yowyob.rideandgo.domain.model.Fare;
 import com.yowyob.rideandgo.domain.model.Offer;
 import com.yowyob.rideandgo.domain.model.User;
-import com.yowyob.rideandgo.domain.ports.out.FareCachePort;
-import com.yowyob.rideandgo.domain.ports.out.OfferCachePort;
-import com.yowyob.rideandgo.domain.ports.out.UserCachePort;
-import com.yowyob.rideandgo.domain.ports.out.LocationCachePort;
+import com.yowyob.rideandgo.domain.ports.out.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
@@ -20,10 +18,11 @@ import java.util.UUID;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class RedisAdapter implements OfferCachePort, UserCachePort, FareCachePort, LocationCachePort {
-    
+public class RedisAdapter
+        implements OfferCachePort, UserCachePort, FareCachePort, LocationCachePort, CacheInvalidationPort {
+
     private final ReactiveRedisTemplate<String, Object> redisTemplate;
-    
+
     private static final String LOCATION_KEY_PREFIX = "location:";
     private static final Duration LOCATION_TTL = Duration.ofMinutes(5);
 
@@ -32,12 +31,10 @@ public class RedisAdapter implements OfferCachePort, UserCachePort, FareCachePor
     @Override
     public Mono<Boolean> saveLocation(UUID actorId, Double latitude, Double longitude) {
         String key = LOCATION_KEY_PREFIX + actorId.toString();
-        // Using a Map for simple JSON serialization in Redis
         Map<String, Double> coords = Map.of(
-            "lat", latitude, 
-            "lon", longitude
-        );
-        
+                "lat", latitude,
+                "lon", longitude);
+
         return redisTemplate.opsForValue()
                 .set(key, coords, LOCATION_TTL)
                 .doOnSuccess(success -> log.debug("Location cached for actor {} (success: {})", actorId, success))
@@ -105,5 +102,20 @@ public class RedisAdapter implements OfferCachePort, UserCachePort, FareCachePor
         return redisTemplate.opsForValue()
                 .get("fare:" + fareId)
                 .cast(Fare.class);
+    }
+
+    // --- CacheInvalidationPort Implementation ---
+
+    @Override
+    public Mono<Void> invalidateUserCache(UUID userId) {
+        String userKey = "user:" + userId.toString();
+        String locationKey = LOCATION_KEY_PREFIX + userId.toString();
+
+        log.info("🔥 Invalidating cache for user {}: keys [{}, {}]", userId, userKey, locationKey);
+
+        // Supprime les deux clés de manière réactive
+        return Flux.just(userKey, locationKey)
+                .flatMap(redisTemplate::delete)
+                .then();
     }
 }

@@ -1,9 +1,11 @@
 package com.yowyob.rideandgo.infrastructure.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature; // Import
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -15,42 +17,61 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 @Configuration
 public class RedisConfig {
+        /**
+         * ObjectMapper standard pour l'application (WebClient, Controllers, etc.).
+         * N'active PAS le default typing. C'est le bean par défaut.
+         */
+        @Bean
+        @Primary
+        public ObjectMapper objectMapper() {
+                JavaTimeModule javaTimeModule = new JavaTimeModule();
 
-    /**
-     * Crée un ObjectMapper customisé pour toute l'application (WebClient, Redis...).
-     * Il est configuré pour gérer les dates/heures correctement.
-     */
-    @Bean
-    @Primary
-    public ObjectMapper objectMapper() {
-        JavaTimeModule javaTimeModule = new JavaTimeModule();
-        
-        return new ObjectMapper()
-                .registerModule(new ParameterNamesModule())
-                .registerModule(javaTimeModule)
-                // Configuration cruciale :
-                // Empêche Jackson d'écrire les dates comme des timestamps numériques (ex: 1674892800.12345)
-                // et lui dit de les écrire en format String ISO-8601, ce qui est plus standard.
-                .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
-    }
+                return new ObjectMapper()
+                                .registerModule(new ParameterNamesModule())
+                                .registerModule(javaTimeModule)
+                                .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+        }
 
+        /**
+         * ObjectMapper SPÉCIFIQUE et ISOLÉ pour Redis.
+         * Il est construit à partir de zéro pour ne pas muter le bean primaire.
+         * Il active le "default typing" pour la désérialisation polymorphique.
+         */
+        @Bean
+        @Qualifier("redisObjectMapper")
+        public ObjectMapper redisObjectMapper() {
+                JavaTimeModule javaTimeModule = new JavaTimeModule();
 
-    /**
-     * Configure le template Redis pour utiliser notre ObjectMapper customisé.
-     */
-    @Bean
-    public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(
-            ReactiveRedisConnectionFactory factory, ObjectMapper objectMapper) { // Injection du bean ObjectMapper
+                ObjectMapper objectMapper = new ObjectMapper()
+                                .registerModule(new ParameterNamesModule())
+                                .registerModule(javaTimeModule)
+                                .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
 
-        Jackson2JsonRedisSerializer<Object> jsonSerializer =
-                new Jackson2JsonRedisSerializer<>(objectMapper, Object.class);
+                // Activation du "Typing" uniquement pour cette instance d'ObjectMapper.
+                objectMapper.activateDefaultTyping(
+                                LaissezFaireSubTypeValidator.instance,
+                                ObjectMapper.DefaultTyping.NON_FINAL);
 
-        RedisSerializationContext<String, Object> context =
-                RedisSerializationContext.<String, Object>newSerializationContext(new StringRedisSerializer())
-                        .value(jsonSerializer)
-                        .hashValue(jsonSerializer)
-                        .build();
+                return objectMapper;
+        }
 
-        return new ReactiveRedisTemplate<>(factory, context);
-    }
+        /**
+         * Configure le template Redis pour utiliser l'ObjectMapper SPÉCIFIQUE à Redis.
+         */
+        @Bean
+        public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(
+                        ReactiveRedisConnectionFactory factory,
+                        @Qualifier("redisObjectMapper") ObjectMapper redisObjectMapper) { // Injection du bean qualifié
+
+                Jackson2JsonRedisSerializer<Object> jsonSerializer = new Jackson2JsonRedisSerializer<>(
+                                redisObjectMapper, Object.class);
+
+                RedisSerializationContext<String, Object> context = RedisSerializationContext
+                                .<String, Object>newSerializationContext(new StringRedisSerializer())
+                                .value(jsonSerializer)
+                                .hashValue(jsonSerializer)
+                                .build();
+
+                return new ReactiveRedisTemplate<>(factory, context);
+        }
 }

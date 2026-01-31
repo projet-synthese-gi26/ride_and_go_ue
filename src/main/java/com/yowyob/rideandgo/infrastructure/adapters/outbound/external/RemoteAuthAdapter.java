@@ -4,6 +4,7 @@ import com.yowyob.rideandgo.domain.exception.UserAlreadyExistsException;
 import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.out.AuthPort;
+import com.yowyob.rideandgo.domain.ports.out.CacheInvalidationPort;
 import com.yowyob.rideandgo.domain.ports.out.UserRepositoryPort;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.AuthApiClient;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class RemoteAuthAdapter implements AuthPort {
 
     private final AuthApiClient client;
     private final UserRepositoryPort userRepository;
+    private final CacheInvalidationPort cacheInvalidationPort;
 
     // Selon votre capture d'écran, le service attend bien "RIDE_AND_GO" (avec les
     // underscores)
@@ -35,6 +37,14 @@ public class RemoteAuthAdapter implements AuthPort {
     public Mono<AuthResponse> login(String identifier, String password) {
         log.info("🌐 REMOTE AUTH : Login pour {}", identifier);
         return client.login(new AuthApiClient.LoginRequest(identifier, password))
+                .doOnSuccess(response -> {
+                    // Side-effect: Invalider le cache de l'utilisateur après un login réussi
+                    if (response != null && response.user() != null && response.user().id() != null) {
+                        UUID userId = UUID.fromString(response.user().id());
+                        // On "fire and forget", pas besoin d'attendre la fin de la suppression
+                        cacheInvalidationPort.invalidateUserCache(userId).subscribe();
+                    }
+                })
                 .map(this::mapToDomain)
                 .doOnError(e -> log.error("Login failed: {}", e.getMessage()));
     }
@@ -97,7 +107,7 @@ public class RemoteAuthAdapter implements AuthPort {
                         return Mono.error(new UserAlreadyExistsException(
                                 "Un utilisateur existe déjà avec cet email ou ce nom d'utilisateur."));
                     }
- 
+
                     return Mono.error(new RuntimeException("Erreur inscription : " + ex.getResponseBodyAsString()));
                 });
     }
@@ -106,6 +116,13 @@ public class RemoteAuthAdapter implements AuthPort {
     public Mono<AuthResponse> refreshToken(String refreshToken) {
         log.debug("🌐 REMOTE AUTH : Refresh Token requested");
         return client.refresh(new AuthApiClient.RefreshTokenRequest(refreshToken))
+                .doOnSuccess(response -> {
+                    // On invalide aussi le cache lors d'un refresh
+                    if (response != null && response.user() != null && response.user().id() != null) {
+                        UUID userId = UUID.fromString(response.user().id());
+                        cacheInvalidationPort.invalidateUserCache(userId).subscribe();
+                    }
+                })
                 .map(this::mapToDomain)
                 .doOnError(e -> log.error("Refresh Token failed: {}", e.getMessage()));
     }
