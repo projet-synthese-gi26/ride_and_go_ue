@@ -25,7 +25,7 @@ public interface AuthApiClient {
         @PostExchange(url = "/auth/register", contentType = MediaType.MULTIPART_FORM_DATA_VALUE)
         Mono<TraMaSysResponse> register(@RequestBody MultiValueMap<String, ?> parts);
 
-        @PostExchange("/auth/refresh")
+        @PostExchange(url = "/auth/refresh", contentType = "application/json")
         Mono<TraMaSysResponse> refresh(@RequestBody RefreshTokenRequest request);
 
         // --- USERS READ ---
