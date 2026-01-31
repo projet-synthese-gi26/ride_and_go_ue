@@ -7,10 +7,14 @@ import java.util.UUID;
 
 public interface NotificationHistoryRepositoryPort {
     Mono<Void> save(Notification notification);
-    
-    // Retourne une structure paginée simplifiée
+
     Mono<PagedResult<Notification>> getUserNotifications(UUID userId, int page, int size);
 
+    Mono<Void> markAsRead(UUID notificationId);
+
+    Mono<Void> markAllAsReadForUser(UUID userId);
+
     // Record Helper pour la pagination
-    record PagedResult<T>(List<T> content, long totalElements, int totalPages, int currentPage) {}
+    record PagedResult<T>(List<T> content, long totalElements, int totalPages, int currentPage) {
+    }
 }
