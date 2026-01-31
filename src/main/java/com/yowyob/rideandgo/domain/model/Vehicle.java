@@ -1,6 +1,8 @@
 package com.yowyob.rideandgo.domain.model;
 
 import lombok.Builder;
+
+import java.util.List;
 import java.util.UUID;
 
 @Builder
@@ -33,5 +35,7 @@ public record Vehicle(
     int vehicleAgeAtStart,
     
     // Champ redondant mais présent
-    String brand
+    String brand,
+
+    List<String> illustrationImages
 ) {}

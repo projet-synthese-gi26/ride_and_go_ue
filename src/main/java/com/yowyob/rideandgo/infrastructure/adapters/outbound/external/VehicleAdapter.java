@@ -6,15 +6,15 @@ import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.Veh
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
-import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.reactive.function.BodyInserters;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import java.time.Duration;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -26,8 +26,6 @@ public class VehicleAdapter implements VehicleRepositoryPort {
 
     private static final String CACHE_KEY = "vehicle:";
     private static final Duration TTL = Duration.ofHours(1);
-
-    // --- CREATE ---
 
     @Override
     public Mono<Vehicle> createVehicle(Vehicle domain) {
@@ -56,12 +54,10 @@ public class VehicleAdapter implements VehicleRepositoryPort {
                 domain.brand());
 
         return client.createVehicleSimplified(request)
-                .map(this::mapResponseToDomain)
+                .map(res -> this.mapResponseToDomain(res, Collections.emptyList()))
                 .flatMap(created -> cacheVehicle(created).thenReturn(created))
                 .doOnSuccess(v -> log.info("✅ Vehicle created with ID: {}", v.id()));
     }
-
-    // --- READ ---
 
     @Override
     public Mono<Vehicle> getVehicleById(UUID vehicleId) {
@@ -70,8 +66,6 @@ public class VehicleAdapter implements VehicleRepositoryPort {
                 .cast(Vehicle.class)
                 .switchIfEmpty(fetchAndCache(vehicleId.toString()));
     }
-
-    // --- PATCH ---
 
     @Override
     public Mono<Vehicle> patchVehicle(UUID vehicleId, Vehicle partial) {
@@ -89,7 +83,7 @@ public class VehicleAdapter implements VehicleRepositoryPort {
                 partial.vehicleSerialPhoto(),
                 partial.registrationNumber(),
                 partial.registrationPhoto(),
-                null, // Expiry
+                null,
                 partial.tankCapacity() > 0 ? partial.tankCapacity() : null,
                 partial.luggageMaxCapacity() > 0 ? partial.luggageMaxCapacity() : null,
                 partial.totalSeatNumber() > 0 ? partial.totalSeatNumber() : null,
@@ -100,30 +94,33 @@ public class VehicleAdapter implements VehicleRepositoryPort {
                 partial.brand());
 
         return client.patchVehicle(vehicleId.toString(), request)
-                .map(this::mapResponseToDomain)
+                .flatMap(res -> this.getVehicleImages(vehicleId).collectList()
+                        .map(images -> mapResponseToDomain(res, images)))
                 .flatMap(updated -> cacheVehicle(updated).thenReturn(updated));
     }
-
-    // --- DOCUMENTS & IMAGES ---
 
     @Override
     public Mono<Vehicle> uploadRegistrationDocument(UUID vehicleId, FilePart file) {
         return client.uploadRegistrationDocument(vehicleId.toString(), buildMultipart(file, "file"))
-                .map(this::mapResponseToDomain)
+                .flatMap(res -> this.getVehicleImages(vehicleId).collectList()
+                        .map(images -> mapResponseToDomain(res, images)))
                 .flatMap(v -> cacheVehicle(v).thenReturn(v));
     }
 
     @Override
     public Mono<Vehicle> uploadSerialDocument(UUID vehicleId, FilePart file) {
         return client.uploadSerialDocument(vehicleId.toString(), buildMultipart(file, "file"))
-                .map(this::mapResponseToDomain)
+                .flatMap(res -> this.getVehicleImages(vehicleId).collectList()
+                        .map(images -> mapResponseToDomain(res, images)))
                 .flatMap(v -> cacheVehicle(v).thenReturn(v));
     }
 
     @Override
     public Mono<String> uploadVehicleImage(UUID vehicleId, FilePart file) {
         return client.uploadVehicleImage(vehicleId.toString(), buildMultipart(file, "file"))
-                .map(VehicleApiClient.VehicleImageResponse::imagePath);
+                .map(VehicleApiClient.VehicleImageResponse::imagePath)
+                // Invalidation du cache pour forcer le rechargement des images au prochain GET
+                .flatMap(path -> redisTemplate.delete(CACHE_KEY + vehicleId).thenReturn(path));
     }
 
     @Override
@@ -135,8 +132,10 @@ public class VehicleAdapter implements VehicleRepositoryPort {
     // --- HELPERS ---
 
     private Mono<Vehicle> fetchAndCache(String id) {
-        return client.getVehicleById(id)
-                .map(this::mapResponseToDomain)
+        return Mono.zip(
+                client.getVehicleById(id),
+                this.getVehicleImages(UUID.fromString(id)).collectList().defaultIfEmpty(Collections.emptyList()))
+                .map(tuple -> mapResponseToDomain(tuple.getT1(), tuple.getT2()))
                 .flatMap(v -> cacheVehicle(v).thenReturn(v));
     }
 
@@ -145,7 +144,7 @@ public class VehicleAdapter implements VehicleRepositoryPort {
         return redisTemplate.opsForValue().set(CACHE_KEY + vehicle.id(), vehicle, TTL).then();
     }
 
-    private Vehicle mapResponseToDomain(VehicleApiClient.VehicleResponse res) {
+    private Vehicle mapResponseToDomain(VehicleApiClient.VehicleResponse res, List<String> images) {
         return new Vehicle(
                 UUID.fromString(res.vehicleId()),
                 res.vehicleMakeId(),
@@ -166,7 +165,8 @@ public class VehicleAdapter implements VehicleRepositoryPort {
                 res.mileageAtStart(),
                 (int) res.mileageSinceCommissioning(),
                 (int) res.vehicleAgeAtStart(),
-                res.brand());
+                res.brand(),
+                images);
     }
 
     private MultiValueMap<String, ?> buildMultipart(FilePart file, String keyName) {

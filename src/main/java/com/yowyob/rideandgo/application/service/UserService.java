@@ -24,7 +24,7 @@ public class UserService implements UserUseCases {
     private final ExternalUserPort externalUserPort;
     private final DriverRepositoryPort driverRepositoryPort;
     private final VehicleRepositoryPort vehicleRepositoryPort;
-    private final SyndicatePort syndicatePort; // Injection Syndicate
+    private final SyndicatePort syndicatePort;
 
     @Override
     public Mono<User> saveUser(User user) {
@@ -125,16 +125,13 @@ public class UserService implements UserUseCases {
                                 return chain;
                             })
                             .flatMap(finalVehicle -> {
-                                // REGLE METIER : Le profil n'est complété QUE si l'on est déjà syndiqué.
-                                // On fera la vérification asynchrone via la route callback plus tard.
                                 Driver newDriver = Driver.builder()
                                         .id(userId)
                                         .status("OFFLINE")
                                         .licenseNumber(request.licenseNumber())
                                         .hasCar(true)
                                         .isOnline(false)
-                                        .isProfileCompleted(false) // Reste à false tant que pas de vérification
-                                                                   // syndicat
+                                        .isProfileCompleted(false)
                                         .isProfileValidated(false)
                                         .isSyndicated(false)
                                         .vehicleId(finalVehicle.id())
@@ -147,6 +144,8 @@ public class UserService implements UserUseCases {
                                                 savedDriver.licenseNumber(),
                                                 savedDriver.isOnline(),
                                                 savedDriver.isProfileValidated(),
+                                                savedDriver.isSyndicated(),
+                                                savedDriver.isProfileCompleted(),
                                                 finalVehicle));
                             })
                             .flatMap(response -> {
@@ -161,9 +160,6 @@ public class UserService implements UserUseCases {
                 });
     }
 
-    /**
-     * NOUVEAU : Vérifie le statut auprès d'UGate et complète le profil si vérifié.
-     */
     @Override
     public Mono<DriverProfileResponse> verifySyndicateStatus(UUID userId) {
         log.info("🛠 Verifying Syndicate status for Driver {}", userId);
@@ -171,7 +167,6 @@ public class UserService implements UserUseCases {
         return syndicatePort.checkIsSyndicated(userId)
                 .flatMap(isVerified -> driverRepositoryPort.findById(userId)
                         .flatMap(driver -> {
-                            // Mise à jour du statut syndicat et completion profil
                             Driver updatedDriver = Driver.builder()
                                     .id(driver.id())
                                     .status(driver.status())
@@ -181,14 +176,15 @@ public class UserService implements UserUseCases {
                                     .isProfileValidated(driver.isProfileValidated())
                                     .vehicleId(driver.vehicleId())
                                     .isSyndicated(isVerified)
-                                    .isProfileCompleted(isVerified) // REGLE : isCompleted si Verified
+                                    .isProfileCompleted(isVerified)
                                     .build();
 
                             return driverRepositoryPort.save(updatedDriver)
                                     .flatMap(saved -> vehicleRepositoryPort.getVehicleById(saved.vehicleId())
                                             .map(v -> new DriverProfileResponse(
                                                     saved.id(), saved.status(), saved.licenseNumber(),
-                                                    saved.isOnline(), saved.isProfileValidated(), v)));
+                                                    saved.isOnline(), saved.isProfileValidated(),
+                                                    saved.isSyndicated(), saved.isProfileCompleted(), v)));
                         }));
     }
 }
