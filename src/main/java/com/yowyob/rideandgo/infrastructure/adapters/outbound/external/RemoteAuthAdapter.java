@@ -97,7 +97,7 @@ public class RemoteAuthAdapter implements AuthPort {
                         return Mono.error(new UserAlreadyExistsException(
                                 "Un utilisateur existe déjà avec cet email ou ce nom d'utilisateur."));
                     }
-
+ 
                     return Mono.error(new RuntimeException("Erreur inscription : " + ex.getResponseBodyAsString()));
                 });
     }
