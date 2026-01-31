@@ -72,6 +72,7 @@ public class DriverR2dbcAdapter implements DriverRepositoryPort {
                 driver.isProfileCompleted(),
                 driver.vehicleId(),
                 driver.isProfileValidated(),
+                false, 
                 false // Par défaut false
         );
 

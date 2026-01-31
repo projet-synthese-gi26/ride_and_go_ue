@@ -3,6 +3,7 @@ package com.yowyob.rideandgo.infrastructure.config;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.AuthApiClient;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.FareCalculatorClient;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.NotificationApiClient;
+import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.SyndicateApiClient;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.VehicleApiClient;
 
 import reactor.core.publisher.Mono;
@@ -39,12 +40,12 @@ public class WebClientConfig {
     }
 
     @Bean
-    public AuthApiClient authApiClient(WebClient.Builder builder, 
-                                       @Value("${application.auth.url}") String url) {
+    public AuthApiClient authApiClient(WebClient.Builder builder,
+            @Value("${application.auth.url}") String url) {
         WebClient webClient = builder
                 .baseUrl(url)
                 .filter(addBearerToken()) // Gestion Token Bearer
-                .filter(logRequest())     // Ajout Logging
+                .filter(logRequest()) // Ajout Logging
                 .build();
 
         WebClientAdapter adapter = WebClientAdapter.create(webClient);
@@ -57,9 +58,8 @@ public class WebClientConfig {
             // Log uniquement pour les routes Auth pour ne pas polluer
             if (request.url().getPath().contains("/auth/")) {
                 log.info("🚀 [WebClient] Request: {} {}", request.method(), request.url());
-                request.headers().forEach((name, values) -> 
-                    values.forEach(value -> log.info("   🧩 Header: {}={}", name, value))
-                );
+                request.headers().forEach(
+                        (name, values) -> values.forEach(value -> log.info("   🧩 Header: {}={}", name, value)));
             }
             return next.exchange(request);
         };
@@ -77,6 +77,15 @@ public class WebClientConfig {
 
         WebClientAdapter adapter = WebClientAdapter.create(webClient);
         return HttpServiceProxyFactory.builderFor(adapter).build().createClient(NotificationApiClient.class);
+    }
+
+    @Bean
+    public SyndicateApiClient syndicateApiClient(WebClient.Builder builder,
+            @Value("${application.syndicate.url}") String url) {
+        WebClient webClient = builder.baseUrl(url).filter(addBearerToken()).build(); // UGate ne semble pas demander de
+                                                                                     // Token Auth pour cette
+        WebClientAdapter adapter = WebClientAdapter.create(webClient);
+        return HttpServiceProxyFactory.builderFor(adapter).build().createClient(SyndicateApiClient.class);
     }
 
     @Bean

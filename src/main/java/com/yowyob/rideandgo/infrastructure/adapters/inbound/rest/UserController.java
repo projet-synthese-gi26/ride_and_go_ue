@@ -88,11 +88,19 @@ public class UserController {
         }
 
         return getCurrentUserId()
-                .flatMap(userId ->
-                        userService.upgradeToDriverComplete(
-                                userId, request, registrationPhoto, serialPhoto
-                        )
-                );
+                .flatMap(userId -> userService.upgradeToDriverComplete(
+                        userId, request, registrationPhoto, serialPhoto));
+    }
+
+    /**
+     * NOUVEAU : Route pour déclencher la vérification du statut Syndicat.
+     */
+    @PatchMapping("/verify-compliance")
+    @Operation(summary = "Verify Syndicate Membership", description = "Checks with UGate if the driver is verified. If yes, completes the profile.")
+    @PreAuthorize("hasAuthority('RIDE_AND_GO_DRIVER')")
+    public Mono<DriverProfileResponse> verifyCompliance() {
+        return getCurrentUserId()
+                .flatMap(userUseCases::verifySyndicateStatus);
     }
 
     // --- LECTURE STANDARD ---

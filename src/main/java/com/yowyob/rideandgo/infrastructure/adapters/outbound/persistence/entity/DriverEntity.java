@@ -36,6 +36,9 @@ public class DriverEntity implements Persistable<UUID> {
     @Column("is_profile_validated")
     private boolean isProfileValidated;
 
+    @Column("is_syndicated")
+    private boolean isSyndicated;
+
     @Transient
     private boolean newEntity = false;
 

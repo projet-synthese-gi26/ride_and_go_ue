@@ -12,5 +12,6 @@ public record Driver(
     boolean isOnline,
     boolean isProfileCompleted,
     boolean isProfileValidated, // NOUVEAU
+    boolean isSyndicated,
     UUID vehicleId              // NOUVEAU
 ) {}

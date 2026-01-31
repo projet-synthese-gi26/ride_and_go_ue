@@ -95,6 +95,9 @@ application:
   vehicle:
     url: https://vehicule-service.pynfi.com
 
+  syndicate:
+    url: https://ugate.pynfi.com
+
   kafka:
     topics:
       notification-service-create-topic: notification-create-topic

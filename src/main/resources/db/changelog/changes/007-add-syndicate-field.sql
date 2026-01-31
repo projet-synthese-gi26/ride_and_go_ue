@@ -1,0 +1,1 @@
+ALTER TABLE ride_and_go.drivers ADD COLUMN is_syndicated BOOLEAN DEFAULT false;

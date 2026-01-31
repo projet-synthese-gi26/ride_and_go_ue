@@ -5,15 +5,10 @@ import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.domain.model.Vehicle;
 import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.in.UserUseCases;
-import com.yowyob.rideandgo.domain.ports.out.UserRepositoryPort;
-import com.yowyob.rideandgo.domain.ports.out.ExternalUserPort;
-import com.yowyob.rideandgo.domain.ports.out.DriverRepositoryPort;
-import com.yowyob.rideandgo.domain.ports.out.VehicleRepositoryPort;
-import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.BecomeDriverRequest; // Import
+import com.yowyob.rideandgo.domain.ports.out.*;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.BecomeDriverRequest;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.DriverProfileResponse;
-
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -25,11 +20,11 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class UserService implements UserUseCases {
-
     private final UserRepositoryPort userRepositoryPort;
     private final ExternalUserPort externalUserPort;
     private final DriverRepositoryPort driverRepositoryPort;
     private final VehicleRepositoryPort vehicleRepositoryPort;
+    private final SyndicatePort syndicatePort; // Injection Syndicate
 
     @Override
     public Mono<User> saveUser(User user) {
@@ -48,7 +43,6 @@ public class UserService implements UserUseCases {
 
     @Override
     public Mono<User> getUserById(UUID userId) {
-        // Règle stricte : Appel Distant -> Sauvegarde Locale -> Retour
         return externalUserPort.fetchRemoteUserById(userId)
                 .flatMap(userRepositoryPort::save)
                 .doOnSuccess(u -> log.info("✅ Synced user {} from remote", u.id()));
@@ -56,7 +50,6 @@ public class UserService implements UserUseCases {
 
     @Override
     public Flux<User> getAllUsers() {
-        // Appel Distant -> Sauvegarde tout -> Retourne flux sauvegardé
         return externalUserPort.fetchAllRemoteUsers()
                 .flatMap(userRepositoryPort::save)
                 .doOnComplete(() -> log.info("✅ Full user list synced from remote"));
@@ -81,7 +74,6 @@ public class UserService implements UserUseCases {
         return externalUserPort.fetchAllRemoteUsersByService(serviceName).flatMap(userRepositoryPort::save);
     }
 
-    // Ancien (Legacy)
     @Override
     public Mono<Void> upgradeToDriver(UUID userId) {
         return driverRepositoryPort.createDriver(userId)
@@ -93,20 +85,13 @@ public class UserService implements UserUseCases {
     @Override
     public Mono<DriverProfileResponse> upgradeToDriverComplete(UUID userId, BecomeDriverRequest request,
             FilePart regPhoto, FilePart serialPhoto) {
-        log.info("🚀 Starting Driver Onboarding for User {} (Full Flow)", userId);
+        log.info("🚀 Starting Driver Onboarding for User {} (Syndicate-Aware Flow)", userId);
 
-        // 1. Vérifier d'abord si l'utilisateur a déjà le rôle DRIVER
         return userRepositoryPort.findUserById(userId)
                 .flatMap(user -> {
                     boolean alreadyHasRole = user.roles() != null && user.roles().stream()
                             .anyMatch(r -> r.type() == RoleType.RIDE_AND_GO_DRIVER);
 
-                    if (alreadyHasRole) {
-                        log.info("ℹ️ User {} already has DRIVER role. Proceeding with vehicle update/creation.",
-                                userId);
-                    }
-
-                    // 2. Logique de création du véhicule
                     var vInfo = request.vehicle();
                     Vehicle vehicleDomain = Vehicle.builder()
                             .vehicleMakeId(vInfo.makeName())
@@ -130,29 +115,28 @@ public class UserService implements UserUseCases {
 
                     return vehicleRepositoryPort.createVehicle(vehicleDomain)
                             .flatMap(createdVehicle -> {
-                                log.info("✅ Vehicle created/updated with ID: {}", createdVehicle.id());
-
                                 Mono<Vehicle> chain = Mono.just(createdVehicle);
-                                if (regPhoto != null) {
+                                if (regPhoto != null)
                                     chain = chain.flatMap(
                                             v -> vehicleRepositoryPort.uploadRegistrationDocument(v.id(), regPhoto));
-                                }
-                                if (serialPhoto != null) {
+                                if (serialPhoto != null)
                                     chain = chain.flatMap(
                                             v -> vehicleRepositoryPort.uploadSerialDocument(v.id(), serialPhoto));
-                                }
                                 return chain;
                             })
                             .flatMap(finalVehicle -> {
-                                // 3. Création / Mise à jour du profil Chauffeur
+                                // REGLE METIER : Le profil n'est complété QUE si l'on est déjà syndiqué.
+                                // On fera la vérification asynchrone via la route callback plus tard.
                                 Driver newDriver = Driver.builder()
                                         .id(userId)
                                         .status("OFFLINE")
                                         .licenseNumber(request.licenseNumber())
                                         .hasCar(true)
                                         .isOnline(false)
-                                        .isProfileCompleted(true)
+                                        .isProfileCompleted(false) // Reste à false tant que pas de vérification
+                                                                   // syndicat
                                         .isProfileValidated(false)
+                                        .isSyndicated(false)
                                         .vehicleId(finalVehicle.id())
                                         .build();
 
@@ -166,16 +150,45 @@ public class UserService implements UserUseCases {
                                                 finalVehicle));
                             })
                             .flatMap(response -> {
-                                // 4. Assignation du rôle (Seulement si pas déjà présent)
                                 if (!alreadyHasRole) {
                                     return externalUserPort.addRole(userId, RoleType.RIDE_AND_GO_DRIVER.name())
                                             .then(userRepositoryPort.addRoleToUser(userId, RoleType.RIDE_AND_GO_DRIVER))
-                                            .doOnSuccess(v -> log.info("🔑 Role DRIVER assigned to user {}", userId))
                                             .thenReturn(response);
                                 } else {
                                     return Mono.just(response);
                                 }
                             });
                 });
+    }
+
+    /**
+     * NOUVEAU : Vérifie le statut auprès d'UGate et complète le profil si vérifié.
+     */
+    @Override
+    public Mono<DriverProfileResponse> verifySyndicateStatus(UUID userId) {
+        log.info("🛠 Verifying Syndicate status for Driver {}", userId);
+
+        return syndicatePort.checkIsSyndicated(userId)
+                .flatMap(isVerified -> driverRepositoryPort.findById(userId)
+                        .flatMap(driver -> {
+                            // Mise à jour du statut syndicat et completion profil
+                            Driver updatedDriver = Driver.builder()
+                                    .id(driver.id())
+                                    .status(driver.status())
+                                    .licenseNumber(driver.licenseNumber())
+                                    .hasCar(driver.hasCar())
+                                    .isOnline(driver.isOnline())
+                                    .isProfileValidated(driver.isProfileValidated())
+                                    .vehicleId(driver.vehicleId())
+                                    .isSyndicated(isVerified)
+                                    .isProfileCompleted(isVerified) // REGLE : isCompleted si Verified
+                                    .build();
+
+                            return driverRepositoryPort.save(updatedDriver)
+                                    .flatMap(saved -> vehicleRepositoryPort.getVehicleById(saved.vehicleId())
+                                            .map(v -> new DriverProfileResponse(
+                                                    saved.id(), saved.status(), saved.licenseNumber(),
+                                                    saved.isOnline(), saved.isProfileValidated(), v)));
+                        }));
     }
 }

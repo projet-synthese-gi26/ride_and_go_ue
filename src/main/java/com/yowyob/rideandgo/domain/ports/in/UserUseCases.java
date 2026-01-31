@@ -34,4 +34,6 @@ public interface UserUseCases {
     Mono<Void> changePassword(UUID userId, String currentPassword, String newPassword);
 
     Flux<User> getAllRemoteUsersByService(String serviceName);
+
+    Mono<DriverProfileResponse> verifySyndicateStatus(UUID userId);
 }
