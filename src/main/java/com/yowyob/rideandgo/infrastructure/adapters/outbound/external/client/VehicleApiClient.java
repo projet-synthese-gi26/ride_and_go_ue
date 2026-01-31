@@ -11,7 +11,7 @@ import org.springframework.web.service.annotation.PostExchange;
 import org.springframework.web.service.annotation.PutExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import java.time.ZonedDateTime;
+import java.time.LocalDateTime;
 
 @HttpExchange("/vehicles")
 public interface VehicleApiClient {
@@ -67,7 +67,7 @@ public interface VehicleApiClient {
             String vehicleSerialPhoto,
             String registrationNumber,
             String registrationPhoto,
-            ZonedDateTime registrationExpiryDate, // Peut être null
+            LocalDateTime registrationExpiryDate, // Peut être null
             int tankCapacity,
             int luggageMaxCapacity,
             int totalSeatNumber,
@@ -91,7 +91,7 @@ public interface VehicleApiClient {
             String vehicleSerialPhoto,
             String registrationNumber,
             String registrationPhoto,
-            ZonedDateTime registrationExpiryDate,
+            LocalDateTime registrationExpiryDate,
             Integer tankCapacity,
             Integer luggageMaxCapacity,
             Integer totalSeatNumber,
@@ -116,7 +116,7 @@ public interface VehicleApiClient {
             String vehicleSerialPhoto,
             String registrationNumber,
             String registrationPhoto,
-            ZonedDateTime registrationExpiryDate,
+            LocalDateTime registrationExpiryDate,
             int tankCapacity,
             int luggageMaxCapacity,
             int totalSeatNumber,
@@ -125,8 +125,8 @@ public interface VehicleApiClient {
             double mileageSinceCommissioning,
             double vehicleAgeAtStart,
             String brand,
-            ZonedDateTime createdAt,
-            ZonedDateTime updatedAt) {
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt) {
     }
 
     // 4. Image Response

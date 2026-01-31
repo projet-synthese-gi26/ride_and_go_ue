@@ -1,5 +1,7 @@
 package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yowyob.rideandgo.application.service.UserService;
 import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.domain.model.Vehicle;
@@ -33,6 +35,7 @@ public class UserController {
     private final UserUseCases userUseCases;
     private final UserMapper userMapper;
     private final UserService userService;
+    private final ObjectMapper objectMapper;
 
     // --- GESTION ADMIN ---
 
@@ -72,16 +75,25 @@ public class UserController {
     }
 
     @PostMapping(value = "/driver", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Become a Driver (Full)", description = "Registers vehicle, uploads docs, creates driver profile and assigns role.")
     public Mono<DriverProfileResponse> becomeDriver(
-            @RequestPart("data") BecomeDriverRequest request,
+            @RequestPart("data") String requestJson,
             @RequestPart(name = "registrationPhoto", required = false) FilePart registrationPhoto,
-            @RequestPart(name = "serialPhoto", required = false) FilePart serialPhoto
-    ) {
+            @RequestPart(name = "serialPhoto", required = false) FilePart serialPhoto) {
+
+        BecomeDriverRequest request;
+        try {
+            request = objectMapper.readValue(requestJson, BecomeDriverRequest.class);
+        } catch (JsonProcessingException e) {
+            return Mono.error(new IllegalArgumentException("Invalid JSON in 'data' part", e));
+        }
+
         return getCurrentUserId()
-                .flatMap(userId -> userService.upgradeToDriverComplete(userId, request, registrationPhoto, serialPhoto));
-    }   
+                .flatMap(userId ->
+                        userService.upgradeToDriverComplete(
+                                userId, request, registrationPhoto, serialPhoto
+                        )
+                );
+    }
 
     // --- LECTURE STANDARD ---
 
