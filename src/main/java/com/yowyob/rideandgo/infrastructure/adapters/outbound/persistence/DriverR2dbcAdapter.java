@@ -12,7 +12,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import java.util.UUID;
 
-@Slf4j
+@Slf4j 
 @Component
 @RequiredArgsConstructor
 public class DriverR2dbcAdapter implements DriverRepositoryPort {
