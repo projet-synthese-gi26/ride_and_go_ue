@@ -25,6 +25,9 @@ public class UserEntity implements Persistable<UUID> { // <--- Implémente Persi
     @Column("phone_number") 
     private String telephone;
 
+    @Column("photo_uri")
+    private String photoUri;
+
     @Transient 
     private String password; 
 

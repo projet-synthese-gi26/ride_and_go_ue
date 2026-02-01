@@ -1,0 +1,1 @@
+ALTER TABLE ride_and_go.users ADD COLUMN photo_uri TEXT;

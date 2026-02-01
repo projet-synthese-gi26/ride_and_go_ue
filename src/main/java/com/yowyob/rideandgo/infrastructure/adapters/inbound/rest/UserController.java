@@ -76,17 +76,11 @@ public class UserController {
     }
 
     @PostMapping(value = "/driver", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Become Driver - Full Onboarding")
     public Mono<DriverProfileResponse> becomeDriver(
-            @RequestPart("data") String requestJson,
+            @RequestPart("data") BecomeDriverRequest request, // ✅ Objet structuré
             @RequestPart(name = "registrationPhoto", required = false) FilePart registrationPhoto,
             @RequestPart(name = "serialPhoto", required = false) FilePart serialPhoto) {
-
-        BecomeDriverRequest request;
-        try {
-            request = objectMapper.readValue(requestJson, BecomeDriverRequest.class);
-        } catch (JsonProcessingException e) {
-            return Mono.error(new IllegalArgumentException("Invalid JSON in 'data' part", e));
-        }
 
         return getCurrentUserId()
                 .flatMap(userId -> userService.upgradeToDriverComplete(

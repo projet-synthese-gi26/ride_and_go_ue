@@ -11,6 +11,7 @@ public record User(
     String email,
     String telephone,
     String password,
+    String photoUri,
     Set<Role> roles,
     Set<Permission> directPermissions
 ) {}

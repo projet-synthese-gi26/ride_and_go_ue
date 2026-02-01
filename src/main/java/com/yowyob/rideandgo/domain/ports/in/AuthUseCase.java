@@ -2,6 +2,7 @@ package com.yowyob.rideandgo.domain.ports.in;
 
 import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.domain.ports.out.AuthPort;
+import org.springframework.http.codec.multipart.FilePart; // Import requis
 import reactor.core.publisher.Mono;
 import java.util.List;
 
@@ -19,6 +20,7 @@ public interface AuthUseCase {
         String phone, 
         String firstName, 
         String lastName,
-        List<RoleType> roles 
+        List<RoleType> roles,
+        FilePart photo // ✅ Ajout ici
     );
 }

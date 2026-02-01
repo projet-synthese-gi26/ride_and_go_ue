@@ -8,6 +8,7 @@ import com.yowyob.rideandgo.domain.ports.out.PaymentPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import java.util.List;
@@ -30,20 +31,20 @@ public class AuthService implements AuthUseCase {
         return authPort.refreshToken(refreshToken);
     }
 
+    @Override // ✅ Signature mise à jour
     public Mono<AuthPort.AuthResponse> register(String username, String email, String password, String phone,
-            String firstName, String lastName, List<RoleType> roles) {
-        return authPort.register(username, password, email, phone, firstName, lastName, roles)
+            String firstName, String lastName, List<RoleType> roles, FilePart photo) {
+        
+        return authPort.register(username, password, email, phone, firstName, lastName, roles, photo)
                 .flatMap(response -> {
-                    // CAS 1 : Création Wallet lors du Register si le rôle DRIVER est demandé
                     boolean isDriver = roles.contains(RoleType.RIDE_AND_GO_DRIVER);
 
                     if (isDriver) {
-                        log.info("💳 Registering a Driver: Triggering Wallet creation for {}", response.userId());
+                        log.info("💳 Driver registered, creating wallet for {}", response.userId());
                         return paymentPort.createWallet(response.userId(), response.username())
                                 .thenReturn(response)
                                 .onErrorResume(e -> {
-                                    log.error("⚠️ Wallet creation failed during register, but continuing: {}",
-                                            e.getMessage());
+                                    log.error("⚠️ Wallet creation failed, continuing: {}", e.getMessage());
                                     return Mono.just(response);
                                 });
                     }

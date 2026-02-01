@@ -6,6 +6,8 @@ import com.yowyob.rideandgo.domain.ports.out.AuthPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
@@ -24,22 +26,24 @@ public class AuthController {
         return authUseCase.login(request.identifier(), request.password());
     }
 
-    @PostMapping("/register")
-    @Operation(summary = "Inscription Multi-Rôles")
-    public Mono<AuthPort.AuthResponse> register(@RequestBody RegisterDto dto) {
-        // Gestion par défaut : Si aucune liste n'est fournie, on assigne PASSENGER
+    @PostMapping(value = "/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Inscription Multi-Rôles avec Photo")
+    public Mono<AuthPort.AuthResponse> register(
+            @RequestPart("data") RegisterDto dto, // ✅ Objet structuré
+            @RequestPart(value = "file", required = false) FilePart photo) {
+
         List<RoleType> rolesToAssign = (dto.roles() != null && !dto.roles().isEmpty())
                 ? dto.roles()
-                : List.of(RoleType.RIDE_AND_GO_PASSENGER); // dto.roles();
+                : List.of(RoleType.RIDE_AND_GO_PASSENGER);
 
         return authUseCase.register(
                 dto.username(), dto.password(), dto.email(),
                 dto.phone(), dto.firstName(), dto.lastName(),
-                rolesToAssign);
+                rolesToAssign, photo);
     }
 
     @PostMapping("/refresh")
-    @Operation(summary = "Refresh Token", description = "Uses a valid Refresh Token to generate a new Access Token.")
+    @Operation(summary = "Refresh Token")
     public Mono<AuthPort.AuthResponse> refresh(@RequestBody RefreshTokenDto request) {
         return authUseCase.refreshToken(request.refreshToken());
     }
@@ -47,7 +51,8 @@ public class AuthController {
     public record LoginRequest(String identifier, String password) {
     }
 
-    public record RefreshTokenDto(String refreshToken) {}
+    public record RefreshTokenDto(String refreshToken) {
+    }
 
     public record RegisterDto(
             String username,

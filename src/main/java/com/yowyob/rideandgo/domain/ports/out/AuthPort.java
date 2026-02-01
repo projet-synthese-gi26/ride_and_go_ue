@@ -13,13 +13,10 @@ public interface AuthPort {
     Mono<AuthResponse> refreshToken(String refreshToken);
 
     Mono<AuthResponse> register(
-            String username,
-            String password,
-            String email,
-            String phone,
-            String firstName,
-            String lastName,
-            List<RoleType> roles);
+            String username, String password, String email, String phone,
+            String firstName, String lastName, List<RoleType> roles,
+            org.springframework.http.codec.multipart.FilePart photo // Ajouté
+    );
 
     record AuthResponse(
             UUID userId, // Ajouté pour identifier l'utilisateur

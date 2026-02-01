@@ -63,7 +63,7 @@ public class UserService implements UserUseCases {
         return externalUserPort.updateProfile(userId, firstName, lastName, phone)
                 .flatMap(updated -> userRepositoryPort.findUserById(userId)
                         .map(local -> new User(local.id(), local.name(), local.email(), phone, local.password(),
-                                local.roles(), local.directPermissions()))
+                                local.photoUri(), local.roles(), local.directPermissions()))
                         .flatMap(userRepositoryPort::save));
     }
 
