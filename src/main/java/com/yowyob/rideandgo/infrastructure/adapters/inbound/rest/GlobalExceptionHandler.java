@@ -44,4 +44,11 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleUserAlreadyExists(UserAlreadyExistsException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
     }
+
+    @ExceptionHandler(com.yowyob.rideandgo.domain.exception.WalletNotFoundException.class)
+    public ProblemDetail handleWalletNotFound(com.yowyob.rideandgo.domain.exception.WalletNotFoundException e) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+        problemDetail.setTitle("Portefeuille introuvable");
+        return problemDetail;
+    }
 }
