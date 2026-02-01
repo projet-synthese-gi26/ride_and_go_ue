@@ -125,8 +125,11 @@ public class RemoteUserAdapter implements ExternalUserPort {
         return User.builder()
                 .id(UUID.fromString(dto.id()))
                 .name(dto.username())
+                .firstName(dto.firstName()) // ✅ Ajouté
+                .lastName(dto.lastName()) // ✅ Ajouté
                 .email(dto.email())
                 .telephone(dto.phone())
+                .photoUri(dto.photoUri())
                 .roles(roles)
                 .directPermissions(Collections.emptySet())
                 .build();

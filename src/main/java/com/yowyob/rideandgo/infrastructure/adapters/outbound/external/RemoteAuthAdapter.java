@@ -55,7 +55,7 @@ public class RemoteAuthAdapter implements AuthPort {
     @Override
     public Mono<AuthResponse> register(String username, String email, String password, String phone,
             String firstName, String lastName, List<RoleType> roles, FilePart photo) {
-        
+
         log.info("🌐 REMOTE AUTH : Register Multipart avec photo pour {}", username);
 
         List<String> rolesToSend = roles.stream().map(Enum::name).toList();
@@ -66,7 +66,7 @@ public class RemoteAuthAdapter implements AuthPort {
         // Construction du corps Multipart
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("data", registerDto, MediaType.APPLICATION_JSON);
-        
+
         if (photo != null) {
             builder.part("file", photo);
         }
@@ -77,9 +77,11 @@ public class RemoteAuthAdapter implements AuthPort {
                     User localUser = User.builder()
                             .id(UUID.fromString(response.user().id()))
                             .name(response.user().username())
+                            .firstName(response.user().firstName()) // ✅ Ajouté
+                            .lastName(response.user().lastName()) // ✅ Ajouté
                             .email(response.user().email())
                             .telephone(response.user().phone())
-                            .photoUri(response.user().photoUri()) // ✅ PHOTO STOCKÉE
+                            .photoUri(response.user().photoUri())
                             .roles(Collections.emptySet())
                             .directPermissions(Collections.emptySet())
                             .build();
@@ -109,12 +111,19 @@ public class RemoteAuthAdapter implements AuthPort {
     }
 
     @Override
-    public Mono<Void> forgotPassword(String email) { return Mono.empty(); }
+    public Mono<Void> forgotPassword(String email) {
+        return Mono.empty();
+    }
 
     private AuthResponse mapToDomain(AuthApiClient.TraMaSysResponse res) {
         List<String> filteredRoles = res.user().roles().stream()
                 .filter(roleStr -> {
-                    try { RoleType.valueOf(roleStr); return true; } catch (Exception e) { return false; }
+                    try {
+                        RoleType.valueOf(roleStr);
+                        return true;
+                    } catch (Exception e) {
+                        return false;
+                    }
                 }).collect(Collectors.toList());
 
         return new AuthResponse(
