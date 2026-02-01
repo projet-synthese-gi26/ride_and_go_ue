@@ -1,5 +1,6 @@
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.external;
 
+import com.yowyob.rideandgo.domain.exception.AuthenticationFailedException;
 import com.yowyob.rideandgo.domain.exception.UserAlreadyExistsException;
 import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.domain.model.enums.RoleType;
@@ -26,11 +27,9 @@ import java.util.stream.Collectors;
 public class RemoteAuthAdapter implements AuthPort {
 
     private final AuthApiClient client;
-    private final UserRepositoryPort userRepository;
+    private final UserRepositoryPort userRepositoryPort;
     private final CacheInvalidationPort cacheInvalidationPort;
 
-    // Selon votre capture d'écran, le service attend bien "RIDE_AND_GO" (avec les
-    // underscores)
     private static final String SERVICE_NAME = "RIDE_AND_GO";
 
     @Override
@@ -38,23 +37,30 @@ public class RemoteAuthAdapter implements AuthPort {
         log.info("🌐 REMOTE AUTH : Login pour {}", identifier);
         return client.login(new AuthApiClient.LoginRequest(identifier, password))
                 .doOnSuccess(response -> {
-                    // Side-effect: Invalider le cache de l'utilisateur après un login réussi
                     if (response != null && response.user() != null && response.user().id() != null) {
                         UUID userId = UUID.fromString(response.user().id());
-                        // On "fire and forget", pas besoin d'attendre la fin de la suppression
                         cacheInvalidationPort.invalidateUserCache(userId).subscribe();
                     }
                 })
                 .map(this::mapToDomain)
-                .doOnError(e -> log.error("Login failed: {}", e.getMessage()));
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    if (ex.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+                        log.warn("❌ Login failed: Invalid credentials for {}", identifier);
+                        return Mono.error(new AuthenticationFailedException("Identifiant ou mot de passe incorrect."));
+                    }
+                    if (ex.getStatusCode() == HttpStatus.FORBIDDEN) {
+                        return Mono.error(new AuthenticationFailedException("Compte bloqué ou accès refusé."));
+                    }
+                    log.error("❌ Remote Auth Error: {} - {}", ex.getStatusCode(), ex.getResponseBodyAsString());
+                    return Mono.error(new RuntimeException("Erreur d'authentification distante"));
+                });
     }
 
     @Override
-    public Mono<AuthResponse> register(String username, String email, String password, String phone, String firstName,
-            String lastName, List<RoleType> roles) {
+    public Mono<AuthResponse> register(String username, String email, String password, String phone,
+            String firstName, String lastName, List<RoleType> roles) {
         log.info("🌐 REMOTE AUTH : Register Multipart pour {} (Service: {})", username, SERVICE_NAME);
 
-        // 1. Préparation des données (JSON Object)
         List<String> rolesToSend = roles.stream()
                 .map(Enum::name)
                 .toList();
@@ -69,23 +75,11 @@ public class RemoteAuthAdapter implements AuthPort {
                 SERVICE_NAME,
                 rolesToSend);
 
-        // 2. Construction du corps Multipart
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
-
-        // Partie 'data' : Le JSON (Important: spécifier le MediaType pour que le
-        // backend distant sache le parser)
         builder.part("data", registerDto, MediaType.APPLICATION_JSON);
 
-        // Partie 'file' : Optionnelle.
-        // Si l'API plante sans fichier, on peut décommenter la ligne suivante pour
-        // envoyer un fichier vide "dummy"
-        // builder.part("file", new byte[0],
-        // MediaType.APPLICATION_OCTET_STREAM).filename("empty.png");
-
-        // 3. Appel du client avec le build() qui retourne une MultiValueMap
         return client.register(builder.build())
                 .flatMap(response -> {
-                    // Sauvegarde locale
                     User localUser = User.builder()
                             .id(UUID.fromString(response.user().id()))
                             .name(response.user().username())
@@ -95,7 +89,7 @@ public class RemoteAuthAdapter implements AuthPort {
                             .directPermissions(Collections.emptySet())
                             .build();
 
-                    return userRepository.save(localUser)
+                    return userRepositoryPort.save(localUser)
                             .doOnSuccess(u -> log.info("✅ User synced locally: {}", u.id()))
                             .thenReturn(mapToDomain(response));
                 })
@@ -117,14 +111,16 @@ public class RemoteAuthAdapter implements AuthPort {
         log.debug("🌐 REMOTE AUTH : Refresh Token requested");
         return client.refresh(new AuthApiClient.RefreshTokenRequest(refreshToken))
                 .doOnSuccess(response -> {
-                    // On invalide aussi le cache lors d'un refresh
                     if (response != null && response.user() != null && response.user().id() != null) {
                         UUID userId = UUID.fromString(response.user().id());
                         cacheInvalidationPort.invalidateUserCache(userId).subscribe();
                     }
                 })
                 .map(this::mapToDomain)
-                .doOnError(e -> log.error("Refresh Token failed: {}", e.getMessage()));
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    log.warn("❌ Refresh Token failed: {}", ex.getStatusCode());
+                    return Mono.error(new AuthenticationFailedException("Session expirée, veuillez vous reconnecter."));
+                });
     }
 
     @Override
@@ -145,7 +141,7 @@ public class RemoteAuthAdapter implements AuthPort {
                 .collect(Collectors.toList());
 
         return new AuthResponse(
-                UUID.fromString(res.user().id()), // Ajout de l'UUID ici
+                UUID.fromString(res.user().id()),
                 res.accessToken(),
                 res.refreshToken(),
                 res.user().username(),

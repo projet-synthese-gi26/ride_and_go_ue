@@ -1,10 +1,13 @@
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.external;
 
+import com.yowyob.rideandgo.domain.exception.AuthenticationFailedException;
 import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.domain.ports.out.ExternalUserPort;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.external.client.AuthApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import java.util.Collections;
@@ -33,7 +36,12 @@ public class RemoteUserAdapter implements ExternalUserPort {
     }
 
     private Flux<User> getUsersByService(String service) {
-        return client.getUsersByService(service).map(this::mapToDomain);
+        return client.getUsersByService(service)
+                .map(this::mapToDomain)
+                .onErrorResume(e -> {
+                    log.error("Failed to fetch remote users for service {}: {}", service, e.getMessage());
+                    return Flux.empty();
+                });
     }
 
     @Override
@@ -53,27 +61,50 @@ public class RemoteUserAdapter implements ExternalUserPort {
     @Override
     public Mono<Void> addRole(UUID userId, String roleName) {
         log.info("🌍 Propagating ADD ROLE {} for user {} to Auth Service", roleName, userId);
-        return client.addRole(userId.toString(), roleName);
+        return client.addRole(userId.toString(), roleName)
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    log.error("Failed to add role {} to user {}: {}", roleName, userId, ex.getStatusCode());
+                    return Mono.error(new RuntimeException("Impossible de modifier les rôles à distance."));
+                });
     }
 
     @Override
     public Mono<Void> removeRole(UUID userId, String roleName) {
         log.info("🌍 Propagating REMOVE ROLE {} for user {} to Auth Service", roleName, userId);
-        return client.removeRole(userId.toString(), roleName);
+        return client.removeRole(userId.toString(), roleName)
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    log.error("Failed to remove role {} from user {}: {}", roleName, userId, ex.getStatusCode());
+                    return Mono.error(new RuntimeException("Impossible de modifier les rôles à distance."));
+                });
     }
 
     @Override
     public Mono<User> updateProfile(UUID userId, String firstName, String lastName, String phone) {
         log.info("🌍 Propagating UPDATE PROFILE for user {} to Auth Service", userId);
         return client.updateProfile(userId.toString(), new AuthApiClient.UpdateProfileDto(firstName, lastName, phone))
-                .map(this::mapToDomain);
+                .map(this::mapToDomain)
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    if (ex.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+                        return Mono.error(new AuthenticationFailedException("Session expirée ou non autorisée."));
+                    }
+                    return Mono.error(new RuntimeException("Erreur lors de la mise à jour du profil distant."));
+                });
     }
 
     @Override
     public Mono<Void> changePassword(UUID userId, String currentPassword, String newPassword) {
         log.info("🌍 Propagating PASSWORD CHANGE for user {} to Auth Service", userId);
         return client.changePassword(userId.toString(),
-                new AuthApiClient.ChangePasswordDto(currentPassword, newPassword));
+                new AuthApiClient.ChangePasswordDto(currentPassword, newPassword))
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    // C'est ici qu'on attrape ton erreur 401
+                    if (ex.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+                        log.warn("❌ Password change failed: Current password incorrect for user {}", userId);
+                        return Mono.error(new AuthenticationFailedException("Le mot de passe actuel est incorrect."));
+                    }
+                    log.error("❌ Password change error: Status {}", ex.getStatusCode());
+                    return Mono.error(new RuntimeException("Erreur lors du changement de mot de passe à distance."));
+                });
     }
 
     // --- MAPPER ---
@@ -93,7 +124,7 @@ public class RemoteUserAdapter implements ExternalUserPort {
 
         return User.builder()
                 .id(UUID.fromString(dto.id()))
-                .name(dto.username()) // Username est utilisé comme name ici, ou on concatène First/Last
+                .name(dto.username())
                 .email(dto.email())
                 .telephone(dto.phone())
                 .roles(roles)

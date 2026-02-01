@@ -19,7 +19,7 @@ public interface PaymentApiClient {
 
     @PostExchange("/transactions/payment")
     Mono<Void> createPaymentTransaction(@RequestBody PaymentTransactionRequest request);
-
+    
     record CreateWalletRequest(String ownerId, String ownerName) {
     }
 
