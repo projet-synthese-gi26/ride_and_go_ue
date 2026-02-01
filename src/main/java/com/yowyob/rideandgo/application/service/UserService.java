@@ -8,6 +8,9 @@ import com.yowyob.rideandgo.domain.ports.in.UserUseCases;
 import com.yowyob.rideandgo.domain.ports.out.*;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.BecomeDriverRequest;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.DriverProfileResponse;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FullDriverProfileResponse;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.UserResponse;
+import com.yowyob.rideandgo.infrastructure.mappers.UserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Service;
@@ -15,6 +18,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import lombok.extern.slf4j.Slf4j;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -26,6 +30,7 @@ public class UserService implements UserUseCases {
     private final VehicleRepositoryPort vehicleRepositoryPort;
     private final SyndicatePort syndicatePort;
     private final PaymentPort paymentPort;
+    private final UserMapper userMapper;
 
     @Override
     public Mono<User> saveUser(User user) {
@@ -79,6 +84,51 @@ public class UserService implements UserUseCases {
                 .flatMap(v -> paymentPort.createWallet(userId, "Driver_" + userId.toString().substring(0, 5)))
                 .then();
     }
+
+    @Override
+    public Mono<FullDriverProfileResponse> getFullDriverProfile(UUID userId) {
+        log.info("🎯 Fetching Full Aggregated Profile for Driver {}", userId);
+
+        // 1. Récupération de l'utilisateur (Local + Remote sync)
+        Mono<UserResponse> userMono = getUserById(userId)
+                .map(u -> {
+                    UserResponse res = userMapper.toResponse(u);
+                    if (u.roles() != null) {
+                        res.setRoles(u.roles().stream().map(r -> r.type()).collect(Collectors.toList()));
+                    }
+                    return res;
+                });
+
+        // 2. Récupération Driver + Vehicle (Chaînés)
+        Mono<DriverVehicleContainer> driverVehicleMono = driverRepositoryPort.findById(userId)
+                .flatMap(driver -> {
+                    if (driver.vehicleId() != null) {
+                        return vehicleRepositoryPort.getVehicleById(driver.vehicleId())
+                                .map(v -> new DriverVehicleContainer(driver, v))
+                                .onErrorReturn(new DriverVehicleContainer(driver, null)); // Sécurité si vehicle API down
+                    }
+                    return Mono.just(new DriverVehicleContainer(driver, null));
+                })
+                .defaultIfEmpty(new DriverVehicleContainer(null, null));
+
+        // 3. Récupération Wallet
+        Mono<com.yowyob.rideandgo.domain.model.Wallet> walletMono = paymentPort.getWalletByOwnerId(userId)
+                .onErrorResume(e -> {
+                    log.warn("Wallet not found for driver profile {}", userId);
+                    return Mono.empty(); // On ne fait pas planter le profil si pas de wallet
+                });
+
+        // 4. Agrégation finale
+        return Mono.zip(userMono, driverVehicleMono, walletMono.defaultIfEmpty(com.yowyob.rideandgo.domain.model.Wallet.builder().build()))
+                .map(tuple -> FullDriverProfileResponse.builder()
+                        .user(tuple.getT1())
+                        .driver(tuple.getT2().driver)
+                        .vehicle(tuple.getT2().vehicle)
+                        .wallet(tuple.getT3().id() != null ? tuple.getT3() : null)
+                        .build());
+    }
+
+    private record DriverVehicleContainer(Driver driver, Vehicle vehicle) {}
 
     @Override
     public Mono<DriverProfileResponse> upgradeToDriverComplete(UUID userId, BecomeDriverRequest request,

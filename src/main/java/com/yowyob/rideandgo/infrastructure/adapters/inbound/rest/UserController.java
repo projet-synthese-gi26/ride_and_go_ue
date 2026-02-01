@@ -9,6 +9,7 @@ import com.yowyob.rideandgo.domain.ports.in.UserUseCases;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.BecomeDriverRequest;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.ChangePasswordRequest;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.DriverProfileResponse;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FullDriverProfileResponse;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.UpdateUserProfileRequest;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.UserResponse;
 import com.yowyob.rideandgo.infrastructure.mappers.UserMapper;
@@ -101,6 +102,14 @@ public class UserController {
     public Mono<DriverProfileResponse> verifyCompliance() {
         return getCurrentUserId()
                 .flatMap(userUseCases::verifySyndicateStatus);
+    }
+
+    @GetMapping("/me/driver-profile")
+    @Operation(summary = "Get Full Driver Profile", description = "Aggregates User, Driver, Wallet and Vehicle data.")
+    @PreAuthorize("hasAuthority('RIDE_AND_GO_DRIVER')")
+    public Mono<FullDriverProfileResponse> getFullDriverProfile() {
+        return getCurrentUserId()
+                .flatMap(userService::getFullDriverProfile);
     }
 
     // --- LECTURE STANDARD ---

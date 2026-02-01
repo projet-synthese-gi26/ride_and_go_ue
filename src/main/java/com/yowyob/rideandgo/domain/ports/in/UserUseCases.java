@@ -5,6 +5,7 @@ import com.yowyob.rideandgo.domain.model.Vehicle; // Import
 import com.yowyob.rideandgo.domain.model.enums.RoleType;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.BecomeDriverRequest;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.DriverProfileResponse;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.FullDriverProfileResponse;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -36,4 +37,6 @@ public interface UserUseCases {
     Flux<User> getAllRemoteUsersByService(String serviceName);
 
     Mono<DriverProfileResponse> verifySyndicateStatus(UUID userId);
+
+    Mono<FullDriverProfileResponse> getFullDriverProfile(UUID userId);
 }
