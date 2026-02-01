@@ -9,10 +9,12 @@ import java.util.UUID;
 
 @Slf4j
 public class FakeAuthAdapter implements AuthPort {
+    
     @Override
     public Mono<AuthResponse> login(String email, String password) {
         log.info("🛠 MODE FAKE AUTH : Login pour {}", email);
         return Mono.just(new AuthResponse(
+                UUID.randomUUID(),
                 "fake.jwt.token",
                 "fake.refresh.token",
                 email,
@@ -28,6 +30,7 @@ public class FakeAuthAdapter implements AuthPort {
         List<String> rolesStr = roles.stream().map(Enum::name).toList();
 
         return Mono.just(new AuthResponse(
+                UUID.randomUUID(),
                 "fake.jwt.token",
                 "fake.refresh.token",
                 username,
@@ -39,6 +42,7 @@ public class FakeAuthAdapter implements AuthPort {
     public Mono<AuthResponse> refreshToken(String refreshToken) {
         log.info("🛠 MODE FAKE AUTH : Refresh Token");
         return Mono.just(new AuthResponse(
+                UUID.randomUUID(),
                 "new.fake.jwt.token." + UUID.randomUUID(),
                 "new.fake.refresh.token." + UUID.randomUUID(),
                 "RefreshUser",

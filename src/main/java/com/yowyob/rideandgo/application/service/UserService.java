@@ -25,7 +25,7 @@ public class UserService implements UserUseCases {
     private final DriverRepositoryPort driverRepositoryPort;
     private final VehicleRepositoryPort vehicleRepositoryPort;
     private final SyndicatePort syndicatePort;
-    private final PaymentPort paymentPort; // Injection
+    private final PaymentPort paymentPort;
 
     @Override
     public Mono<User> saveUser(User user) {
@@ -76,13 +76,14 @@ public class UserService implements UserUseCases {
         return driverRepositoryPort.createDriver(userId)
                 .flatMap(d -> externalUserPort.addRole(userId, RoleType.RIDE_AND_GO_DRIVER.name()))
                 .flatMap(v -> userRepositoryPort.addRoleToUser(userId, RoleType.RIDE_AND_GO_DRIVER))
+                .flatMap(v -> paymentPort.createWallet(userId, "Driver_" + userId.toString().substring(0, 5)))
                 .then();
     }
 
     @Override
     public Mono<DriverProfileResponse> upgradeToDriverComplete(UUID userId, BecomeDriverRequest request,
             FilePart regPhoto, FilePart serialPhoto) {
-        log.info("🚀 Starting Driver Onboarding for User {}", userId);
+        log.info("🚀 Starting Driver Onboarding for User {} (Full Flow)", userId);
 
         return userRepositoryPort.findUserById(userId)
                 .flatMap(user -> {
@@ -135,7 +136,7 @@ public class UserService implements UserUseCases {
                                         .build();
 
                                 return driverRepositoryPort.save(newDriver)
-                                        // CRÉATION DU WALLET ICI
+                                        // CAS 2 : Création Wallet lors de l'onboarding
                                         .flatMap(savedDriver -> paymentPort.createWallet(userId, user.name())
                                                 .thenReturn(savedDriver))
                                         .map(savedDriver -> new DriverProfileResponse(
@@ -162,6 +163,8 @@ public class UserService implements UserUseCases {
 
     @Override
     public Mono<DriverProfileResponse> verifySyndicateStatus(UUID userId) {
+        log.info("🛠 Verifying Syndicate status for Driver {}", userId);
+
         return syndicatePort.checkIsSyndicated(userId)
                 .flatMap(isVerified -> driverRepositoryPort.findById(userId)
                         .flatMap(driver -> {

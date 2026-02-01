@@ -41,6 +41,7 @@ public class OfferService implements
     private final RideRepositoryPort rideRepositoryPort;
     private final LocationCachePort locationCachePort;
     private final EtaCalculatorService etaCalculatorService;
+    private final TrackingCalculatorService trackingCalculatorService;
     private final DriverRepositoryPort driverRepositoryPort;
     private final VehicleRepositoryPort vehicleRepositoryPort;
     private final PaymentPort paymentPort;
@@ -335,34 +336,61 @@ public class OfferService implements
                     if (offer.bids() == null || offer.bids().isEmpty())
                         return Mono.just(offer);
 
-                    return Flux.fromIterable(offer.bids())
-                            .flatMap(bid -> Mono.zip(
-                                    userRepositoryPort.findUserById(bid.driverId()),
-                                    driverRepositoryPort.findById(bid.driverId()),
-                                    locationCachePort.getLocation(bid.driverId())
-                                            .defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0)))
-                                    .flatMap(tuple -> {
-                                        var user = tuple.getT1();
-                                        var driver = tuple.getT2();
-                                        var loc = tuple.getT3();
-
-                                        return vehicleRepositoryPort.getVehicleById(driver.vehicleId())
-                                                .flatMap(v -> etaCalculatorService
-                                                        .calculateEta(loc.latitude(), loc.longitude(), 0.0, 0.0)
-                                                        .map(eta -> Bid.builder()
-                                                                .driverId(user.id())
-                                                                .driverName(user.name())
-                                                                .latitude(loc.latitude())
-                                                                .longitude(loc.longitude())
-                                                                .eta(eta)
-                                                                .rating(4.8)
-                                                                .carModel(v.brand() + " " + v.vehicleModelId())
-                                                                .licensePlate(v.registrationNumber())
-                                                                .build()));
-                                    }))
-                            .collectList()
-                            .map(offer::withBids);
+                    // 1. Récupérer la position du passager (point de départ) pour calculs
+                    return locationCachePort.getLocation(offer.passengerId())
+                            .defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0))
+                            .flatMap(pLoc -> Flux.fromIterable(offer.bids())
+                                    .flatMap(bid -> enrichSingleBid(bid, pLoc))
+                                    .collectList()
+                                    .map(offer::withBids));
                 });
+    }
+
+    /**
+     * Orchestre la récupération des données réelles pour un seul chauffeur.
+     */
+    private Mono<Bid> enrichSingleBid(Bid bid, LocationCachePort.Location pLoc) {
+        UUID dId = bid.driverId();
+        return Mono.zip(
+                userRepositoryPort.findUserById(dId),
+                driverRepositoryPort.findById(dId),
+                locationCachePort.getLocation(dId).defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0)),
+                rideRepositoryPort.countCompletedRidesByDriverId(dId) // RÉCUPÉRATION RÉELLE DE L'HISTORIQUE
+        ).flatMap(tuple -> {
+            User user = tuple.getT1();
+            Driver driver = tuple.getT2();
+            LocationCachePort.Location dLoc = tuple.getT3();
+            Long totalTrips = tuple.getT4();
+
+            return vehicleRepositoryPort.getVehicleById(driver.vehicleId())
+                    .map(v -> {
+                        double dist = 0.0;
+                        int eta = 0;
+                        if (dLoc.latitude() != 0.0 && pLoc.latitude() != 0.0) {
+                            dist = trackingCalculatorService.calculateDistance(dLoc.latitude(), dLoc.longitude(),
+                                    pLoc.latitude(), pLoc.longitude());
+                            eta = trackingCalculatorService.calculateEtaInMinutes(dist);
+                        }
+                        return Bid.builder()
+                                .driverId(dId)
+                                .driverName(user.name())
+                                .rating(4.8)
+                                .totalTrips(totalTrips.intValue()) // INJECTION RÉELLE
+                                .latitude(dLoc.latitude())
+                                .longitude(dLoc.longitude())
+                                .distanceToPassenger(dist)
+                                .eta(eta)
+                                .vehicleId(v.id().toString())
+                                .brand(v.brand())
+                                .model(v.vehicleModelId())
+                                .color("unknow")
+                                .licensePlate(v.registrationNumber())
+                                .vehicleType(v.vehicleTypeId())
+                                .manufacturingYear(0)
+                                .vehicleImages(v.illustrationImages())
+                                .build();
+                    });
+        });
     }
 
     // ==================================================================================

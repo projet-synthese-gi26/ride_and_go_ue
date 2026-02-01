@@ -145,6 +145,7 @@ public class RemoteAuthAdapter implements AuthPort {
                 .collect(Collectors.toList());
 
         return new AuthResponse(
+                UUID.fromString(res.user().id()), // Ajout de l'UUID ici
                 res.accessToken(),
                 res.refreshToken(),
                 res.user().username(),
