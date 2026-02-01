@@ -54,9 +54,14 @@ public class VehicleAdapter implements VehicleRepositoryPort {
 
         @Override
         public Mono<Vehicle> getVehicleById(UUID vehicleId) {
+                // ✅ AJOUT DE LA GARDE
+                if (vehicleId == null) {
+                        log.warn("⚠️ Attempted to fetch vehicle with NULL ID");
+                        return Mono.empty();
+                }
+
                 log.debug("🌐 [API Direct] Fetching vehicle {}", vehicleId);
 
-                // On combine l'appel aux détails et l'appel aux images en parallèle
                 return Mono.zip(
                                 client.getVehicleById(vehicleId.toString()),
                                 this.getVehicleImages(vehicleId).collectList().defaultIfEmpty(Collections.emptyList()))

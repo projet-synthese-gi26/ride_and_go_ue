@@ -355,44 +355,50 @@ public class OfferService implements
                 userRepositoryPort.findUserById(dId),
                 driverRepositoryPort.findById(dId),
                 locationCachePort.getLocation(dId).defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0)),
-                rideRepositoryPort.countCompletedRidesByDriverId(dId) // RÉCUPÉRATION RÉELLE DE L'HISTORIQUE
-        ).flatMap(tuple -> {
-            User user = tuple.getT1();
-            Driver driver = tuple.getT2();
-            LocationCachePort.Location dLoc = tuple.getT3();
-            Long totalTrips = tuple.getT4();
+                rideRepositoryPort.countCompletedRidesByDriverId(dId).defaultIfEmpty(0L)).flatMap(tuple -> {
+                    User user = tuple.getT1();
+                    Driver driver = tuple.getT2();
+                    LocationCachePort.Location dLoc = tuple.getT3();
+                    Long totalTrips = tuple.getT4();
 
-            return vehicleRepositoryPort.getVehicleById(driver.vehicleId())
-                    .map(v -> {
-                        double dist = 0.0;
-                        int eta = 0;
-                        if (dLoc.latitude() != 0.0 && pLoc.latitude() != 0.0) {
-                            dist = trackingCalculatorService.calculateDistance(dLoc.latitude(), dLoc.longitude(),
-                                    pLoc.latitude(), pLoc.longitude());
-                            eta = trackingCalculatorService.calculateEtaInMinutes(dist);
-                        }
-                        return Bid.builder()
-                                .driverId(dId)
-                                .driverName(user.name())
-                                .rating(4.8)
-                                .totalTrips(totalTrips.intValue()) // INJECTION RÉELLE
-                                .latitude(dLoc.latitude())
-                                .longitude(dLoc.longitude())
-                                .distanceToPassenger(dist)
-                                .eta(eta)
-                                .vehicleId(v.id().toString())
-                                .brand(v.brand())
-                                .model(v.vehicleModelId())
-                                .color("unknow")
-                                .licensePlate(v.registrationNumber())
-                                .vehicleType(v.vehicleTypeId())
-                                .manufacturingYear(0)
-                                .vehicleImages(v.illustrationImages())
-                                .build();
-                    });
-        });
+                    // ✅ RÉCUPÉRATION SÉCURISÉE DU VÉHICULE
+                    return Mono.justOrEmpty(driver.vehicleId())
+                            .flatMap(vehicleRepositoryPort::getVehicleById)
+                            // Si pas de véhicule ou ID null, on crée un objet Vehicle vide pour ne pas
+                            // bloquer le map
+                            .defaultIfEmpty(Vehicle.builder().brand("Inconnu").registrationNumber("N/A")
+                                    .illustrationImages(List.of()).build())
+                            .map(v -> {
+                                double dist = 0.0;
+                                int eta = 0;
+                                if (dLoc.latitude() != 0.0 && pLoc.latitude() != 0.0) {
+                                    dist = trackingCalculatorService.calculateDistance(dLoc.latitude(),
+                                            dLoc.longitude(),
+                                            pLoc.latitude(), pLoc.longitude());
+                                    eta = trackingCalculatorService.calculateEtaInMinutes(dist);
+                                }
+                                return Bid.builder()
+                                        .driverId(dId)
+                                        .driverName(user.name())
+                                        .driverPhoto(user.photoUri()) // Ajout de la photo de profil ici aussi
+                                        .rating(4.8)
+                                        .totalTrips(totalTrips.intValue())
+                                        .latitude(dLoc.latitude())
+                                        .longitude(dLoc.longitude())
+                                        .distanceToPassenger(dist)
+                                        .eta(eta)
+                                        .vehicleId(v.id() != null ? v.id().toString() : null)
+                                        .brand(v.brand())
+                                        .model(v.vehicleModelId())
+                                        .color("N/A")
+                                        .licensePlate(v.registrationNumber())
+                                        .vehicleType(v.vehicleTypeId())
+                                        .manufacturingYear(v.vehicleAgeAtStart())
+                                        .vehicleImages(v.illustrationImages())
+                                        .build();
+                            });
+                });
     }
-
     // ==================================================================================
     // CRUD ET GESTION
     // ==================================================================================
