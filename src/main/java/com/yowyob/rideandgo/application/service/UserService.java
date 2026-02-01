@@ -1,5 +1,6 @@
 package com.yowyob.rideandgo.application.service;
 
+import com.yowyob.rideandgo.domain.exception.WalletNotFoundException;
 import com.yowyob.rideandgo.domain.model.Driver;
 import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.domain.model.Vehicle;
@@ -89,7 +90,6 @@ public class UserService implements UserUseCases {
     public Mono<FullDriverProfileResponse> getFullDriverProfile(UUID userId) {
         log.info("🎯 Fetching Full Aggregated Profile for Driver {}", userId);
 
-        // 1. Récupération de l'utilisateur (Local + Remote sync)
         Mono<UserResponse> userMono = getUserById(userId)
                 .map(u -> {
                     UserResponse res = userMapper.toResponse(u);
@@ -99,27 +99,26 @@ public class UserService implements UserUseCases {
                     return res;
                 });
 
-        // 2. Récupération Driver + Vehicle (Chaînés)
         Mono<DriverVehicleContainer> driverVehicleMono = driverRepositoryPort.findById(userId)
                 .flatMap(driver -> {
                     if (driver.vehicleId() != null) {
                         return vehicleRepositoryPort.getVehicleById(driver.vehicleId())
                                 .map(v -> new DriverVehicleContainer(driver, v))
-                                .onErrorReturn(new DriverVehicleContainer(driver, null)); // Sécurité si vehicle API down
+                                .onErrorReturn(new DriverVehicleContainer(driver, null));
                     }
                     return Mono.just(new DriverVehicleContainer(driver, null));
                 })
                 .defaultIfEmpty(new DriverVehicleContainer(null, null));
 
-        // 3. Récupération Wallet
         Mono<com.yowyob.rideandgo.domain.model.Wallet> walletMono = paymentPort.getWalletByOwnerId(userId)
                 .onErrorResume(e -> {
                     log.warn("Wallet not found for driver profile {}", userId);
-                    return Mono.empty(); // On ne fait pas planter le profil si pas de wallet
+                    return Mono.empty();
                 });
 
-        // 4. Agrégation finale
-        return Mono.zip(userMono, driverVehicleMono, walletMono.defaultIfEmpty(com.yowyob.rideandgo.domain.model.Wallet.builder().build()))
+        return Mono
+                .zip(userMono, driverVehicleMono,
+                        walletMono.defaultIfEmpty(com.yowyob.rideandgo.domain.model.Wallet.builder().build()))
                 .map(tuple -> FullDriverProfileResponse.builder()
                         .user(tuple.getT1())
                         .driver(tuple.getT2().driver)
@@ -128,7 +127,8 @@ public class UserService implements UserUseCases {
                         .build());
     }
 
-    private record DriverVehicleContainer(Driver driver, Vehicle vehicle) {}
+    private record DriverVehicleContainer(Driver driver, Vehicle vehicle) {
+    }
 
     @Override
     public Mono<DriverProfileResponse> upgradeToDriverComplete(UUID userId, BecomeDriverRequest request,
@@ -186,9 +186,16 @@ public class UserService implements UserUseCases {
                                         .build();
 
                                 return driverRepositoryPort.save(newDriver)
-                                        // CAS 2 : Création Wallet lors de l'onboarding
-                                        .flatMap(savedDriver -> paymentPort.createWallet(userId, user.name())
-                                                .thenReturn(savedDriver))
+                                        .flatMap(savedDriver ->
+                                // ✅ VÉRIFICATION WALLET EXISTANT
+                                paymentPort.getWalletByOwnerId(userId)
+                                        .doOnSuccess(w -> log.info(
+                                                "💳 Wallet already exists for driver {}, skipping creation.", userId))
+                                        .onErrorResume(WalletNotFoundException.class, e -> {
+                                            log.info("💳 Wallet not found for {}, creating new one...", userId);
+                                            return paymentPort.createWallet(userId, user.name());
+                                        })
+                                        .thenReturn(savedDriver))
                                         .map(savedDriver -> new DriverProfileResponse(
                                                 savedDriver.id(),
                                                 savedDriver.status(),
