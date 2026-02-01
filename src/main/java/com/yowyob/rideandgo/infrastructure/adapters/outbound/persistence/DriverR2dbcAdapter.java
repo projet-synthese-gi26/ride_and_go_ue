@@ -76,7 +76,7 @@ public class DriverR2dbcAdapter implements DriverRepositoryPort {
         DriverEntity entity = new DriverEntity(
                 driver.id(), driver.status(), driver.licenseNumber(), driver.hasCar(),
                 driver.isOnline(), driver.isProfileCompleted(), driver.vehicleId(),
-                driver.isProfileValidated(), driver.isSyndicated(), false);
+                driver.isProfileValidated(), driver.isSyndicated(), driver.rating(), driver.totalReviewsCount(), false);
         return driverRepository.existsById(driver.id())
                 .flatMap(exists -> {
                     entity.setNewEntity(!exists);
@@ -105,6 +105,8 @@ public class DriverR2dbcAdapter implements DriverRepositoryPort {
                 .isProfileCompleted(entity.isProfileCompleted())
                 .isProfileValidated(entity.isProfileValidated())
                 .isSyndicated(entity.isSyndicated())
+                .rating(entity.getRating())
+                .totalReviewsCount(entity.getTotalReviewsCount())
                 .vehicleId(entity.getVehicleId())
                 .build();
     }

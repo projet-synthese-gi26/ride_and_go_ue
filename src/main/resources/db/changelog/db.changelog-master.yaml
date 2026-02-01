@@ -30,3 +30,6 @@ databaseChangeLog:
 
   - include:
       file: db/changelog/changes/009-add-user-names.sql
+
+  - include:
+      file: db/changelog/changes/010-create-reviews-schema.sql

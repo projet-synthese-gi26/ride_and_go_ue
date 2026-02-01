@@ -39,6 +39,11 @@ public class DriverEntity implements Persistable<UUID> {
     @Column("is_syndicated")
     private boolean isSyndicated;
 
+    private Double rating;
+    
+    @Column("total_reviews_count")
+    private Integer totalReviewsCount;
+
     @Transient
     private boolean newEntity = false;
 
