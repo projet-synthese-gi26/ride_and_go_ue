@@ -51,4 +51,9 @@ public class GlobalExceptionHandler {
         problemDetail.setTitle("Portefeuille introuvable");
         return problemDetail;
     }
+
+    @ExceptionHandler(com.yowyob.rideandgo.domain.exception.DriverProfileNotValidatedException.class)
+    public ProblemDetail handleDriverNotValidated(com.yowyob.rideandgo.domain.exception.DriverProfileNotValidatedException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
+    }
 }

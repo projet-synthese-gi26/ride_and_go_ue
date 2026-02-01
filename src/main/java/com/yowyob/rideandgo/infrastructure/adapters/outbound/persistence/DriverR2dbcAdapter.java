@@ -1,5 +1,6 @@
 package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence;
 
+import com.yowyob.rideandgo.domain.exception.DriverProfileNotValidatedException;
 import com.yowyob.rideandgo.domain.model.Driver;
 import com.yowyob.rideandgo.domain.ports.out.DriverRepositoryPort;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.DriverEntity;
@@ -19,18 +20,29 @@ public class DriverR2dbcAdapter implements DriverRepositoryPort {
 
     @Override
     public Mono<Boolean> setOnlineStatus(UUID driverId, boolean isOnline) {
+        log.info("🔌 Request to set ONLINE={} for driver {}", isOnline, driverId);
+
         return driverRepository.findById(driverId)
-                .flatMap(driver -> {
-                    if (isOnline && !driver.isProfileValidated()) {
-                        log.warn("⛔ Driver {} blocked: Profile not validated by admin.", driverId);
-                        return Mono.just(false);
+                .switchIfEmpty(
+                        Mono.error(new IllegalStateException("Le profil chauffeur n'existe pas en base locale.")))
+                .flatMap(driverEntity -> {
+                    // Blocage métier si on veut passer Online sans validation
+                    if (isOnline && !driverEntity.isProfileValidated()) {
+                        log.warn("⛔ Driver {} blocked: Profile not validated.", driverId);
+                        return Mono.error(new DriverProfileNotValidatedException(
+                                "Votre profil n'a pas encore été validé par un administrateur."));
                     }
-                    driver.setOnline(isOnline);
-                    driver.setNewEntity(false);
-                    return driverRepository.save(driver);
+
+                    driverEntity.setOnline(isOnline);
+                    driverEntity.setNewEntity(false); // Force UPDATE
+
+                    log.info("💾 Saving online status for driver {}", driverId);
+                    return driverRepository.save(driverEntity);
                 })
-                .map(d -> true)
-                .defaultIfEmpty(false);
+                .map(saved -> {
+                    log.info("✅ Status updated successfully for {}", driverId);
+                    return true;
+                });
     }
 
     @Override

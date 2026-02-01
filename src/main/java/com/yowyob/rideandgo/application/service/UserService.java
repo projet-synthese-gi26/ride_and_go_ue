@@ -180,7 +180,7 @@ public class UserService implements UserUseCases {
                                         .hasCar(true)
                                         .isOnline(false)
                                         .isProfileCompleted(false)
-                                        .isProfileValidated(false)
+                                        .isProfileValidated(true)
                                         .isSyndicated(false)
                                         .vehicleId(finalVehicle.id())
                                         .build();
