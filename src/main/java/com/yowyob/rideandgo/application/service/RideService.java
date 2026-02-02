@@ -122,6 +122,7 @@ public class RideService implements UpdateRideStatusUseCase {
                             .partnerName(partner.firstName() + " " + partner.lastName())
                             .partnerPhone(partner.telephone())
                             .partnerPhoto(partner.photoUri())
+                            .createdAt(ride.createdAt())
                             .vehicle(vehicle.id() != null ? vehicle : null)
                             .build();
                 })

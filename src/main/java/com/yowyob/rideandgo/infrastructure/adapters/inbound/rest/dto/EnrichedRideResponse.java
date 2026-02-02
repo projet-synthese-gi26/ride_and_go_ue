@@ -16,13 +16,13 @@ public class EnrichedRideResponse {
     private Double price;
     private String startPoint;
     private String endPoint;
-    private LocalDateTime createdAt;
+    private LocalDateTime createdAt; // ✅ S'assurer que ce champ est bien là
 
-    // Infos sur l'autre personne
+    // Infos sur le partenaire
     private String partnerName;
     private String partnerPhone;
     private String partnerPhoto;
 
-    // Infos véhicule (si applicable)
+    // Infos véhicule
     private Vehicle vehicle;
 }

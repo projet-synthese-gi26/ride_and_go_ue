@@ -8,8 +8,11 @@ import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface RideMapper {
+    
+    @Mapping(target = "createdAt", source = "createdDate")
     Ride toDomain(RideEntity entity);
 
+    @Mapping(target = "createdDate", source = "createdAt")
     RideEntity toEntity(Ride domain);
 
     RideResponse toResponse(Ride domain);
