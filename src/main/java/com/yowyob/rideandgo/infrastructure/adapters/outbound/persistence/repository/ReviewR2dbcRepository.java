@@ -8,10 +8,11 @@ import reactor.core.publisher.Mono;
 import java.util.UUID;
 
 public interface ReviewR2dbcRepository extends ReactiveCrudRepository<ReviewEntity, UUID> {
-
+    
     Flux<ReviewEntity> findByDriverIdOrderByCreatedAtDesc(UUID driverId);
 
-    @Query("SELECT AVG(rating) FROM reviews WHERE driver_id = :driverId")
+    // ✅ Utilisation de COALESCE et CAST pour garantir un Double 0.0 (jamais NULL)
+    @Query("SELECT CAST(COALESCE(AVG(rating), 0.0) AS DOUBLE PRECISION) FROM reviews WHERE driver_id = :driverId")
     Mono<Double> getAverageRatingForDriver(UUID driverId);
 
     @Query("SELECT COUNT(*) FROM reviews WHERE driver_id = :driverId")

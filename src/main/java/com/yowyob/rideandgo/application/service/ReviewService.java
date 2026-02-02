@@ -28,31 +28,65 @@ public class ReviewService {
 
     @Transactional
     public Mono<Review> submitReview(UUID rideId, UUID passengerId, int stars, String comment) {
+        log.info("⭐ Process start: Submitting {} stars for ride {}", stars, rideId);
+
         return rideRepository.findRideById(rideId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Course introuvable")))
                 .flatMap(ride -> {
+                    // Validations métier
                     if (ride.state() != RideState.COMPLETED) {
-                        return Mono.error(new IllegalStateException("La course doit être terminée pour être notée."));
+                        return Mono.error(new IllegalStateException("Seule une course COMPLETED peut être notée."));
                     }
                     if (!ride.passengerId().equals(passengerId)) {
-                        return Mono.error(new IllegalStateException("Seul le passager peut noter cette course."));
+                        return Mono.error(new IllegalStateException("Accès refusé: vous n'êtes pas le passager de cette course."));
                     }
-                    Review review = Review.builder()
-                            .id(Utils.generateUUID()).rideId(rideId).driverId(ride.driverId())
-                            .passengerId(passengerId).rating(stars).comment(comment).build();
 
+                    Review review = Review.builder()
+                            .id(Utils.generateUUID())
+                            .rideId(rideId)
+                            .driverId(ride.driverId())
+                            .passengerId(passengerId)
+                            .rating(stars)
+                            .comment(comment)
+                            .build();
+
+                    // 1. Sauvegarde l'avis 
+                    // 2. Déclenche le recalcul immédiat
+                    // 3. Retourne l'avis sauvegardé
                     return reviewRepository.save(review)
-                            .flatMap(saved -> updateDriverStats(ride.driverId()).thenReturn(saved));
+                            .doOnSuccess(saved -> log.info("✅ Review saved. Triggering driver stats update..."))
+                            .flatMap(savedReview -> updateDriverStats(ride.driverId())
+                                    .thenReturn(savedReview));
                 });
+    }
+
+    private Mono<Void> updateDriverStats(UUID driverId) {
+        return Mono.zip(
+                reviewRepository.getAverageRatingForDriver(driverId),
+                reviewRepository.countReviewsForDriver(driverId)
+        ).flatMap(tuple -> {
+            Double avg = tuple.getT1();
+            Long count = tuple.getT2();
+            
+            log.info("📊 New Stats for driver {}: Avg={}, Count={}", driverId, avg, count);
+
+            return driverRepository.findById(driverId)
+                    .flatMap(driver -> {
+                        var updatedDriver = driver.toBuilder()
+                                .rating(avg != null ? avg : 0.0)
+                                .totalReviewsCount(count != null ? count.intValue() : 0)
+                                .build();
+                        return driverRepository.save(updatedDriver);
+                    });
+        }).then();
     }
 
     public Flux<ReviewResponse> getReviewsForDriver(UUID driverId) {
         return reviewRepository.findAllByDriverId(driverId)
                 .flatMap(review -> userRepository.findUserById(review.passengerId())
                         .map(user -> mapToResponse(review, user))
-                        // Fallback si l'utilisateur n'est pas trouvé
-                        .defaultIfEmpty(mapToResponse(review,
-                                User.builder().firstName("Passager").lastName("Anonyme").build())));
+                        .defaultIfEmpty(mapToResponse(review, User.builder().firstName("Client").lastName("Anonyme").build()))
+                );
     }
 
     private ReviewResponse mapToResponse(Review review, User passenger) {
@@ -64,17 +98,5 @@ public class ReviewService {
                 .passengerName(passenger.firstName() + " " + passenger.lastName())
                 .passengerPhoto(passenger.photoUri())
                 .build();
-    }
-
-    private Mono<Void> updateDriverStats(UUID driverId) {
-        return Mono.zip(
-                reviewRepository.getAverageRatingForDriver(driverId),
-                reviewRepository.countReviewsForDriver(driverId)).flatMap(
-                        tuple -> driverRepository.findById(driverId)
-                                .flatMap(driver -> driverRepository.save(driver.toBuilder()
-                                        .rating(tuple.getT1())
-                                        .totalReviewsCount(tuple.getT2().intValue())
-                                        .build())))
-                .then();
     }
 }
