@@ -65,6 +65,7 @@ public class DriverR2dbcAdapter implements DriverRepositoryPort {
                     newEntity.setOnline(false);
                     newEntity.setProfileCompleted(false);
                     newEntity.setLicenseNumber("PENDING");
+                    newEntity.setProfileValidated(true);
                     newEntity.setNewEntity(true);
                     return driverRepository.save(newEntity);
                 }))
