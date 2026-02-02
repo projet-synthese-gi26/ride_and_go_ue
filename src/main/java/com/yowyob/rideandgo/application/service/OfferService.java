@@ -109,7 +109,8 @@ public class OfferService implements
     @Override
     public Flux<Offer> getAvailableOffers() {
         return repository.findAll()
-                .filter(o -> o.state() == OfferState.PENDING || o.state() == OfferState.BID_RECEIVED);
+                .filter(o -> o.state() == OfferState.PENDING || o.state() == OfferState.BID_RECEIVED)
+                .flatMap(this::enrichOffer); // ✅ Applique l'enrichissement à chaque offre
     }
 
     // ==================================================================================
@@ -341,6 +342,19 @@ public class OfferService implements
                         .build());
     }
 
+    private Mono<Offer> enrichOffer(Offer offer) {
+        if (offer.bids() == null || offer.bids().isEmpty()) {
+            return Mono.just(offer);
+        }
+
+        return locationCachePort.getLocation(offer.passengerId())
+                .defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0))
+                .flatMap(pLoc -> Flux.fromIterable(offer.bids())
+                        .flatMap(bid -> enrichSingleBid(bid, pLoc))
+                        .collectList()
+                        .map(offer::withBids));
+    }
+    
     // ==================================================================================
     // ENRICHISSEMENT (UI) AVEC DONNÉES RÉELLES
     // ==================================================================================
@@ -398,13 +412,15 @@ public class OfferService implements
 
     @Override
     public Flux<Offer> getAllOffers() {
-        return repository.findAll();
+        return repository.findAll()
+                .flatMap(this::enrichOffer); // ✅ Enrichit toute la liste
     }
 
     @Override
     public Mono<Offer> getOfferById(UUID id) {
         return repository.findById(id)
-                .switchIfEmpty(Mono.error(new OfferNotFoundException("Offer not found: " + id)));
+                .switchIfEmpty(Mono.error(new OfferNotFoundException("Offer not found: " + id)))
+                .flatMap(this::enrichOffer); // ✅ Enrichit l'offre unique
     }
 
 @Override
