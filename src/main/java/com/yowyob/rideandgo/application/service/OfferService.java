@@ -372,7 +372,7 @@ public class OfferService implements
                                     .flatMap(bid -> enrichSingleBid(bid, pLoc))
                                     .collectList()
                                     .map(offer::withBids)); 
-                });
+                }); 
     }
 
     /**
