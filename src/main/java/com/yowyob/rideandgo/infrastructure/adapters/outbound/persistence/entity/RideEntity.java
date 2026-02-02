@@ -45,7 +45,7 @@ public class RideEntity implements Persistable<UUID> {
 
     @CreatedDate
     @Column("created_at")
-    private LocalDateTime createdDate;
+    private LocalDateTime createdDate = LocalDateTime.now();
 
     @LastModifiedDate
     @Column("updated_at")
