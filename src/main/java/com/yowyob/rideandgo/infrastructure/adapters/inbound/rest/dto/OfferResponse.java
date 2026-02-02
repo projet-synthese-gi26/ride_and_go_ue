@@ -14,6 +14,8 @@ public record OfferResponse(
         String startPoint,
         String endPoint,
         double price,
+        String passengerPhone,
+        String departureTime,
         OfferState state,
         List<Bid> bids 
 ) {}

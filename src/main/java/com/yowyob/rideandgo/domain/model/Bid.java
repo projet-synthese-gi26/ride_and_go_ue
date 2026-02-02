@@ -8,6 +8,7 @@ import java.util.UUID;
 public record Bid(
         UUID driverId,
         String driverName,
+        String driverPhone, // ✅ Ajouté
         String driverPhoto,
         Double rating,
         Integer totalTrips,

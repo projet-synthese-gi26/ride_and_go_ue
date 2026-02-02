@@ -12,19 +12,23 @@ import org.mapstruct.ReportingPolicy;
 public interface OfferMapper {
 
     @Mapping(target = "bids", ignore = true)
-    @Mapping(target = "version", ignore = true) 
+    @Mapping(target = "version", ignore = true)
     Offer toDomain(OfferEntity entity);
 
+    /**
+     * Mappe la requête de création vers le domaine.
+     * passengerPhone et departureTime sont mappés automatiquement par nom.
+     */
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "bids", ignore = true)
     @Mapping(target = "version", ignore = true)
-    @Mapping(target = "passengerId", ignore = true)     // Géré manuellement
-    @Mapping(target = "state", ignore = true)           // Géré par le service (PENDING)
+    @Mapping(target = "passengerId", ignore = true)
+    @Mapping(target = "state", ignore = true)
     @Mapping(target = "selectedDriverId", ignore = true)
     Offer toDomain(CreateOfferRequest request);
 
     OfferResponse toResponse(Offer domain);
 
-    @Mapping(target = "agreements", ignore = true) 
+    @Mapping(target = "agreements", ignore = true)
     OfferEntity toEntity(Offer domain);
 }

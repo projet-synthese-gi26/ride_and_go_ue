@@ -42,6 +42,13 @@ public class OfferEntity implements Persistable<UUID> {
     @Column("state")
     private OfferState state;
 
+    // --- NOUVEAUX CHAMPS ---
+    @Column("passenger_phone")
+    private String passengerPhone;
+
+    @Column("departure_time")
+    private String departureTime;
+
     @CreatedDate
     @Column("created_at")
     private LocalDateTime createdDate;

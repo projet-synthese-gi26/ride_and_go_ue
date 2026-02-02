@@ -72,27 +72,28 @@ public class OfferService implements
     // 1. CRÉATION D'OFFRE (PASSAGER)
     // ==================================================================================
     @Override
-    public Mono<Offer> createOffer(Offer request, UUID passengerId) {
-        return ensureUserExistsLocally(passengerId)
+    public Mono<Offer> createOffer(Offer request, UUID callerId) {
+        return userRepositoryPort.findUserById(callerId)
                 .flatMap(user -> {
+                    // Si le front n'a pas envoyé de numéro spécifique, on prend celui de l'user
+                    String finalPhone = (request.passengerPhone() != null && !request.passengerPhone().isBlank()) 
+                                        ? request.passengerPhone() 
+                                        : user.telephone();
+
                     Offer offer = Offer.builder()
                             .id(Utils.generateUUID())
-                            .passengerId(passengerId)
+                            .passengerId(callerId)
                             .startPoint(request.startPoint())
                             .endPoint(request.endPoint())
                             .price(request.price())
+                            .passengerPhone(finalPhone) // ✅
+                            .departureTime(request.departureTime()) // ✅
                             .state(OfferState.PENDING)
                             .bids(new ArrayList<>())
                             .build();
 
                     return repository.save(offer)
-                            .flatMap(saved -> cache.saveInCache(saved).thenReturn(saved))
-                            .flatMap(saved -> {
-                                // Notification filtrée par le solde et le statut des chauffeurs
-                                notifyEligibleDriversWithBalance(saved).subscribe();
-                                return Mono.just(saved);
-                            })
-                            .doOnSuccess(o -> log.info("Offer created: {}", o.id()));
+                            .flatMap(saved -> cache.saveInCache(saved).thenReturn(saved));
                 });
     }
 
@@ -368,51 +369,29 @@ public class OfferService implements
         return Mono.zip(
                 userRepositoryPort.findUserById(dId),
                 driverRepositoryPort.findById(dId),
-                locationCachePort.getLocation(dId).defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0)),
-                rideRepositoryPort.countCompletedRidesByDriverId(dId).defaultIfEmpty(0L)).flatMap(tuple -> {
-                    User user = tuple.getT1();
-                    Driver driver = tuple.getT2();
-                    LocationCachePort.Location dLoc = tuple.getT3();
-                    Long totalTrips = tuple.getT4();
+                locationCachePort.getLocation(dId).defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0))
+        ).flatMap(tuple -> {
+            User user = tuple.getT1();
+            Driver driver = tuple.getT2();
+            LocationCachePort.Location dLoc = tuple.getT3();
 
-                    // ✅ RÉCUPÉRATION SÉCURISÉE DU VÉHICULE
-                    return Mono.justOrEmpty(driver.vehicleId())
-                            .flatMap(vehicleRepositoryPort::getVehicleById)
-                            // Si pas de véhicule ou ID null, on crée un objet Vehicle vide pour ne pas
-                            // bloquer le map
-                            .defaultIfEmpty(Vehicle.builder().brand("Inconnu").registrationNumber("N/A")
-                                    .illustrationImages(List.of()).build())
-                            .map(v -> {
-                                double dist = 0.0;
-                                int eta = 0;
-                                if (dLoc.latitude() != 0.0 && pLoc.latitude() != 0.0) {
-                                    dist = trackingCalculatorService.calculateDistance(dLoc.latitude(),
-                                            dLoc.longitude(),
-                                            pLoc.latitude(), pLoc.longitude());
-                                    eta = trackingCalculatorService.calculateEtaInMinutes(dist);
-                                }
-                                return Bid.builder()
-                                        .driverId(dId)
-                                        .driverName(user.name())
-                                        .driverPhoto(user.photoUri()) // Ajout de la photo de profil ici aussi
-                                        .rating(4.8)
-                                        .totalTrips(totalTrips.intValue())
-                                        .latitude(dLoc.latitude())
-                                        .longitude(dLoc.longitude())
-                                        .distanceToPassenger(dist)
-                                        .eta(eta)
-                                        .vehicleId(v.id() != null ? v.id().toString() : null)
-                                        .brand(v.brand())
-                                        .model(v.vehicleModelId())
-                                        .color("N/A")
-                                        .licensePlate(v.registrationNumber())
-                                        .vehicleType(v.vehicleTypeId())
-                                        .manufacturingYear(v.vehicleAgeAtStart())
-                                        .vehicleImages(v.illustrationImages())
-                                        .build();
-                            });
-                });
+            return Mono.justOrEmpty(driver.vehicleId())
+                    .flatMap(vehicleRepositoryPort::getVehicleById)
+                    .defaultIfEmpty(Vehicle.builder().brand("N/A").build())
+                    .map(v -> Bid.builder()
+                            .driverId(dId)
+                            .driverName(user.firstName() + " " + user.lastName())
+                            .driverPhone(user.telephone()) // ✅ AJOUT DU NUMÉRO
+                            .driverPhoto(user.photoUri())
+                            .latitude(dLoc.latitude())
+                            .longitude(dLoc.longitude())
+                            .brand(v.brand())
+                            .model(v.vehicleModelId())
+                            .licensePlate(v.registrationNumber())
+                            .build());
+        });
     }
+    
     // ==================================================================================
     // CRUD ET GESTION
     // ==================================================================================
@@ -428,11 +407,12 @@ public class OfferService implements
                 .switchIfEmpty(Mono.error(new OfferNotFoundException("Offer not found: " + id)));
     }
 
-    @Override
+@Override
     public Mono<Offer> updateOffer(UUID id, Offer offerDetails) {
         return repository.findById(id)
                 .switchIfEmpty(Mono.error(new OfferNotFoundException("Offer not found: " + id)))
                 .flatMap(existingOffer -> {
+                    // Construction de l'offre mise à jour avec les nouveaux champs
                     Offer updated = new Offer(
                             existingOffer.id(),
                             existingOffer.passengerId(),
@@ -440,9 +420,21 @@ public class OfferService implements
                             offerDetails.startPoint() != null ? offerDetails.startPoint() : existingOffer.startPoint(),
                             offerDetails.endPoint() != null ? offerDetails.endPoint() : existingOffer.endPoint(),
                             offerDetails.price() > 0 ? offerDetails.price() : existingOffer.price(),
+                            
+                            // Gestion des nouveaux champs (Phone & Time)
+                            (offerDetails.passengerPhone() != null && !offerDetails.passengerPhone().isBlank()) 
+                                ? offerDetails.passengerPhone() : existingOffer.passengerPhone(),
+                                
+                            (offerDetails.departureTime() != null && !offerDetails.departureTime().isBlank()) 
+                                ? offerDetails.departureTime() : existingOffer.departureTime(),
+                                
                             existingOffer.state(),
                             existingOffer.bids(),
-                            existingOffer.version());
+                            existingOffer.version()
+                    );
+                    
+                    log.info("📝 Updating Offer {}: phone={}, time={}", id, updated.passengerPhone(), updated.departureTime());
+                    
                     return repository.save(updated);
                 })
                 .flatMap(saved -> cache.saveInCache(saved).thenReturn(saved));
