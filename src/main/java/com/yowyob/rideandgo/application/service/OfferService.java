@@ -347,6 +347,7 @@ public class OfferService implements
             return Mono.just(offer);
         }
 
+        
         return locationCachePort.getLocation(offer.passengerId())
                 .defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0))
                 .flatMap(pLoc -> Flux.fromIterable(offer.bids())

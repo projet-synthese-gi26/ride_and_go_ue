@@ -112,11 +112,11 @@ public class UserController {
     public Mono<UserResponse> getUserById(@PathVariable UUID userId) {
         return userUseCases.getUserById(userId).map(this::mapToResponse);
     }
-    
+
     @GetMapping("/drivers/{id}")
-    @Operation(summary = "Get Driver Public Profile", description = "Get details about a specific driver including their vehicle.")
-    public Mono<DriverProfileResponse> getDriverById(@PathVariable UUID id) {
-        return userService.getDriverProfile(id);
+    @Operation(summary = "Get Driver Full Profile", description = "Aggregates User, Driver, Wallet and Vehicle data for a specific driver.")
+    public Mono<FullDriverProfileResponse> getDriverById(@PathVariable UUID id) {
+        return userService.getFullDriverProfile(id);
     }
 
     // --- HELPERS ---

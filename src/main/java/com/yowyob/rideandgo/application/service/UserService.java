@@ -285,7 +285,8 @@ public class UserService implements UserUseCases {
         ).flatMap(tuple -> {
             Driver driver = tuple.getT1();
             User user = tuple.getT2();
-
+            
+            log.info("here is the driver : {} \n and user: {}", user, driver);
             return Mono.justOrEmpty(driver.vehicleId())
                     .flatMap(vehicleRepositoryPort::getVehicleById)
                     .map(v -> mapToProfileResponse(user, driver, v))
