@@ -371,7 +371,7 @@ public class OfferService implements
                             .flatMap(pLoc -> Flux.fromIterable(offer.bids())
                                     .flatMap(bid -> enrichSingleBid(bid, pLoc))
                                     .collectList()
-                                    .map(offer::withBids));
+                                    .map(offer::withBids)); 
                 });
     }
 
