@@ -15,6 +15,8 @@ import com.yowyob.rideandgo.infrastructure.mappers.UserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import lombok.extern.slf4j.Slf4j;
@@ -198,12 +200,16 @@ public class UserService implements UserUseCases {
                                         .thenReturn(savedDriver))
                                         .map(savedDriver -> new DriverProfileResponse(
                                                 savedDriver.id(),
+                                                user.firstName(),           // ✅ Ajouté
+                                                user.lastName(),            // ✅ Ajouté
                                                 savedDriver.status(),
                                                 savedDriver.licenseNumber(),
                                                 savedDriver.isOnline(),
                                                 savedDriver.isProfileValidated(),
                                                 savedDriver.isSyndicated(),
                                                 savedDriver.isProfileCompleted(),
+                                                savedDriver.rating(),       // ✅ Ajouté
+                                                savedDriver.totalReviewsCount(), // ✅ Ajouté
                                                 finalVehicle));
                             })
                             .flatMap(response -> {
@@ -219,31 +225,52 @@ public class UserService implements UserUseCases {
     }
 
     @Override
+    @Transactional
     public Mono<DriverProfileResponse> verifySyndicateStatus(UUID userId) {
         log.info("🛠 Verifying Syndicate status for Driver {}", userId);
 
         return syndicatePort.checkIsSyndicated(userId)
-                .flatMap(isVerified -> driverRepositoryPort.findById(userId)
-                        .flatMap(driver -> {
-                            Driver updatedDriver = Driver.builder()
-                                    .id(driver.id())
-                                    .status(driver.status())
-                                    .licenseNumber(driver.licenseNumber())
-                                    .hasCar(driver.hasCar())
-                                    .isOnline(driver.isOnline())
-                                    .isProfileValidated(driver.isProfileValidated())
-                                    .vehicleId(driver.vehicleId())
-                                    .isSyndicated(isVerified)
-                                    .isProfileCompleted(isVerified)
-                                    .build();
+                .flatMap(isVerified -> 
+                    // 1. On récupère le chauffeur et l'utilisateur en parallèle
+                    Mono.zip(
+                        driverRepositoryPort.findById(userId)
+                            .switchIfEmpty(Mono.error(new IllegalArgumentException("Chauffeur non trouvé"))),
+                        userRepositoryPort.findUserById(userId)
+                            .switchIfEmpty(Mono.error(new IllegalArgumentException("Utilisateur non trouvé")))
+                    ).flatMap(tuple -> {
+                        Driver driver = tuple.getT1();
+                        User user = tuple.getT2();
 
-                            return driverRepositoryPort.save(updatedDriver)
-                                    .flatMap(saved -> vehicleRepositoryPort.getVehicleById(saved.vehicleId())
-                                            .map(v -> new DriverProfileResponse(
-                                                    saved.id(), saved.status(), saved.licenseNumber(),
-                                                    saved.isOnline(), saved.isProfileValidated(),
-                                                    saved.isSyndicated(), saved.isProfileCompleted(), v)));
-                        }));
+                        // 2. On prépare la mise à jour du chauffeur
+                        Driver updatedDriver = driver.toBuilder()
+                                .isSyndicated(isVerified)
+                                .isProfileCompleted(isVerified) // Un chauffeur est complet s'il est syndiqué (règle métier)
+                                .build();
+
+                        // 3. On sauvegarde et on enrichit avec le véhicule
+                        return driverRepositoryPort.save(updatedDriver)
+                                .flatMap(savedDriver -> {
+                                    Mono<Vehicle> vehicleMono = Mono.justOrEmpty(savedDriver.vehicleId())
+                                            .flatMap(vehicleRepositoryPort::getVehicleById)
+                                            .defaultIfEmpty(Vehicle.builder().brand("Inconnu").build());
+
+                                    return vehicleMono.map(v -> new DriverProfileResponse(
+                                            savedDriver.id(),
+                                            user.firstName(),           // ✅ Ajouté
+                                            user.lastName(),            // ✅ Ajouté
+                                            savedDriver.status(),
+                                            savedDriver.licenseNumber(),
+                                            savedDriver.isOnline(),
+                                            savedDriver.isProfileValidated(),
+                                            savedDriver.isSyndicated(),
+                                            savedDriver.isProfileCompleted(),
+                                            savedDriver.rating(),       // ✅ Ajouté
+                                            savedDriver.totalReviewsCount(), // ✅ Ajouté
+                                            v
+                                    ));
+                                });
+                    })
+                );
     }
 
     @Override
@@ -259,25 +286,27 @@ public class UserService implements UserUseCases {
             Driver driver = tuple.getT1();
             User user = tuple.getT2();
 
-            // Si le chauffeur a un véhicule, on va le chercher, sinon on renvoie null
             return Mono.justOrEmpty(driver.vehicleId())
                     .flatMap(vehicleRepositoryPort::getVehicleById)
-                    .map(vehicle -> mapToProfileResponse(user, driver, vehicle))
+                    .map(v -> mapToProfileResponse(user, driver, v))
                     .defaultIfEmpty(mapToProfileResponse(user, driver, null));
         });
     }
 
-    // Helper de mapping pour la lisibilité
     private DriverProfileResponse mapToProfileResponse(User user, Driver driver, Vehicle vehicle) {
         return new DriverProfileResponse(
                 user.id(),
+                user.firstName(),           // ✅ Ajouté
+                user.lastName(),            // ✅ Ajouté
                 driver.status(),
                 driver.licenseNumber(),
                 driver.isOnline(),
                 driver.isProfileValidated(),
                 driver.isSyndicated(),
                 driver.isProfileCompleted(),
-                vehicle // Contient tous les champs, y compris les images
+                driver.rating(),            // ✅ Ajouté
+                driver.totalReviewsCount(), // ✅ Ajouté
+                vehicle
         );
     }
 }
