@@ -6,6 +6,7 @@ import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.repository.ReviewR2dbcRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -32,6 +33,12 @@ public class ReviewR2dbcAdapter implements ReviewRepositoryPort {
     @Override
     public Mono<Long> countReviewsForDriver(UUID driverId) {
         return repository.countReviewsForDriver(driverId).defaultIfEmpty(0L);
+    }
+
+    @Override
+    public Flux<Review> findAllByDriverId(UUID driverId) {
+        return repository.findByDriverIdOrderByCreatedAtDesc(driverId)
+                .map(this::mapToDomain);
     }
 
     private Review mapToDomain(ReviewEntity e) {
