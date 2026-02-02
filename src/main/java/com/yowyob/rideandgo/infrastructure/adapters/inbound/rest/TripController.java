@@ -53,26 +53,17 @@ public class TripController {
     }
 
     @GetMapping("/enriched-history")
-    @Operation(summary = "Get my enriched ride history")
-    public Flux<EnrichedRideResponse> getMyHistoryEnriched(
+    @Operation(summary = "Get my ride history with full details", description = "Aggregates Ride, User and Vehicle info. Never fails with 500.")
+    public Flux<EnrichedRideResponse> getMyEnrichedHistory(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
+        
         return ReactiveSecurityContextHolder.getContext()
                 .map(SecurityContext::getAuthentication)
                 .flatMapMany(auth -> {
                     UUID userId = UUID.fromString(auth.getName());
-                    return rideService.getEnrichedHistoryForUser(userId, page, size);
+                    return rideService.getEnrichedHistory(userId, page, size);
                 });
-    }
-
-    @GetMapping("/driver/{driverId}/enriched-history")
-    @Operation(summary = "Get driver specific enriched history")
-    @PreAuthorize("hasAuthority('RIDE_AND_GO_ADMIN') or #driverId.toString() == authentication.name")
-    public Flux<EnrichedRideResponse> getDriverHistoryEnriched(
-            @PathVariable UUID driverId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return rideService.getEnrichedHistoryForDriver(driverId, page, size);
     }
 
     @GetMapping("/{id}")

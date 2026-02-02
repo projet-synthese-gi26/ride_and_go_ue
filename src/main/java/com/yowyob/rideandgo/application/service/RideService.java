@@ -1,6 +1,9 @@
 package com.yowyob.rideandgo.application.service;
 
+import com.yowyob.rideandgo.domain.model.Offer;
 import com.yowyob.rideandgo.domain.model.Ride;
+import com.yowyob.rideandgo.domain.model.User;
+import com.yowyob.rideandgo.domain.model.Vehicle;
 import com.yowyob.rideandgo.domain.model.enums.RideState;
 import com.yowyob.rideandgo.domain.ports.in.UpdateRideStatusUseCase;
 import com.yowyob.rideandgo.domain.ports.out.DriverRepositoryPort;
@@ -75,52 +78,56 @@ public class RideService implements UpdateRideStatusUseCase {
                 });
     }
 
-    public Flux<EnrichedRideResponse> getEnrichedHistoryForUser(UUID userId, int page, int size) {
+    public Flux<EnrichedRideResponse> getEnrichedHistory(UUID userId, int page, int size) {
         return rideRepository.findRideHistoryByUserId(userId, page, size)
-                .flatMap(this::enrichRide);
+                .flatMap(ride -> enrichRide(ride, userId));
     }
 
-    public Flux<EnrichedRideResponse> getEnrichedHistoryForDriver(UUID driverId, int page, int size) {
-        return rideRepository.findRideHistoryByDriverId(driverId, page, size)
-                .flatMap(this::enrichRide);
-    }
+    private Mono<EnrichedRideResponse> enrichRide(Ride ride, UUID requesterId) {
+        // 1. Déterminer qui est le partenaire (l'autre personne)
+        UUID partnerId = ride.driverId().equals(requesterId) ? ride.passengerId() : ride.driverId();
 
-    private Mono<EnrichedRideResponse> enrichRide(Ride ride) {
-        // 1. Infos Offre
-        var offerMono = offerRepository.findById(ride.offerId()).defaultIfEmpty(null);
-        
-        // 2. Infos Chauffeur (User + Profile)
-        var driverUserMono = userRepository.findUserById(ride.driverId()).defaultIfEmpty(null);
-        var driverProfileMono = driverRepository.findById(ride.driverId()).defaultIfEmpty(null);
-        
-        // 3. Infos Passager
-        var passengerUserMono = userRepository.findUserById(ride.passengerId()).defaultIfEmpty(null);
+        // 2. Appel Partenaire (Robuste)
+        Mono<User> partnerMono = userRepository.findUserById(partnerId)
+                .onErrorResume(e -> Mono.empty())
+                .defaultIfEmpty(User.builder().name("Inconnu").firstName("Utilisateur").lastName("Inconnu").build());
 
-        return Mono.zip(offerMono, driverUserMono, driverProfileMono, passengerUserMono)
-                .flatMap(tuple -> {
-                    var offer = tuple.getT1();
-                    var dUser = tuple.getT2();
-                    var dProfile = tuple.getT3();
-                    var pUser = tuple.getT4();
+        // 3. Appel Offre (pour récupérer points de départ/arrivée et prix)
+        Mono<Offer> offerMono = offerRepository.findById(ride.offerId())
+                .onErrorResume(e -> Mono.empty())
+                .defaultIfEmpty(Offer.builder().startPoint("N/A").endPoint("N/A").price(0.0).build());
 
-                    // 4. Infos Véhicule (dépend du profil chauffeur)
-                    Mono<com.yowyob.rideandgo.domain.model.Vehicle> vehicleMono = Mono.empty();
-                    if (dProfile != null && dProfile.vehicleId() != null) {
-                        vehicleMono = vehicleRepository.getVehicleById(dProfile.vehicleId());
-                    }
+        // 4. Appel Véhicule (Uniquement si le demandeur est le passager)
+        Mono<Vehicle> vehicleMono = Mono.empty();
+        if (requesterId.equals(ride.passengerId())) {
+            vehicleMono = driverRepository.findById(ride.driverId())
+                    .flatMap(d -> d.vehicleId() != null ? vehicleRepository.getVehicleById(d.vehicleId()) : Mono.empty())
+                    .onErrorResume(e -> Mono.empty());
+        }
 
-                    return vehicleMono.defaultIfEmpty(null)
-                            .map(v -> EnrichedRideResponse.builder()
-                                    .ride(ride)
-                                    .startPoint(offer != null ? offer.startPoint() : "N/A")
-                                    .endPoint(offer != null ? offer.endPoint() : "N/A")
-                                    .price(offer != null ? offer.price() : 0.0)
-                                    .driverName(dUser != null ? dUser.name() : "Inconnu")
-                                    .driverPhoto(dUser != null ? dUser.photoUri() : null)
-                                    .passengerName(pUser != null ? pUser.name() : "Inconnu")
-                                    .passengerPhoto(pUser != null ? pUser.photoUri() : null)
-                                    .vehicle(v)
-                                    .build());
+        // 5. Agrégation avec ZIP (Toutes les branches sont sécurisées)
+        return Mono.zip(partnerMono, offerMono, vehicleMono.defaultIfEmpty(Vehicle.builder().brand("N/A").build()))
+                .map(tuple -> {
+                    User partner = tuple.getT1();
+                    Offer offer = tuple.getT2();
+                    Vehicle vehicle = tuple.getT3();
+
+                    return EnrichedRideResponse.builder()
+                            .rideId(ride.id())
+                            .state(ride.state())
+                            .distance(ride.distance())
+                            .price(offer.price())
+                            .startPoint(offer.startPoint())
+                            .endPoint(offer.endPoint())
+                            .partnerName(partner.firstName() + " " + partner.lastName())
+                            .partnerPhone(partner.telephone())
+                            .partnerPhoto(partner.photoUri())
+                            .vehicle(vehicle.id() != null ? vehicle : null)
+                            .build();
+                })
+                .onErrorResume(e -> {
+                    log.error("CRITICAL: Failed to enrich ride {}, skipping item", ride.id(), e);
+                    return Mono.empty(); // En dernier recours, on ignore cette course plutôt que de tout faire planter
                 });
     }
 
