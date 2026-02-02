@@ -39,4 +39,6 @@ public interface UserUseCases {
     Mono<DriverProfileResponse> verifySyndicateStatus(UUID userId);
 
     Mono<FullDriverProfileResponse> getFullDriverProfile(UUID userId);
+
+    Mono<DriverProfileResponse> getDriverProfile(UUID driverId);
 }

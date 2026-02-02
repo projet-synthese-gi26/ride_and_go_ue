@@ -245,4 +245,39 @@ public class UserService implements UserUseCases {
                                                     saved.isSyndicated(), saved.isProfileCompleted(), v)));
                         }));
     }
+
+    @Override
+    public Mono<DriverProfileResponse> getDriverProfile(UUID driverId) {
+        log.info("🔍 Fetching public profile for driver {}", driverId);
+
+        return Mono.zip(
+                driverRepositoryPort.findById(driverId)
+                        .switchIfEmpty(Mono.error(new IllegalArgumentException("Chauffeur non trouvé"))),
+                userRepositoryPort.findUserById(driverId)
+                        .switchIfEmpty(Mono.error(new IllegalArgumentException("Utilisateur non trouvé")))
+        ).flatMap(tuple -> {
+            Driver driver = tuple.getT1();
+            User user = tuple.getT2();
+
+            // Si le chauffeur a un véhicule, on va le chercher, sinon on renvoie null
+            return Mono.justOrEmpty(driver.vehicleId())
+                    .flatMap(vehicleRepositoryPort::getVehicleById)
+                    .map(vehicle -> mapToProfileResponse(user, driver, vehicle))
+                    .defaultIfEmpty(mapToProfileResponse(user, driver, null));
+        });
+    }
+
+    // Helper de mapping pour la lisibilité
+    private DriverProfileResponse mapToProfileResponse(User user, Driver driver, Vehicle vehicle) {
+        return new DriverProfileResponse(
+                user.id(),
+                driver.status(),
+                driver.licenseNumber(),
+                driver.isOnline(),
+                driver.isProfileValidated(),
+                driver.isSyndicated(),
+                driver.isProfileCompleted(),
+                vehicle // Contient tous les champs, y compris les images
+        );
+    }
 }
