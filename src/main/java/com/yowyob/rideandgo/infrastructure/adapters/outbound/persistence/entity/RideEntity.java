@@ -34,7 +34,7 @@ public class RideEntity implements Persistable<UUID> {
 
     private double distance;
 
-    @Column("time_estimation") 
+    @Column("time_estimation")  
     private int duration;
 
     @Column("state")
