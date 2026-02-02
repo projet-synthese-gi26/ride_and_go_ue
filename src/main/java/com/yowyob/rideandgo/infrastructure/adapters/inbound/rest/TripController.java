@@ -2,6 +2,7 @@ package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
 
 import com.yowyob.rideandgo.application.service.RideService;
 import com.yowyob.rideandgo.domain.ports.in.GetRideLocationUseCase;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.EnrichedRideResponse;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.RideResponse;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.RideTrackingResponse;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.UpdateStatusRequest;
@@ -49,6 +50,29 @@ public class TripController {
             @RequestParam(defaultValue = "10") int size) {
         return rideService.getHistoryForDriver(driverId, page, size)
                 .map(rideMapper::toResponse);
+    }
+
+    @GetMapping("/enriched-history")
+    @Operation(summary = "Get my enriched ride history")
+    public Flux<EnrichedRideResponse> getMyHistoryEnriched(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ReactiveSecurityContextHolder.getContext()
+                .map(SecurityContext::getAuthentication)
+                .flatMapMany(auth -> {
+                    UUID userId = UUID.fromString(auth.getName());
+                    return rideService.getEnrichedHistoryForUser(userId, page, size);
+                });
+    }
+
+    @GetMapping("/driver/{driverId}/enriched-history")
+    @Operation(summary = "Get driver specific enriched history")
+    @PreAuthorize("hasAuthority('RIDE_AND_GO_ADMIN') or #driverId.toString() == authentication.name")
+    public Flux<EnrichedRideResponse> getDriverHistoryEnriched(
+            @PathVariable UUID driverId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return rideService.getEnrichedHistoryForDriver(driverId, page, size);
     }
 
     @GetMapping("/{id}")

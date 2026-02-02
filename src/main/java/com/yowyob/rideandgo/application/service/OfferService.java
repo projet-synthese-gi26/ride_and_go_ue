@@ -22,6 +22,8 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -181,32 +183,44 @@ public class OfferService implements
     // ==================================================================================
     // 5. CONFIRMATION & CRÉATION TRIP (CHAUFFEUR)
     // ==================================================================================
+    @Transactional
     public Mono<Ride> driverAcceptsOffer(UUID offerId, UUID driverId) {
+        log.info("🏁 Driver {} is accepting Offer {}", driverId, offerId);
+
         return repository.findById(offerId)
+                .switchIfEmpty(Mono.error(new OfferNotFoundException("Offre introuvable")))
                 .flatMap(offer -> {
+                    // 1. Vérifications de sécurité
                     if (offer.state() != OfferState.DRIVER_SELECTED) {
-                        return Mono.error(new OfferStatutNotMatchException("Offer must be in DRIVER_SELECTED state."));
+                        return Mono.error(new OfferStatutNotMatchException("L'offre n'est pas en attente de confirmation."));
                     }
                     if (offer.selectedDriverId() == null || !offer.selectedDriverId().equals(driverId)) {
-                        return Mono.error(new IllegalStateException("Access Denied: You are not the selected driver."));
+                        return Mono.error(new IllegalStateException("Vous n'êtes pas le chauffeur sélectionné pour cette offre."));
                     }
 
-                    // PAIEMENT : On crée la transaction de paiement basée sur le prix de l'offre
+                    // 2. Paiement de la commission et Mise à jour de l'Offre
                     return paymentPort.getWalletByOwnerId(driverId)
                             .flatMap(wallet -> paymentPort.processPayment(wallet.id(), offer.price()))
-                            .then(repository.save(offer.withState(OfferState.VALIDATED)));
+                            .then(repository.save(offer.withState(OfferState.VALIDATED))) // ✅ L'OFFRE PASSE EN VALIDATED
+                            .doOnSuccess(savedOffer -> log.info("✅ Offer {} state updated to VALIDATED", offerId))
+                            .thenReturn(offer);
                 })
                 .flatMap(offer -> {
+                    // 3. Création de la Course (Ride)
                     Ride ride = Ride.builder()
                             .id(Utils.generateUUID())
                             .offerId(offer.id())
                             .passengerId(offer.passengerId())
                             .driverId(driverId)
-                            .state(RideState.CREATED)
+                            .distance(0.0) // Sera mis à jour pendant la course
+                            .duration(0)
+                            .state(RideState.CREATED) // ✅ LA COURSE DÉBUTE EN 'CREATED'
                             .build();
 
                     return rideRepositoryPort.save(ride)
                             .flatMap(savedRide -> {
+                                log.info("🚀 Ride created: {}", savedRide.id());
+                                // Notification asynchrone
                                 saveAndDispatch(
                                         offer.passengerId(),
                                         tmplRideConfirmed,
