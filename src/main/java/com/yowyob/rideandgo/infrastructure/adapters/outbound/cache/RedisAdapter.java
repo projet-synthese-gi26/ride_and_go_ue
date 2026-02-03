@@ -6,13 +6,22 @@ import com.yowyob.rideandgo.domain.model.User;
 import com.yowyob.rideandgo.domain.ports.out.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.data.geo.Distance;
+import org.springframework.data.geo.Point;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.data.geo.Circle;
+import org.springframework.data.geo.Distance;
+import org.springframework.data.geo.Metrics;
+import org.springframework.data.geo.Point;
+import org.springframework.data.redis.connection.RedisGeoCommands;
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
-import java.util.Map;
+import java.time.Instant;
 import java.util.UUID;
 
 @Slf4j
@@ -23,39 +32,125 @@ public class RedisAdapter
 
     private final ReactiveRedisTemplate<String, Object> redisTemplate;
 
-    private static final String LOCATION_KEY_PREFIX = "location:";
-    private static final Duration LOCATION_TTL = Duration.ofMinutes(5);
+    // CLÉ 1 : Le "Live" (Geo Set unique pour tous les drivers)
+    // Contient : {Membre: "uuid", Score: GeoHash}
+    private static final String KEY_GEO_LIVE = "drivers:geo:live";
+    
+    // CLÉ 2 : Le "Buffer" (Préfixe pour les listes d'historique)
+    // Contient : Liste de strings "lat,lon,timestamp"
+    private static final String PREFIX_HISTORY = "history:driver:";
 
     // --- LocationCachePort Implementation ---
 
     @Override
     public Mono<Boolean> saveLocation(UUID actorId, Double latitude, Double longitude) {
-        String key = LOCATION_KEY_PREFIX + actorId.toString();
-        Map<String, Double> coords = Map.of(
-                "lat", latitude,
-                "lon", longitude);
+        String driverIdStr = actorId.toString();
+        // Redis utilise (Longitude, Latitude) pour ses Points
+        Point point = new Point(longitude, latitude); 
 
-        return redisTemplate.opsForValue()
-                .set(key, coords, LOCATION_TTL)
-                .doOnSuccess(success -> log.debug("Location cached for actor {} (success: {})", actorId, success))
-                .onErrorResume(e -> {
-                    log.error("Failed to cache location for actor {}", actorId, e);
-                    return Mono.just(false);
-                });
+        // 1. Mise à jour du Live (GEOADD)
+        // Ajoute ou met à jour la position du membre dans le Set géospatial
+        Mono<Long> geoAdd = redisTemplate.opsForGeo()
+                .add(KEY_GEO_LIVE, point, driverIdStr);
+
+        // 2. Ajout à l'historique (RPUSH)
+        // Format compact pour économiser la RAM : "lat,lon,timestamp"
+        String historyEntry = String.format("%f,%f,%d", latitude, longitude, Instant.now().getEpochSecond());
+        String historyKey = PREFIX_HISTORY + driverIdStr;
+
+        Mono<Long> listPush = redisTemplate.opsForList()
+                .rightPush(historyKey, historyEntry);
+        
+        // 3. Sécurité : TTL sur la liste d'historique (1h).
+        // Si le Cron plante, ces données seront perdues après 1h mais la RAM sera libérée.
+        Mono<Boolean> setTtl = redisTemplate.expire(historyKey, Duration.ofHours(1));
+
+        // Exécution parallèle (Pipelining)
+        return Mono.zip(geoAdd, listPush, setTtl)
+                .map(tuple -> true)
+                .doOnError(e -> log.error("❌ Failed to update location for {}", actorId, e))
+                .onErrorReturn(false);
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Mono<Location> getLocation(UUID actorId) {
-        String key = LOCATION_KEY_PREFIX + actorId.toString();
-        return redisTemplate.opsForValue()
-                .get(key)
-                .map(obj -> {
-                    Map<String, Double> coords = (Map<String, Double>) obj;
-                    return new Location(coords.get("lat"), coords.get("lon"));
-                })
-                .doOnError(e -> log.error("Error retrieving location for actor {}", actorId, e))
-                .onErrorResume(e -> Mono.empty());
+        // opsForGeo().position() retourne un Mono<Point> correspondant au membre demandé.
+        // Si le membre n'est pas dans le Set, le Mono est vide.
+        return redisTemplate.opsForGeo()
+                .position(KEY_GEO_LIVE, actorId.toString())
+                .map(p -> new Location(p.getY(), p.getX())); // Point.y = Lat, Point.x = Lon
+    }
+
+    @Override
+    public Flux<GeoResult> findNearbyDrivers(Double latitude, Double longitude, Double radiusKm) {
+        // 1. Définir le point central (Le passager)
+        Point center = new Point(longitude, latitude); // Rappel: Redis c'est (Lon, Lat)
+        
+        // 2. Définir le rayon de recherche
+        // Distance prend (valeur, métrique). KILOMETERS est une constante de Spring Data Redis.
+        Distance radius = new Distance(radiusKm, Metrics.KILOMETERS);
+        
+        // 3. Définir le cercle de recherche
+        org.springframework.data.geo.Circle circle = new org.springframework.data.geo.Circle(center, radius);
+
+        // 4. Configurer la commande Redis (GEOSEARCH)
+        // - includeDistance() : On veut savoir à quelle distance ils sont
+        // - includeCoordinates() : On veut leur position exacte actuelle
+        // - sortAscending() : On veut les plus proches en premier
+        RedisGeoCommands.GeoRadiusCommandArgs args = RedisGeoCommands.GeoRadiusCommandArgs
+                .newGeoRadiusArgs()
+                .includeDistance()
+                .includeCoordinates()
+                .sortAscending();
+
+        // 5. Exécuter la commande
+        return redisTemplate.opsForGeo()
+                .radius(KEY_GEO_LIVE, circle, args)
+                .flatMap(geoResult -> {
+                    // Mapping du résultat Redis (GeoResult<RedisGeoCommands.GeoLocation<Object>>)
+                    // vers notre objet de domaine (LocationCachePort.GeoResult)
+                    
+                    String driverIdStr = (String) geoResult.getContent().getName();
+                    Point driverPoint = geoResult.getContent().getPoint();
+                    double dist = geoResult.getDistance().getValue(); // Distance dans l'unité demandée (km)
+
+                    try {
+                        UUID driverId = UUID.fromString(driverIdStr);
+                        
+                        // Création de notre objet Location interne
+                        Location loc = new Location(driverPoint.getY(), driverPoint.getX()); // Y=Lat, X=Lon
+                        
+                        // Création du résultat final
+                        return Mono.just(new GeoResult(driverId, dist, loc));
+                        
+                    } catch (IllegalArgumentException e) {
+                        log.warn("⚠️ Found invalid UUID in Geo Set: {}", driverIdStr);
+                        return Mono.empty();
+                    }
+                });
+    }
+
+    // --- CacheInvalidationPort Implementation ---
+
+    @Override
+    public Mono<Void> invalidateUserCache(UUID userId) {
+        String userIdStr = userId.toString();
+        String userKey = "user:" + userIdStr;
+
+        log.info("🔥 Invalidating cache for user {}", userId);
+
+        // 1. Supprimer le cache profil utilisateur
+        Mono<Boolean> delUser = redisTemplate.delete(userKey).map(l -> l > 0);
+        
+        // 2. Supprimer de la carte Live (ZREM / GEO REMOVE)
+        // Cela le rend invisible pour la recherche de taxi
+        Mono<Long> delGeo = redisTemplate.opsForGeo().remove(KEY_GEO_LIVE, userIdStr);
+
+        // Note: On NE supprime PAS l'historique (historyKey) ici !
+        // On veut que le Cron puisse le traiter et le dumper en base même si l'user se déconnecte.
+        // L'historique expirera tout seul grâce au TTL si le cron ne passe pas.
+
+        return Mono.when(delUser, delGeo);
     }
 
     // --- OfferCachePort Implementation ---
@@ -102,20 +197,5 @@ public class RedisAdapter
         return redisTemplate.opsForValue()
                 .get("fare:" + fareId)
                 .cast(Fare.class);
-    }
-
-    // --- CacheInvalidationPort Implementation ---
-
-    @Override
-    public Mono<Void> invalidateUserCache(UUID userId) {
-        String userKey = "user:" + userId.toString();
-        String locationKey = LOCATION_KEY_PREFIX + userId.toString();
-
-        log.info("🔥 Invalidating cache for user {}: keys [{}, {}]", userId, userKey, locationKey);
-
-        // Supprime les deux clés de manière réactive
-        return Flux.just(userKey, locationKey)
-                .flatMap(redisTemplate::delete)
-                .then();
     }
 }

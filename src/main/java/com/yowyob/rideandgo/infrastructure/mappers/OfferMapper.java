@@ -15,10 +15,6 @@ public interface OfferMapper {
     @Mapping(target = "version", ignore = true)
     Offer toDomain(OfferEntity entity);
 
-    /**
-     * Mappe la requête de création vers le domaine.
-     * passengerPhone et departureTime sont mappés automatiquement par nom.
-     */
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "bids", ignore = true)
     @Mapping(target = "version", ignore = true)

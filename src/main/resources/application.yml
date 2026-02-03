@@ -71,6 +71,13 @@ spring:
 
 # CUSTOM CONFIG 
 application:
+
+  offer:
+    search-radius-km: 5.0  # Rayon par défaut pour le matching
+
+  trajectory:
+    dump-interval-ms: 600000
+
   auth:
     mode: remote # 'fake' pour ton dev local, 'remote' pour le serveur réel
     url: https://auth-service.pynfi.com

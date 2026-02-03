@@ -8,7 +8,8 @@ INCLUDED_EXTENSIONS = (
     ".yml",
     ".yaml",
     ".txt",
-    "Dockerfile"
+    "Dockerfile",
+    ".sql"
 )
 
 # Dossiers / fichiers à ignorer (par nom ou préfixe)
@@ -88,5 +89,5 @@ def concat_files(root_dir: str, output_file: str):
 # Exemple d'utilisation
 if __name__ == "__main__":
     dossier_source = "."   # racine du projet Spring
-    fichier_sortie = "./spring-project-2.txt"
+    fichier_sortie = "./api.txt"
     concat_files(dossier_source, fichier_sortie)

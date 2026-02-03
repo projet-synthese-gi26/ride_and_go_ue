@@ -34,6 +34,12 @@ public class OfferEntity implements Persistable<UUID> {
     @Column("start_point")
     private String startPoint;
 
+   @Column("start_lat") // ✅ Mapping DB
+    private Double startLat;
+
+    @Column("start_lon") // ✅ Mapping DB
+    private Double startLon;
+
     @Column("end_point")
     private String endPoint;
 
