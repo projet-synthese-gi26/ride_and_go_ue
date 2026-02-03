@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,7 +79,7 @@ public class OfferService implements
     public Mono<Offer> createOffer(Offer request, UUID callerId) {
         return userRepositoryPort.findUserById(callerId)
                 .flatMap(user -> {
-                    // Si le front n'a pas envoyé de numéro spécifique, on prend celui de l'user
+                    // Logique métier : Si pas de numéro tiers, on prend celui du compte
                     String finalPhone = (request.passengerPhone() != null && !request.passengerPhone().isBlank())
                             ? request.passengerPhone()
                             : user.telephone();
@@ -87,24 +88,39 @@ public class OfferService implements
                             .id(Utils.generateUUID())
                             .passengerId(callerId)
                             .startPoint(request.startPoint())
-                            .startLat(request.startLat()) // Coordonnées reçues du front
+                            .startLat(request.startLat())
                             .startLon(request.startLon())
                             .endPoint(request.endPoint())
                             .price(request.price())
-                            .passengerPhone(finalPhone) // ✅
-                            .departureTime(request.departureTime()) // ✅
+                            .passengerPhone(finalPhone)
+                            .departureTime(request.departureTime())
                             .state(OfferState.PENDING)
                             .bids(new ArrayList<>())
                             .build();
 
-                    return repository.save(offer)
-                            .flatMap(saved -> cache.saveInCache(saved).thenReturn(saved))
+                    // On utilise updateOfferState pour la cohérence DB/Redis Geo
+                    return updateOfferState(offer, OfferState.PENDING)
                             .flatMap(saved -> {
-                                // 2. Lancement ASYNCHRONE du matching géo
+                                // Lancement asynchrone du matching
                                 this.notifyNearbyDrivers(saved).subscribe();
                                 return Mono.just(saved);
                             });
                 });
+    }
+
+    private Mono<Offer> updateOfferState(Offer offer, OfferState newState) {
+        Offer updated = offer.withState(newState);
+        return repository.save(updated)
+                .flatMap(saved -> {
+                    // Nettoyage de l'index de recherche si l'offre n'est plus "ouverte"
+                    if (newState != OfferState.PENDING && newState != OfferState.BID_RECEIVED) {
+                        return locationCachePort.removeOfferLocation(saved.id()).thenReturn(saved);
+                    }
+                    // Indexation si l'offre est active
+                    return locationCachePort.saveOfferLocation(saved.id(), saved.startLat(), saved.startLon())
+                            .thenReturn(saved);
+                })
+                .flatMap(saved -> cache.saveInCache(saved).thenReturn(saved));
     }
 
     private Mono<Void> notifyNearbyDrivers(Offer offer) {
@@ -159,9 +175,26 @@ public class OfferService implements
     // ==================================================================================
     @Override
     public Flux<Offer> getAvailableOffers() {
-        return repository.findAll()
-                .filter(o -> o.state() == OfferState.PENDING || o.state() == OfferState.BID_RECEIVED)
-                .flatMap(this::enrichOffer); // ✅ Applique l'enrichissement à chaque offre
+        return ReactiveSecurityContextHolder.getContext()
+                .map(ctx -> UUID.fromString(ctx.getAuthentication().getName()))
+                .flatMapMany(driverId ->
+                // TENTATIVE 1 : Recherche Géo
+                locationCachePort.getLocation(driverId)
+                        .flatMapMany(loc -> {
+                            log.info("📍 Driver {} location found, searching within {}km", driverId, searchRadius);
+                            return locationCachePort.findNearbyOfferIds(loc.latitude(), loc.longitude(), searchRadius)
+                                    .flatMap(repository::findById);
+                        })
+                        // TENTATIVE 2 : Fallback si pas de position ou pas d'offres proches
+                        .switchIfEmpty(Flux.defer(() -> {
+                            log.warn("📡 No location for driver {} or no nearby offers. Falling back to latest offers.",
+                                    driverId);
+                            return repository.findLatestPending(20);
+                        }))
+                        // FILTRAGE & ENRICHISSEMENT (Commun aux deux cas)
+                        .filter(o -> o.state() == OfferState.PENDING || o.state() == OfferState.BID_RECEIVED)
+                        .distinct(Offer::id) // Évite les doublons si une offre est dans les deux flux
+                        .flatMap(this::enrichOffer));
     }
 
     // ==================================================================================
@@ -170,15 +203,16 @@ public class OfferService implements
     @Override
     public Mono<Offer> responseToOffer(UUID offerId, UUID driverId) {
         return ensureUserExistsLocally(driverId)
-                .flatMap(driver -> repository.findById(offerId)
+                .flatMap(driverUser -> repository.findById(offerId)
+                        .switchIfEmpty(Mono.error(new OfferNotFoundException("Offre introuvable")))
                         .flatMap(offer -> paymentPort.getWalletByOwnerId(driverId)
                                 .flatMap(wallet -> {
-                                    // VÉRIFICATION : prix de l'offre * commission-rate < balance
+                                    // VÉRIFICATION COMMISSION : prix * taux < solde
                                     double estimatedCommission = offer.price() * commissionRate;
                                     if (wallet.balance() < estimatedCommission) {
                                         return Mono.error(new IllegalStateException(
-                                                "Insufficient wallet balance to cover commission. Balance: "
-                                                        + wallet.balance()));
+                                                "Solde insuffisant pour couvrir la commission (" + estimatedCommission
+                                                        + " F)."));
                                     }
                                     return Mono.just(offer);
                                 }))
@@ -192,15 +226,15 @@ public class OfferService implements
 
                             log.info("🚀 Driver {} applying to Offer {}.", driverId, offerId);
 
-                            return repository.save(offer.withBids(currentBids).withState(OfferState.BID_RECEIVED))
-                                    .flatMap(s -> cache.saveInCache(s).thenReturn(s))
+                            // Mise à jour de l'état vers BID_RECEIVED
+                            return updateOfferState(offer.withBids(currentBids), OfferState.BID_RECEIVED)
                                     .flatMap(saved -> {
                                         saveAndDispatch(
                                                 saved.passengerId(),
                                                 tmplDriverApplied,
                                                 "Nouvelle candidature",
-                                                driver.name() + " a postulé pour votre course.",
-                                                Map.of("driverName", driver.name(), "offerId", offerId.toString()))
+                                                driverUser.name() + " a postulé pour votre course.",
+                                                Map.of("driverName", driverUser.name(), "offerId", offerId.toString()))
                                                 .subscribe();
                                         return Mono.just(saved);
                                     });
@@ -243,22 +277,19 @@ public class OfferService implements
         return repository.findById(offerId)
                 .switchIfEmpty(Mono.error(new OfferNotFoundException("Offre introuvable")))
                 .flatMap(offer -> {
-                    // 1. Vérifications de sécurité
+                    // Sécurités
                     if (offer.state() != OfferState.DRIVER_SELECTED) {
-                        return Mono.error(
-                                new OfferStatutNotMatchException("L'offre n'est pas en attente de confirmation."));
+                        return Mono.error(new OfferStatutNotMatchException("L'offre n'est plus disponible."));
                     }
                     if (offer.selectedDriverId() == null || !offer.selectedDriverId().equals(driverId)) {
-                        return Mono.error(new IllegalStateException(
-                                "Vous n'êtes pas le chauffeur sélectionné pour cette offre."));
+                        return Mono.error(new IllegalStateException("Vous n'êtes pas le chauffeur sélectionné."));
                     }
 
-                    // 2. Paiement de la commission et Mise à jour de l'Offre
+                    // 1. Paiement effectif de la commission
                     return paymentPort.getWalletByOwnerId(driverId)
                             .flatMap(wallet -> paymentPort.processPayment(wallet.id(), offer.price()))
-                            .then(repository.save(offer.withState(OfferState.VALIDATED))) // ✅ L'OFFRE PASSE EN
-                                                                                          // VALIDATED
-                            .doOnSuccess(savedOffer -> log.info("✅ Offer {} state updated to VALIDATED", offerId))
+                            // 2. Mise à jour de l'Offre vers VALIDATED (Retrait de Redis Geo automatique)
+                            .then(updateOfferState(offer, OfferState.VALIDATED))
                             .thenReturn(offer);
                 })
                 .flatMap(offer -> {
@@ -268,15 +299,14 @@ public class OfferService implements
                             .offerId(offer.id())
                             .passengerId(offer.passengerId())
                             .driverId(driverId)
-                            .distance(0.0) // Sera mis à jour pendant la course
+                            .distance(0.0)
                             .duration(0)
-                            .state(RideState.CREATED) // ✅ LA COURSE DÉBUTE EN 'CREATED'
+                            .state(RideState.CREATED)
                             .build();
 
                     return rideRepositoryPort.save(ride)
                             .flatMap(savedRide -> {
                                 log.info("🚀 Ride created: {}", savedRide.id());
-                                // Notification asynchrone
                                 saveAndDispatch(
                                         offer.passengerId(),
                                         tmplRideConfirmed,
@@ -294,20 +324,24 @@ public class OfferService implements
     // ==================================================================================
     public Mono<Offer> cancelOffer(UUID offerId) {
         return repository.findById(offerId)
+                .switchIfEmpty(Mono.error(new OfferNotFoundException("Offre introuvable")))
                 .flatMap(offer -> {
                     if (offer.state() == OfferState.VALIDATED) {
-                        return Mono.error(new IllegalStateException("Cannot cancel validated offer."));
+                        return Mono.error(new IllegalStateException("Impossible d'annuler une offre déjà validée."));
                     }
-                    Mono<Offer> savedOperation = repository.save(offer.withState(OfferState.CANCELLED));
-                    if (offer.selectedDriverId() != null) {
-                        saveAndDispatch(
-                                offer.selectedDriverId(),
-                                tmplRideCancelled,
-                                "Course annulée",
-                                "Le client a annulé la course.",
-                                Map.of("offerId", offerId.toString())).subscribe();
-                    }
-                    return savedOperation;
+
+                    return updateOfferState(offer, OfferState.CANCELLED)
+                            .flatMap(saved -> {
+                                if (offer.selectedDriverId() != null) {
+                                    saveAndDispatch(
+                                            offer.selectedDriverId(),
+                                            tmplRideCancelled,
+                                            "Course annulée",
+                                            "Le client a annulé la course.",
+                                            Map.of("offerId", offerId.toString())).subscribe();
+                                }
+                                return Mono.just(saved);
+                            });
                 });
     }
 
@@ -434,6 +468,7 @@ public class OfferService implements
      */
     private Mono<Bid> enrichSingleBid(Bid bid, LocationCachePort.Location pLoc) {
         UUID dId = bid.driverId();
+
         return Mono.zip(
                 userRepositoryPort.findUserById(dId),
                 driverRepositoryPort.findById(dId),
@@ -443,23 +478,38 @@ public class OfferService implements
                     Driver driver = tuple.getT2();
                     LocationCachePort.Location dLoc = tuple.getT3();
 
+                    double distance = 0.0;
+                    int eta = 0;
+
+                    // Calcul temps réel si les deux positions sont connues
+                    if (pLoc.latitude() != 0.0 && dLoc.latitude() != 0.0) {
+                        distance = trackingCalculatorService.calculateDistance(
+                                pLoc.latitude(), pLoc.longitude(),
+                                dLoc.latitude(), dLoc.longitude());
+                        eta = trackingCalculatorService.calculateEtaInMinutes(distance);
+                    }
+
+                    final double finalDistance = distance;
+                    final int finalEta = eta;
+
                     return Mono.justOrEmpty(driver.vehicleId())
                             .flatMap(vehicleRepositoryPort::getVehicleById)
                             .defaultIfEmpty(Vehicle.builder().brand("N/A").build())
                             .map(v -> Bid.builder()
                                     .driverId(dId)
                                     .driverName(user.firstName() + " " + user.lastName())
-                                    .driverPhone(user.telephone()) // ✅ AJOUT DU NUMÉRO
+                                    .driverPhone(user.telephone())
                                     .driverPhoto(user.photoUri())
                                     .latitude(dLoc.latitude())
                                     .longitude(dLoc.longitude())
+                                    .distanceToPassenger(finalDistance)
+                                    .eta(finalEta)
                                     .brand(v.brand())
                                     .model(v.vehicleModelId())
                                     .licensePlate(v.registrationNumber())
                                     .build());
                 });
     }
-
     // ==================================================================================
     // CRUD ET GESTION
     // ==================================================================================
@@ -477,7 +527,7 @@ public class OfferService implements
                 .flatMap(this::enrichOffer); // ✅ Enrichit l'offre unique
     }
 
-@Override
+    @Override
     public Mono<Offer> updateOffer(UUID id, Offer offerDetails) {
         return repository.findById(id)
                 .switchIfEmpty(Mono.error(new OfferNotFoundException("Offer not found: " + id)))
@@ -492,29 +542,30 @@ public class OfferService implements
                             // ✅ Update Coordonnées Géo
                             offerDetails.startLat() != null ? offerDetails.startLat() : existingOffer.startLat(),
                             offerDetails.startLon() != null ? offerDetails.startLon() : existingOffer.startLon(),
-                            
+
                             offerDetails.endPoint() != null ? offerDetails.endPoint() : existingOffer.endPoint(),
                             offerDetails.price() > 0 ? offerDetails.price() : existingOffer.price(),
-                            
+
                             // Phone & Time
-                            (offerDetails.passengerPhone() != null && !offerDetails.passengerPhone().isBlank()) 
-                                ? offerDetails.passengerPhone() : existingOffer.passengerPhone(),
-                                
-                            (offerDetails.departureTime() != null && !offerDetails.departureTime().isBlank()) 
-                                ? offerDetails.departureTime() : existingOffer.departureTime(),
-                                
+                            (offerDetails.passengerPhone() != null && !offerDetails.passengerPhone().isBlank())
+                                    ? offerDetails.passengerPhone()
+                                    : existingOffer.passengerPhone(),
+
+                            (offerDetails.departureTime() != null && !offerDetails.departureTime().isBlank())
+                                    ? offerDetails.departureTime()
+                                    : existingOffer.departureTime(),
+
                             existingOffer.state(),
                             existingOffer.bids(),
-                            existingOffer.version()
-                    );
-                    
+                            existingOffer.version());
+
                     log.info("📝 Updating Offer {}: Lat={}, Lon={}", id, updated.startLat(), updated.startLon());
-                    
+
                     return repository.save(updated);
                 })
                 .flatMap(saved -> cache.saveInCache(saved).thenReturn(saved));
     }
-    
+
     @Override
     public Mono<Boolean> deleteOffer(UUID id) {
         return repository.findById(id)

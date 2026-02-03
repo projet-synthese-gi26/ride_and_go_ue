@@ -35,10 +35,12 @@ public class RedisAdapter
     // CLÉ 1 : Le "Live" (Geo Set unique pour tous les drivers)
     // Contient : {Membre: "uuid", Score: GeoHash}
     private static final String KEY_GEO_LIVE = "drivers:geo:live";
-    
+
     // CLÉ 2 : Le "Buffer" (Préfixe pour les listes d'historique)
     // Contient : Liste de strings "lat,lon,timestamp"
     private static final String PREFIX_HISTORY = "history:driver:";
+
+    private static final String KEY_OFFERS_GEO = "offers:geo:pending";
 
     // --- LocationCachePort Implementation ---
 
@@ -46,7 +48,7 @@ public class RedisAdapter
     public Mono<Boolean> saveLocation(UUID actorId, Double latitude, Double longitude) {
         String driverIdStr = actorId.toString();
         // Redis utilise (Longitude, Latitude) pour ses Points
-        Point point = new Point(longitude, latitude); 
+        Point point = new Point(longitude, latitude);
 
         // 1. Mise à jour du Live (GEOADD)
         // Ajoute ou met à jour la position du membre dans le Set géospatial
@@ -60,9 +62,10 @@ public class RedisAdapter
 
         Mono<Long> listPush = redisTemplate.opsForList()
                 .rightPush(historyKey, historyEntry);
-        
+
         // 3. Sécurité : TTL sur la liste d'historique (1h).
-        // Si le Cron plante, ces données seront perdues après 1h mais la RAM sera libérée.
+        // Si le Cron plante, ces données seront perdues après 1h mais la RAM sera
+        // libérée.
         Mono<Boolean> setTtl = redisTemplate.expire(historyKey, Duration.ofHours(1));
 
         // Exécution parallèle (Pipelining)
@@ -74,7 +77,8 @@ public class RedisAdapter
 
     @Override
     public Mono<Location> getLocation(UUID actorId) {
-        // opsForGeo().position() retourne un Mono<Point> correspondant au membre demandé.
+        // opsForGeo().position() retourne un Mono<Point> correspondant au membre
+        // demandé.
         // Si le membre n'est pas dans le Set, le Mono est vide.
         return redisTemplate.opsForGeo()
                 .position(KEY_GEO_LIVE, actorId.toString())
@@ -85,11 +89,12 @@ public class RedisAdapter
     public Flux<GeoResult> findNearbyDrivers(Double latitude, Double longitude, Double radiusKm) {
         // 1. Définir le point central (Le passager)
         Point center = new Point(longitude, latitude); // Rappel: Redis c'est (Lon, Lat)
-        
+
         // 2. Définir le rayon de recherche
-        // Distance prend (valeur, métrique). KILOMETERS est une constante de Spring Data Redis.
+        // Distance prend (valeur, métrique). KILOMETERS est une constante de Spring
+        // Data Redis.
         Distance radius = new Distance(radiusKm, Metrics.KILOMETERS);
-        
+
         // 3. Définir le cercle de recherche
         org.springframework.data.geo.Circle circle = new org.springframework.data.geo.Circle(center, radius);
 
@@ -109,20 +114,20 @@ public class RedisAdapter
                 .flatMap(geoResult -> {
                     // Mapping du résultat Redis (GeoResult<RedisGeoCommands.GeoLocation<Object>>)
                     // vers notre objet de domaine (LocationCachePort.GeoResult)
-                    
+
                     String driverIdStr = (String) geoResult.getContent().getName();
                     Point driverPoint = geoResult.getContent().getPoint();
                     double dist = geoResult.getDistance().getValue(); // Distance dans l'unité demandée (km)
 
                     try {
                         UUID driverId = UUID.fromString(driverIdStr);
-                        
+
                         // Création de notre objet Location interne
                         Location loc = new Location(driverPoint.getY(), driverPoint.getX()); // Y=Lat, X=Lon
-                        
+
                         // Création du résultat final
                         return Mono.just(new GeoResult(driverId, dist, loc));
-                        
+
                     } catch (IllegalArgumentException e) {
                         log.warn("⚠️ Found invalid UUID in Geo Set: {}", driverIdStr);
                         return Mono.empty();
@@ -141,13 +146,14 @@ public class RedisAdapter
 
         // 1. Supprimer le cache profil utilisateur
         Mono<Boolean> delUser = redisTemplate.delete(userKey).map(l -> l > 0);
-        
+
         // 2. Supprimer de la carte Live (ZREM / GEO REMOVE)
         // Cela le rend invisible pour la recherche de taxi
         Mono<Long> delGeo = redisTemplate.opsForGeo().remove(KEY_GEO_LIVE, userIdStr);
 
         // Note: On NE supprime PAS l'historique (historyKey) ici !
-        // On veut que le Cron puisse le traiter et le dumper en base même si l'user se déconnecte.
+        // On veut que le Cron puisse le traiter et le dumper en base même si l'user se
+        // déconnecte.
         // L'historique expirera tout seul grâce au TTL si le cron ne passe pas.
 
         return Mono.when(delUser, delGeo);
@@ -197,5 +203,27 @@ public class RedisAdapter
         return redisTemplate.opsForValue()
                 .get("fare:" + fareId)
                 .cast(Fare.class);
+    }
+
+    @Override
+    public Mono<Void> saveOfferLocation(UUID offerId, Double lat, Double lon) {
+        return redisTemplate.opsForGeo()
+                .add(KEY_OFFERS_GEO, new Point(lon, lat), offerId.toString())
+                .then();
+    }
+
+    @Override
+    public Mono<Void> removeOfferLocation(UUID offerId) {
+        return redisTemplate.opsForGeo()
+                .remove(KEY_OFFERS_GEO, offerId.toString())
+                .then();
+    }
+
+    @Override
+    public Flux<UUID> findNearbyOfferIds(Double lat, Double lon, Double radiusKm) {
+        Circle circle = new Circle(new Point(lon, lat), new Distance(radiusKm, Metrics.KILOMETERS));
+        return redisTemplate.opsForGeo()
+                .radius(KEY_OFFERS_GEO, circle)
+                .map(res -> UUID.fromString(res.getContent().getName().toString()));
     }
 }

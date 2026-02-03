@@ -27,19 +27,19 @@ import java.util.UUID;
 @RequestMapping("/api/v1/offers")
 @Tag(name = "Offer-Controller", description = "Matchmaking workflow")
 public class OfferController {
-    
+
     private final CreateOfferUseCase createOfferUseCase;
     private final GetAvailableOffersUseCase getAvailableOffersUseCase;
     private final ResponseToOfferUseCase responseToOfferUseCase;
     private final SelectDriverUseCase selectDriverUseCase;
-    private final OfferService offerService; 
+    private final OfferService offerService;
     private final RideService rideService; // Injection ajoutée
     private final OfferMapper mapper;
-    private final RideMapper rideMapper; 
+    private final RideMapper rideMapper;
 
     @PostMapping
     @Operation(summary = "Publish an offer (Passenger)")
-    @PreAuthorize("hasAuthority('RIDE_AND_GO_PASSENGER')") 
+    @PreAuthorize("hasAuthority('RIDE_AND_GO_PASSENGER')")
     public Mono<OfferResponse> createOffer(@RequestBody CreateOfferRequest request) {
         // Extraction sécurisée de l'ID du passager depuis le token
         return ReactiveSecurityContextHolder.getContext()
@@ -57,7 +57,7 @@ public class OfferController {
     }
 
     @GetMapping("/available")
-    @Operation(summary = "List pending offers (Driver)")
+    @Operation(summary = "List nearby or latest pending offers (Driver)")
     @PreAuthorize("hasAuthority('RIDE_AND_GO_DRIVER')")
     public Flux<OfferResponse> getAvailable() {
         return getAvailableOffersUseCase.getAvailableOffers().map(mapper::toResponse);
@@ -136,7 +136,7 @@ public class OfferController {
                 .endPoint(request.endPoint())
                 .price(request.price() != null ? request.price() : 0.0)
                 .build();
-        
+
         return offerService.updateOffer(id, domainUpdate).map(mapper::toResponse);
     }
 

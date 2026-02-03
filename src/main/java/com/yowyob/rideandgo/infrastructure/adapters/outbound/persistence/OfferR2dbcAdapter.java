@@ -3,6 +3,7 @@ package com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence;
 import com.yowyob.rideandgo.application.utils.Utils;
 import com.yowyob.rideandgo.domain.model.Bid;
 import com.yowyob.rideandgo.domain.model.Offer;
+import com.yowyob.rideandgo.domain.model.enums.OfferState;
 import com.yowyob.rideandgo.domain.ports.out.OfferRepositoryPort;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.OfferAgreementEntity;
 import com.yowyob.rideandgo.infrastructure.adapters.outbound.persistence.entity.OfferEntity;
@@ -32,13 +33,15 @@ public class OfferR2dbcAdapter implements OfferRepositoryPort {
     @Override
     @Transactional
     public Mono<Offer> save(Offer offer) {
-        log.info("💾 SAVE OFFER: ID={}, Bids Count={}", offer.id(), (offer.bids() != null ? offer.bids().size() : "null"));
-        
+        log.info("💾 SAVE OFFER: ID={}, Bids Count={}", offer.id(),
+                (offer.bids() != null ? offer.bids().size() : "null"));
+
         OfferEntity entity = offerMapper.toEntity(offer);
-        
+
         return offerRepository.existsById(offer.id())
                 .flatMap(exists -> {
-                    if (!exists) entity.setNewEntity(true);
+                    if (!exists)
+                        entity.setNewEntity(true);
                     return offerRepository.save(entity);
                 })
                 .flatMap(savedOffer -> {
@@ -51,21 +54,24 @@ public class OfferR2dbcAdapter implements OfferRepositoryPort {
                             .flatMap(bid -> {
                                 log.debug("Processing bid for driver {}", bid.driverId());
                                 return offerAgreementRepository
-                                    .findByOfferIdAndDriverId(savedOffer.getId(), bid.driverId())
-                                    .doOnNext(found -> log.debug("Bid already exists for driver {}", bid.driverId()))
-                                    .switchIfEmpty(
-                                        Mono.defer(() -> {
-                                            log.info("➕ INSERTING BID: Driver {} -> Offer {}", bid.driverId(), savedOffer.getId());
-                                            OfferAgreementEntity link = new OfferAgreementEntity();
-                                            link.setId(Utils.generateUUID());
-                                            link.setOfferId(savedOffer.getId());
-                                            link.setDriverId(bid.driverId());
-                                            link.asNew();
-                                            return offerAgreementRepository.save(link)
-                                                    .doOnSuccess(s -> log.info("✅ Inserted link ID: {}", s.getId()))
-                                                    .doOnError(e -> log.error("❌ Failed to insert link: {}", e.getMessage()));
-                                        })
-                                    );
+                                        .findByOfferIdAndDriverId(savedOffer.getId(), bid.driverId())
+                                        .doOnNext(
+                                                found -> log.debug("Bid already exists for driver {}", bid.driverId()))
+                                        .switchIfEmpty(
+                                                Mono.defer(() -> {
+                                                    log.info("➕ INSERTING BID: Driver {} -> Offer {}", bid.driverId(),
+                                                            savedOffer.getId());
+                                                    OfferAgreementEntity link = new OfferAgreementEntity();
+                                                    link.setId(Utils.generateUUID());
+                                                    link.setOfferId(savedOffer.getId());
+                                                    link.setDriverId(bid.driverId());
+                                                    link.asNew();
+                                                    return offerAgreementRepository.save(link)
+                                                            .doOnSuccess(
+                                                                    s -> log.info("✅ Inserted link ID: {}", s.getId()))
+                                                            .doOnError(e -> log.error("❌ Failed to insert link: {}",
+                                                                    e.getMessage()));
+                                                }));
                             })
                             .collectList() // Force l'exécution
                             .map(links -> {
@@ -76,8 +82,19 @@ public class OfferR2dbcAdapter implements OfferRepositoryPort {
                 .flatMap(savedOffer -> {
                     // Force reload pour vérifier ce qui a été persisté
                     return findById(savedOffer.getId())
-                           .doOnSuccess(o -> log.info("🔍 Reloaded Offer: Bids Count={}", (o.bids() != null ? o.bids().size() : 0)));
+                            .doOnSuccess(o -> log.info("🔍 Reloaded Offer: Bids Count={}",
+                                    (o.bids() != null ? o.bids().size() : 0)));
                 });
+    }
+
+    @Override
+    public Flux<Offer> findLatestPending(int limit) {
+        return offerRepository.findAll()
+                .filter(o -> o.getState() == OfferState.PENDING || o.getState() == OfferState.BID_RECEIVED)
+                .sort((o1, o2) -> o2.getCreatedDate().compareTo(o1.getCreatedDate()))
+                .take(limit)
+                .flatMap(this::enrichOfferWithAgreements)
+                .map(this::mapToDomainManual);
     }
 
     @Override
@@ -100,7 +117,8 @@ public class OfferR2dbcAdapter implements OfferRepositoryPort {
                 .map(agreements -> {
                     entity.setAgreements(agreements != null ? agreements : Collections.emptyList());
                     // Log debug pour voir si on récupère bien de la base
-                    // if (!entity.getAgreements().isEmpty()) log.debug("DB returned {} agreements for offer {}", entity.getAgreements().size(), entity.getId());
+                    // if (!entity.getAgreements().isEmpty()) log.debug("DB returned {} agreements
+                    // for offer {}", entity.getAgreements().size(), entity.getId());
                     return entity;
                 });
     }

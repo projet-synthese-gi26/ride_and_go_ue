@@ -11,4 +11,5 @@ public interface OfferRepositoryPort {
     Mono<Boolean> exists(Offer offer);
     Mono<Offer> findById(UUID offerId);
     Flux<Offer> findAll(); 
+    Flux<Offer> findLatestPending(int limit);
 }

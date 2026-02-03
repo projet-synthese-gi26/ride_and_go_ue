@@ -21,6 +21,12 @@ public interface LocationCachePort {
      */
     Flux<GeoResult> findNearbyDrivers(Double latitude, Double longitude, Double radiusKm);
 
+    Mono<Void> saveOfferLocation(UUID offerId, Double lat, Double lon);
+
+    Mono<Void> removeOfferLocation(UUID offerId);
+
+    Flux<UUID> findNearbyOfferIds(Double lat, Double lon, Double radiusKm);
+
     // Record simple pour les coordonnées
     record Location(Double latitude, Double longitude) {
     }
