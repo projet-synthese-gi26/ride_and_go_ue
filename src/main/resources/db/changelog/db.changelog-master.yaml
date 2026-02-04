@@ -45,3 +45,6 @@ databaseChangeLog:
 
   - include:
       file: db/changelog/changes/014-add-offer-coordinates.sql
+
+  - include:
+      file: db/changelog/changes/015-add-offer-end-coordinates.sql
