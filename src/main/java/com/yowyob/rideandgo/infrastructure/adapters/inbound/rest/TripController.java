@@ -7,6 +7,9 @@ import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.RideRespons
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.RideTrackingResponse;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.UpdateStatusRequest;
 import com.yowyob.rideandgo.infrastructure.mappers.RideMapper;
+import com.yowyob.rideandgo.application.service.TrajectoryService;
+import com.yowyob.rideandgo.domain.model.DriverTrajectory;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +29,7 @@ public class TripController {
     private final RideService rideService;
     private final GetRideLocationUseCase getRideLocationUseCase;
     private final RideMapper rideMapper;
+    private final TrajectoryService trajectoryService;
 
     @GetMapping("/history")
     @Operation(summary = "Get my ride history")
@@ -92,5 +96,17 @@ public class TripController {
         return ReactiveSecurityContextHolder.getContext()
                 .map(SecurityContext::getAuthentication)
                 .flatMap(auth -> getRideLocationUseCase.getPartnerLocation(id, UUID.fromString(auth.getName())));
+    }
+
+    @GetMapping("/trajectories/me")
+    @Operation(summary = "Get my movement history (Segments)", description = "Returns all 10-min trajectory segments for the connected driver.")
+    @PreAuthorize("hasAuthority('RIDE_AND_GO_DRIVER')")
+    public Flux<DriverTrajectory> getMyTrajectories() {
+        return ReactiveSecurityContextHolder.getContext()
+                .map(SecurityContext::getAuthentication)
+                .flatMapMany(auth -> {
+                    UUID driverId = UUID.fromString(auth.getName());
+                    return trajectoryService.getMyTrajectories(driverId);
+                });
     }
 }
