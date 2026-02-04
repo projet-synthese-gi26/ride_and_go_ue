@@ -93,6 +93,8 @@ public class OfferService implements
                             .startLat(request.startLat())
                             .startLon(request.startLon())
                             .endPoint(request.endPoint())
+                            .endLat(request.endLat())
+                            .endLon(request.endLon())
                             .price(request.price())
                             .passengerPhone(finalPhone)
                             .departureTime(request.departureTime())

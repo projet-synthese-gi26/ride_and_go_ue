@@ -146,9 +146,10 @@ resilience4j:
       # Config pour le service de prix
       fare-calculator-service:
         failureRateThreshold: 50
-        waitDurationInOpenState: 10s
+        waitDurationInOpenState: 100s
         slidingWindowSize: 10
-        permittedNumberOfCallsInHalfOpenState: 3
+        permittedNumberOfCallsInHalfOpenState: 10
+
       # Config pour le service auth (si besoin)
       auth-service:
         failureRateThreshold: 50
@@ -159,6 +160,6 @@ resilience4j:
   timelimiter:
     instances:
       fare-calculator-service:
-        timeoutDuration: 20s  
+        timeoutDuration: 100s  
       auth-service:
         timeoutDuration: 20s
