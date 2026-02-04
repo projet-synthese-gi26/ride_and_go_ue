@@ -6,9 +6,11 @@ import java.util.UUID;
 
 public record CreateOfferRequest(
         String startPoint,
+        Double startLat, // ✅ AJOUTÉ
+        Double startLon, // ✅ AJOUTÉ
         String endPoint,
         double price,
-        String passengerPhone, // Optionnel, si vide = soi-même
-        String departureTime // ISO String ou Format texte
+        String passengerPhone, 
+        String departureTime 
 ) {
 }

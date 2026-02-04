@@ -9,11 +9,13 @@ import com.yowyob.rideandgo.domain.model.enums.OfferState;
 import com.yowyob.rideandgo.domain.model.enums.RideState;
 import com.yowyob.rideandgo.domain.ports.in.*;
 import com.yowyob.rideandgo.domain.ports.out.*;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.LandingOfferResponse;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.NotificationType;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.SendNotificationRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -126,42 +128,72 @@ public class OfferService implements
     private Mono<Void> notifyNearbyDrivers(Offer offer) {
         log.info("🎯 Start matching for Offer {} in radius {}km", offer.id(), searchRadius);
 
-        // 1. Trouver les IDs des chauffeurs dans le rayon Redis Geo
+        // 1. Trouver les chauffeurs éligibles (On récupère l'objet User complet)
         return locationCachePort.findNearbyDrivers(offer.startLat(), offer.startLon(), searchRadius)
                 .flatMap(geoResult -> {
                     UUID driverId = geoResult.driverId();
-
-                    // 2. Pour chaque chauffeur proche, vérifier les critères métier (DB)
                     return driverRepositoryPort.findById(driverId)
                             .filter(d -> d.isOnline() && d.isProfileValidated())
                             .flatMap(driver -> paymentPort.getWalletByOwnerId(driverId)
                                     .filter(wallet -> wallet.balance() >= (offer.price() * commissionRate))
-                                    .flatMap(wallet -> userRepositoryPort.findUserById(driverId))
-                                    .map(User::email));
+                                    .flatMap(wallet -> userRepositoryPort.findUserById(driverId))); // On retourne le
+                                                                                                    // User
                 })
                 .collectList()
-                .flatMap(emails -> {
-                    if (emails.isEmpty()) {
+                .flatMap(users -> {
+                    if (users.isEmpty()) {
                         log.warn("⚠️ No eligible drivers found within {}km for offer {}", searchRadius, offer.id());
                         return Mono.empty();
                     }
 
-                    log.info("📢 Notifying {} nearby drivers for offer {}", emails.size(), offer.id());
+                    log.info("📢 Notifying {} nearby drivers for offer {}", users.size(), offer.id());
 
                     Map<String, String> data = Map.of(
                             "offerId", offer.id().toString(),
                             "price", String.valueOf(offer.price()),
                             "start", offer.startPoint());
 
-                    return sendNotificationPort.sendNotification(
+                    // 2. Préparer la liste des emails pour l'envoi groupé
+                    List<String> emails = new ArrayList<>();
+
+                    // 3. Préparer les sauvegardes en base (Historique)
+                    List<Mono<Void>> historySaves = new ArrayList<>();
+
+                    String json = "{}";
+                    try {
+                        json = objectMapper.writeValueAsString(data);
+                    } catch (Exception e) {
+                    }
+
+                    for (User user : users) {
+                        emails.add(user.email());
+
+                        // Création de l'entrée historique pour CHAQUE chauffeur
+                        Notification history = Notification.builder()
+                                .id(Utils.generateUUID())
+                                .userId(user.id())
+                                .title("Nouvelle course disponible")
+                                .message("Une course de " + offer.price() + " F est disponible à " + offer.startPoint())
+                                .type("OFFER")
+                                .isRead(false)
+                                .dataJson(json)
+                                .build();
+
+                        historySaves.add(historyRepositoryPort.save(history));
+                    }
+
+                    // 4. Exécuter : Sauvegarde Historique (Parallèle) ET Envoi Push (Groupé)
+                    Mono<Boolean> sendTask = sendNotificationPort.sendNotification(
                             SendNotificationRequest.builder()
                                     .notificationType(NotificationType.EMAIL)
                                     .templateId(tmplNewOffer)
                                     .to(emails)
                                     .data(data)
                                     .build());
-                })
-                .then();
+
+                    // On lance tout en même temps
+                    return Flux.merge(historySaves).then(sendTask).then();
+                });
     }
 
     private Mono<User> ensureUserExistsLocally(UUID userId) {
@@ -196,6 +228,21 @@ public class OfferService implements
                         .distinct(Offer::id) // Évite les doublons si une offre est dans les deux flux
                         .flatMap(this::enrichOffer));
     }
+
+public Flux<LandingOfferResponse> getLatestPublicOffers(int limit) {
+    return repository.findLatestPending(limit)
+            .map(offer -> new LandingOfferResponse(
+                    offer.startPoint(),
+                    offer.endPoint(),
+                    offer.startLat(),
+                    offer.startLon(),
+                    offer.price(),
+                    offer.departureTime(),
+                    // On récupère la date de création depuis le domaine
+                    // Note: Assure-toi que ton OfferMapper mappe bien createdDate vers createdAt
+                    LocalDateTime.now() // LocalDateTime.now() // Par défaut si null, mais utilise offer.createdAt()
+            ));
+}
 
     // ==================================================================================
     // 3. CANDIDATURE (CHAUFFEUR)
@@ -435,12 +482,14 @@ public class OfferService implements
             return Mono.just(offer);
         }
 
-        return locationCachePort.getLocation(offer.passengerId())
-                .defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0))
-                .flatMap(pLoc -> Flux.fromIterable(offer.bids())
-                        .flatMap(bid -> enrichSingleBid(bid, pLoc))
-                        .collectList()
-                        .map(offer::withBids));
+        LocationCachePort.Location offerStartLoc = new LocationCachePort.Location(
+                offer.startLat() != null ? offer.startLat() : 0.0,
+                offer.startLon() != null ? offer.startLon() : 0.0);
+
+        return Flux.fromIterable(offer.bids())
+                .flatMap(bid -> enrichSingleBid(bid, offerStartLoc))
+                .collectList()
+                .map(offer::withBids);
     }
 
     // ==================================================================================
@@ -453,13 +502,15 @@ public class OfferService implements
                     if (offer.bids() == null || offer.bids().isEmpty())
                         return Mono.just(offer);
 
-                    // 1. Récupérer la position du passager (point de départ) pour calculs
-                    return locationCachePort.getLocation(offer.passengerId())
-                            .defaultIfEmpty(new LocationCachePort.Location(0.0, 0.0))
-                            .flatMap(pLoc -> Flux.fromIterable(offer.bids())
-                                    .flatMap(bid -> enrichSingleBid(bid, pLoc))
-                                    .collectList()
-                                    .map(offer::withBids));
+                    // CORRECTION ICI AUSSI
+                    LocationCachePort.Location offerStartLoc = new LocationCachePort.Location(
+                            offer.startLat() != null ? offer.startLat() : 0.0,
+                            offer.startLon() != null ? offer.startLon() : 0.0);
+
+                    return Flux.fromIterable(offer.bids())
+                            .flatMap(bid -> enrichSingleBid(bid, offerStartLoc))
+                            .collectList()
+                            .map(offer::withBids);
                 });
     }
 

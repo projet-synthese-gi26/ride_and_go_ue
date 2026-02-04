@@ -12,6 +12,8 @@ public record OfferResponse(
         UUID passengerId,
         UUID selectedDriverId,
         String startPoint,
+        Double startLat, // ✅ AJOUTÉ
+        Double startLon, // ✅ AJOUTÉ
         String endPoint,
         double price,
         String passengerPhone,

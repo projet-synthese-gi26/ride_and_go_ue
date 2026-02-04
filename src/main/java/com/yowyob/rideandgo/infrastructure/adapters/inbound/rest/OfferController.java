@@ -2,6 +2,7 @@ package com.yowyob.rideandgo.infrastructure.adapters.inbound.rest;
 
 import com.yowyob.rideandgo.domain.ports.in.*;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.CreateOfferRequest;
+import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.LandingOfferResponse;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.OfferResponse;
 import com.yowyob.rideandgo.infrastructure.adapters.inbound.rest.dto.RideResponse;
 import com.yowyob.rideandgo.infrastructure.mappers.OfferMapper;
@@ -36,6 +37,12 @@ public class OfferController {
     private final RideService rideService; // Injection ajoutée
     private final OfferMapper mapper;
     private final RideMapper rideMapper;
+
+    @GetMapping("/landing")
+    @Operation(summary = "Get latest anonymized offers for landing page")
+    public Flux<LandingOfferResponse> getPublicOffers(@RequestParam(defaultValue = "10") int limit) {
+        return offerService.getLatestPublicOffers(limit);
+    }
 
     @PostMapping
     @Operation(summary = "Publish an offer (Passenger)")
