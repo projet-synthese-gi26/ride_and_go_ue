@@ -15,6 +15,8 @@ public record OfferResponse(
         Double startLat, // ✅ AJOUTÉ
         Double startLon, // ✅ AJOUTÉ
         String endPoint,
+        String endLat, // ✅ Pour dessiner la ligne d'arrivée sur la map
+        String endLon, // ✅
         double price,
         String passengerPhone,
         String departureTime,
