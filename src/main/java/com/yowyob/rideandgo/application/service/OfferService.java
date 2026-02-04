@@ -226,7 +226,7 @@ public class OfferService implements
                         // FILTRAGE & ENRICHISSEMENT (Commun aux deux cas)
                         .filter(o -> o.state() == OfferState.PENDING || o.state() == OfferState.BID_RECEIVED)
                         .distinct(Offer::id) // Évite les doublons si une offre est dans les deux flux
-                        .flatMap(this::enrichOffer));
+                        .flatMap(this::enrichOffer)); 
     }
 
     public Flux<LandingOfferResponse> getLatestPublicOffers(int limit) {
