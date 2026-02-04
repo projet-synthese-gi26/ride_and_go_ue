@@ -5,9 +5,11 @@ import java.time.LocalDateTime;
 public record LandingOfferResponse(
     String startPoint,
     String endPoint,
-    Double startLat,    // ✅ Pour afficher un point sur la carte
-    Double startLon,    // ✅ Pour afficher un point sur la carte
+    Double startLat,
+    Double startLon,
+    Double endLat, // ✅ Pour dessiner la ligne d'arrivée sur la map
+    Double endLon, // ✅
     double price,
     String departureTime,
-    LocalDateTime createdAt // ✅ Le front calculera "Il y a X min" lui-même
+    LocalDateTime createdAt
 ) {}

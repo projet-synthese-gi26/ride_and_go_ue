@@ -43,6 +43,12 @@ public class OfferEntity implements Persistable<UUID> {
     @Column("end_point")
     private String endPoint;
 
+    @Column("end_lat")
+    private Double endLat;
+
+    @Column("end_lon")
+    private Double endLon;
+
     private double price;
 
     @Column("state")

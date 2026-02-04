@@ -229,20 +229,22 @@ public class OfferService implements
                         .flatMap(this::enrichOffer));
     }
 
-public Flux<LandingOfferResponse> getLatestPublicOffers(int limit) {
-    return repository.findLatestPending(limit)
-            .map(offer -> new LandingOfferResponse(
-                    offer.startPoint(),
-                    offer.endPoint(),
-                    offer.startLat(),
-                    offer.startLon(),
-                    offer.price(),
-                    offer.departureTime(),
-                    // On récupère la date de création depuis le domaine
-                    // Note: Assure-toi que ton OfferMapper mappe bien createdDate vers createdAt
-                    LocalDateTime.now() // LocalDateTime.now() // Par défaut si null, mais utilise offer.createdAt()
-            ));
-}
+    public Flux<LandingOfferResponse> getLatestPublicOffers(int limit) {
+        return repository.findLatestPending(limit)
+                .map(offer -> new LandingOfferResponse(
+                        offer.startPoint(),
+                        offer.endPoint(),
+                        offer.startLat(),
+                        offer.startLon(),
+                        offer.endLat(), // ✅ Pour dessiner la ligne d'arrivée sur la map
+                        offer.endLon(), // ✅
+                        offer.price(),
+                        offer.departureTime(),
+                        // On récupère la date de création depuis le domaine
+                        // Note: Assure-toi que ton OfferMapper mappe bien createdDate vers createdAt
+                        LocalDateTime.now() // LocalDateTime.now() // Par défaut si null, mais utilise offer.createdAt()
+                ));
+    }
 
     // ==================================================================================
     // 3. CANDIDATURE (CHAUFFEUR)
@@ -582,36 +584,27 @@ public Flux<LandingOfferResponse> getLatestPublicOffers(int limit) {
     public Mono<Offer> updateOffer(UUID id, Offer offerDetails) {
         return repository.findById(id)
                 .switchIfEmpty(Mono.error(new OfferNotFoundException("Offer not found: " + id)))
-                .flatMap(existingOffer -> {
-                    // Construction de l'offre mise à jour
+                .flatMap(existing -> {
                     Offer updated = new Offer(
-                            existingOffer.id(),
-                            existingOffer.passengerId(),
-                            existingOffer.selectedDriverId(),
-                            // Update Point Nom
-                            offerDetails.startPoint() != null ? offerDetails.startPoint() : existingOffer.startPoint(),
-                            // ✅ Update Coordonnées Géo
-                            offerDetails.startLat() != null ? offerDetails.startLat() : existingOffer.startLat(),
-                            offerDetails.startLon() != null ? offerDetails.startLon() : existingOffer.startLon(),
-
-                            offerDetails.endPoint() != null ? offerDetails.endPoint() : existingOffer.endPoint(),
-                            offerDetails.price() > 0 ? offerDetails.price() : existingOffer.price(),
-
-                            // Phone & Time
-                            (offerDetails.passengerPhone() != null && !offerDetails.passengerPhone().isBlank())
-                                    ? offerDetails.passengerPhone()
-                                    : existingOffer.passengerPhone(),
-
-                            (offerDetails.departureTime() != null && !offerDetails.departureTime().isBlank())
-                                    ? offerDetails.departureTime()
-                                    : existingOffer.departureTime(),
-
-                            existingOffer.state(),
-                            existingOffer.bids(),
-                            existingOffer.version());
-
-                    log.info("📝 Updating Offer {}: Lat={}, Lon={}", id, updated.startLat(), updated.startLon());
-
+                            existing.id(),
+                            existing.passengerId(),
+                            existing.selectedDriverId(),
+                            offerDetails.startPoint() != null ? offerDetails.startPoint() : existing.startPoint(),
+                            offerDetails.startLat() != null ? offerDetails.startLat() : existing.startLat(),
+                            offerDetails.startLon() != null ? offerDetails.startLon() : existing.startLon(),
+                            offerDetails.endPoint() != null ? offerDetails.endPoint() : existing.endPoint(),
+                            // ✅ Gestion des nouvelles coordonnées d'arrivée
+                            offerDetails.endLat() != null ? offerDetails.endLat() : existing.endLat(),
+                            offerDetails.endLon() != null ? offerDetails.endLon() : existing.endLon(),
+                            offerDetails.price() > 0 ? offerDetails.price() : existing.price(),
+                            offerDetails.passengerPhone() != null ? offerDetails.passengerPhone()
+                                    : existing.passengerPhone(),
+                            offerDetails.departureTime() != null ? offerDetails.departureTime()
+                                    : existing.departureTime(),
+                            existing.state(),
+                            existing.bids(),
+                            existing.version(),
+                            existing.createdAt());
                     return repository.save(updated);
                 })
                 .flatMap(saved -> cache.saveInCache(saved).thenReturn(saved));
