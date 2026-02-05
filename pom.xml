@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" 
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    
+
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.2.6</version>
-        <relativePath/>
+        <relativePath />
     </parent>
-    
+
     <groupId>com.yowyob</groupId>
     <artifactId>reactive-hexagonal</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>ride-and-go</name>
     <description>API Ride and Go - Marketplace de transport urbain</description>
-    
+
     <properties>
         <java.version>21</java.version>
         <spring-cloud.version>2023.0.0</spring-cloud.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
     </properties>
-    
+
     <dependencies>
         <!-- REACTIVE CORE -->
         <dependency>
@@ -47,18 +47,18 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-r2dbc</artifactId>
         </dependency>
-        
+
         <!-- JDBC Driver requis pour Liquibase -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
         </dependency>
-        
+
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>r2dbc-postgresql</artifactId>
         </dependency>
-        
+
         <!-- LIQUIBASE (Migration DB) -->
         <dependency>
             <groupId>org.liquibase</groupId>
@@ -98,7 +98,7 @@
             <artifactId>mapstruct</artifactId>
             <version>${mapstruct.version}</version>
         </dependency>
-        
+
         <!-- Docker Compose -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -106,7 +106,7 @@
             <scope>runtime</scope>
             <optional>true</optional>
         </dependency>
-        
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -125,7 +125,7 @@
             <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
             <version>2.5.0</version>
         </dependency>
-        
+
         <!-- SPRING SECURITY -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -162,6 +162,16 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>rewrite-maven-plugin</artifactId>
+                <version>6.28.1</version>
+                <configuration>
+                    <activeRecipes>
+                        <recipe>com.yowyob.RefactorArchitecture</recipe>
+                    </activeRecipes>
                 </configuration>
             </plugin>
             <plugin>
