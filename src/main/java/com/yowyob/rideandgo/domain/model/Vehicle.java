@@ -25,17 +25,32 @@ public record Vehicle(
     String registrationNumber, // Plaque d'immatriculation
     String registrationPhoto,  // URL
 
-    // Capacités et caractéristiques
-    int tankCapacity,
-    int luggageMaxCapacity,
+    // Capacités et caractéristiques (Alignés avec les doubles de l'API)
+    double tankCapacity,
+    double luggageMaxCapacity,
     int totalSeatNumber,
     double averageFuelConsumptionPerKm,
-    int mileageAtStart,
-    int mileageSinceCommissioning,
-    int vehicleAgeAtStart,
+    double mileageAtStart,
+    double mileageSinceCommissioning,
+    double vehicleAgeAtStart,
     
     // Champ redondant mais présent
     String brand,
 
-    List<String> illustrationImages
+    List<String> illustrationImages,
+
+    // --- NOUVEAUX CHAMPS D'EQUIPEMENT ---
+    boolean airConditioned,
+    boolean comfortable,
+    boolean soft,
+    boolean screen,
+    boolean wifi,
+    boolean tollCharge,
+    boolean carParking,
+    boolean alarm,
+    boolean stateTax,
+    boolean driverAllowance,
+    boolean pickupAndDrop,
+    boolean internet,
+    boolean petsAllow
 ) {}

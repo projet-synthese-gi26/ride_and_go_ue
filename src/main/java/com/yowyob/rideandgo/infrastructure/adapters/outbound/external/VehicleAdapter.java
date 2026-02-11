@@ -43,9 +43,22 @@ public class VehicleAdapter implements VehicleRepositoryPort {
                                 domain.totalSeatNumber(),
                                 domain.averageFuelConsumptionPerKm(),
                                 domain.mileageAtStart(),
-                                (double) domain.mileageSinceCommissioning(),
-                                (double) domain.vehicleAgeAtStart(),
-                                domain.brand());
+                                domain.mileageSinceCommissioning(),
+                                domain.vehicleAgeAtStart(),
+                                domain.brand(),
+                                domain.airConditioned(),
+                                domain.comfortable(),
+                                domain.soft(),
+                                domain.screen(),
+                                domain.wifi(),
+                                domain.tollCharge(),
+                                domain.carParking(),
+                                domain.alarm(),
+                                domain.stateTax(),
+                                domain.driverAllowance(),
+                                domain.pickupAndDrop(),
+                                domain.internet(),
+                                domain.petsAllow());
 
                 return client.createVehicleSimplified(request)
                                 .map(res -> this.mapResponseToDomain(res, Collections.emptyList()))
@@ -54,7 +67,6 @@ public class VehicleAdapter implements VehicleRepositoryPort {
 
         @Override
         public Mono<Vehicle> getVehicleById(UUID vehicleId) {
-                // ✅ AJOUT DE LA GARDE
                 if (vehicleId == null) {
                         log.warn("⚠️ Attempted to fetch vehicle with NULL ID");
                         return Mono.empty();
@@ -93,10 +105,22 @@ public class VehicleAdapter implements VehicleRepositoryPort {
                                 partial.averageFuelConsumptionPerKm() > 0 ? partial.averageFuelConsumptionPerKm()
                                                 : null,
                                 partial.mileageAtStart() > 0 ? partial.mileageAtStart() : null,
-                                partial.mileageSinceCommissioning() > 0 ? (double) partial.mileageSinceCommissioning()
-                                                : null,
-                                partial.vehicleAgeAtStart() > 0 ? (double) partial.vehicleAgeAtStart() : null,
-                                partial.brand());
+                                partial.mileageSinceCommissioning() > 0 ? partial.mileageSinceCommissioning() : null,
+                                partial.vehicleAgeAtStart() > 0 ? partial.vehicleAgeAtStart() : null,
+                                partial.brand(),
+                                partial.airConditioned(),
+                                partial.comfortable(),
+                                partial.soft(),
+                                partial.screen(),
+                                partial.wifi(),
+                                partial.tollCharge(),
+                                partial.carParking(),
+                                partial.alarm(),
+                                partial.stateTax(),
+                                partial.driverAllowance(),
+                                partial.pickupAndDrop(),
+                                partial.internet(),
+                                partial.petsAllow());
 
                 return client.patchVehicle(vehicleId.toString(), request)
                                 .flatMap(res -> this.getVehicleImages(vehicleId).collectList()
@@ -134,11 +158,8 @@ public class VehicleAdapter implements VehicleRepositoryPort {
                                 });
         }
 
-        // --- HELPERS ---
-
         @Override
         public Mono<Void> cacheVehicle(Vehicle vehicle) {
-                // Désactivé comme demandé
                 return Mono.empty();
         }
 
@@ -161,10 +182,23 @@ public class VehicleAdapter implements VehicleRepositoryPort {
                                 res.totalSeatNumber(),
                                 res.averageFuelConsumptionPerKm(),
                                 res.mileageAtStart(),
-                                (int) res.mileageSinceCommissioning(),
-                                (int) res.vehicleAgeAtStart(),
+                                res.mileageSinceCommissioning(),
+                                res.vehicleAgeAtStart(),
                                 res.brand(),
-                                images);
+                                images,
+                                res.airConditioned(),
+                                res.comfortable(),
+                                res.soft(),
+                                res.screen(),
+                                res.wifi(),
+                                res.tollCharge(),
+                                res.carParking(),
+                                res.alarm(),
+                                res.stateTax(),
+                                res.driverAllowance(),
+                                res.pickupAndDrop(),
+                                res.internet(),
+                                res.petsAllow());
         }
 
         private MultiValueMap<String, ?> buildMultipart(FilePart file, String keyName) {

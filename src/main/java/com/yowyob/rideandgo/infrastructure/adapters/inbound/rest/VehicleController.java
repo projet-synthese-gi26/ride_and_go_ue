@@ -56,7 +56,7 @@ public class VehicleController {
     @PatchMapping("/{id}")
     @Operation(summary = "Patch Vehicle", description = "Update specific fields of a vehicle.")
     public Mono<Vehicle> patchVehicle(@PathVariable UUID id,
-            @org.springframework.web.bind.annotation.RequestBody UpdateVehicleDto dto) {
+            @RequestBody UpdateVehicleDto dto) {
         // Mapping partiel : on ne mappe que ce qui est présent
         Vehicle partial = Vehicle.builder()
                 .vehicleMakeId(dto.makeName())
@@ -68,16 +68,29 @@ public class VehicleController {
                 .fuelTypeId(dto.fuelTypeName())
                 .vehicleSerialNumber(dto.vehicleSerialNumber())
                 .registrationNumber(dto.registrationNumber())
-                .tankCapacity(dto.tankCapacity() != null ? dto.tankCapacity() : 0)
-                .luggageMaxCapacity(dto.luggageMaxCapacity() != null ? dto.luggageMaxCapacity() : 0)
+                .tankCapacity(dto.tankCapacity() != null ? dto.tankCapacity() : 0.0)
+                .luggageMaxCapacity(dto.luggageMaxCapacity() != null ? dto.luggageMaxCapacity() : 0.0)
                 .totalSeatNumber(dto.totalSeatNumber() != null ? dto.totalSeatNumber() : 0)
                 .averageFuelConsumptionPerKm(
                         dto.averageFuelConsumptionPerKm() != null ? dto.averageFuelConsumptionPerKm() : 0.0)
-                .mileageAtStart(dto.mileageAtStart() != null ? dto.mileageAtStart() : 0)
+                .mileageAtStart(dto.mileageAtStart() != null ? dto.mileageAtStart() : 0.0)
                 .mileageSinceCommissioning(
-                        dto.mileageSinceCommissioning() != null ? dto.mileageSinceCommissioning() : 0)
-                .vehicleAgeAtStart(dto.vehicleAgeAtStart() != null ? dto.vehicleAgeAtStart() : 0)
-                .brand(dto.makeName()) // Fallback
+                        dto.mileageSinceCommissioning() != null ? dto.mileageSinceCommissioning() : 0.0)
+                .vehicleAgeAtStart(dto.vehicleAgeAtStart() != null ? dto.vehicleAgeAtStart() : 0.0)
+                .brand(dto.makeName())
+                .airConditioned(dto.airConditioned() != null ? dto.airConditioned() : false)
+                .comfortable(dto.comfortable() != null ? dto.comfortable() : false)
+                .soft(dto.soft() != null ? dto.soft() : false)
+                .screen(dto.screen() != null ? dto.screen() : false)
+                .wifi(dto.wifi() != null ? dto.wifi() : false)
+                .tollCharge(dto.tollCharge() != null ? dto.tollCharge() : false)
+                .carParking(dto.carParking() != null ? dto.carParking() : false)
+                .alarm(dto.alarm() != null ? dto.alarm() : false)
+                .stateTax(dto.stateTax() != null ? dto.stateTax() : false)
+                .driverAllowance(dto.driverAllowance() != null ? dto.driverAllowance() : false)
+                .pickupAndDrop(dto.pickupAndDrop() != null ? dto.pickupAndDrop() : false)
+                .internet(dto.internet() != null ? dto.internet() : false)
+                .petsAllow(dto.petsAllow() != null ? dto.petsAllow() : false)
                 .build();
 
         return vehicleService.patchVehicle(id, partial);
@@ -103,9 +116,8 @@ public class VehicleController {
     @Operation(summary = "Update Registration Photo")
     public Mono<Vehicle> updateRegistrationDoc(@PathVariable UUID id, @RequestPart("file") FilePart file) {
         return vehicleService.createVehicleWithDocuments(
-                Vehicle.builder().id(id).build(), // Dummy vehicle just to carry ID if needed, or implement direct
-                                                  // method in service
-                file, null).flatMap(v -> vehicleService.getVehicleById(id)); // Reload fresh
+                Vehicle.builder().id(id).build(),
+                file, null).flatMap(v -> vehicleService.getVehicleById(id));
     }
 
     @PutMapping(value = "/{id}/documents/serial", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -114,28 +126,5 @@ public class VehicleController {
         return vehicleService.createVehicleWithDocuments(
                 Vehicle.builder().id(id).build(),
                 null, file).flatMap(v -> vehicleService.getVehicleById(id));
-    }
-
-    // --- HELPER MAPPER ---
-    private Vehicle mapRequestToDomain(BecomeDriverRequest.VehicleInfo info) {
-        return Vehicle.builder()
-                .vehicleMakeId(info.makeName())
-                .vehicleModelId(info.modelName())
-                .transmissionTypeId(info.transmissionType())
-                .manufacturerId(info.manufacturerName())
-                .vehicleSizeId(info.sizeName())
-                .vehicleTypeId(info.typeName())
-                .fuelTypeId(info.fuelTypeName())
-                .vehicleSerialNumber(info.vehicleSerialNumber())
-                .registrationNumber(info.registrationNumber())
-                .tankCapacity(info.tankCapacity())
-                .luggageMaxCapacity(info.luggageMaxCapacity())
-                .totalSeatNumber(info.totalSeatNumber())
-                .averageFuelConsumptionPerKm(info.averageFuelConsumptionPerKm())
-                .mileageAtStart(info.mileageAtStart())
-                .mileageSinceCommissioning((int) info.mileageSinceCommissioning())
-                .vehicleAgeAtStart((int) info.vehicleAgeAtStart())
-                .brand(info.makeName())
-                .build();
     }
 }

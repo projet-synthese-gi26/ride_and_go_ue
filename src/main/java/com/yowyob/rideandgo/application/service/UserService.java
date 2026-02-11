@@ -158,9 +158,22 @@ public class UserService implements UserUseCases {
                             .totalSeatNumber(vInfo.totalSeatNumber())
                             .averageFuelConsumptionPerKm(vInfo.averageFuelConsumptionPerKm())
                             .mileageAtStart(vInfo.mileageAtStart())
-                            .mileageSinceCommissioning((int) vInfo.mileageSinceCommissioning())
-                            .vehicleAgeAtStart((int) vInfo.vehicleAgeAtStart())
+                            .mileageSinceCommissioning(vInfo.mileageSinceCommissioning())
+                            .vehicleAgeAtStart(vInfo.vehicleAgeAtStart())
                             .brand(vInfo.makeName())
+                            .airConditioned(vInfo.airConditioned())
+                            .comfortable(vInfo.comfortable())
+                            .soft(vInfo.soft())
+                            .screen(vInfo.screen())
+                            .wifi(vInfo.wifi())
+                            .tollCharge(vInfo.tollCharge())
+                            .carParking(vInfo.carParking())
+                            .alarm(vInfo.alarm())
+                            .stateTax(vInfo.stateTax())
+                            .driverAllowance(vInfo.driverAllowance())
+                            .pickupAndDrop(vInfo.pickupAndDrop())
+                            .internet(vInfo.internet())
+                            .petsAllow(vInfo.petsAllow())
                             .build();
 
                     return vehicleRepositoryPort.createVehicle(vehicleDomain)
@@ -189,10 +202,8 @@ public class UserService implements UserUseCases {
 
                                 return driverRepositoryPort.save(newDriver)
                                         .flatMap(savedDriver ->
-                                // ✅ VÉRIFICATION WALLET EXISTANT
                                 paymentPort.getWalletByOwnerId(userId)
-                                        .doOnSuccess(w -> log.info(
-                                                "💳 Wallet already exists for driver {}, skipping creation.", userId))
+                                        .doOnSuccess(w -> log.info("💳 Wallet already exists for driver {}, skipping creation.", userId))
                                         .onErrorResume(WalletNotFoundException.class, e -> {
                                             log.info("💳 Wallet not found for {}, creating new one...", userId);
                                             return paymentPort.createWallet(userId, user.name());
@@ -200,16 +211,16 @@ public class UserService implements UserUseCases {
                                         .thenReturn(savedDriver))
                                         .map(savedDriver -> new DriverProfileResponse(
                                                 savedDriver.id(),
-                                                user.firstName(),           // ✅ Ajouté
-                                                user.lastName(),            // ✅ Ajouté
+                                                user.firstName(),           
+                                                user.lastName(),            
                                                 savedDriver.status(),
                                                 savedDriver.licenseNumber(),
                                                 savedDriver.isOnline(),
                                                 savedDriver.isProfileValidated(),
                                                 savedDriver.isSyndicated(),
                                                 savedDriver.isProfileCompleted(),
-                                                savedDriver.rating(),       // ✅ Ajouté
-                                                savedDriver.totalReviewsCount(), // ✅ Ajouté
+                                                savedDriver.rating(),       
+                                                savedDriver.totalReviewsCount(), 
                                                 finalVehicle));
                             })
                             .flatMap(response -> {
@@ -223,7 +234,7 @@ public class UserService implements UserUseCases {
                             });
                 });
     }
-
+    
     @Override
     @Transactional
     public Mono<DriverProfileResponse> verifySyndicateStatus(UUID userId) {
