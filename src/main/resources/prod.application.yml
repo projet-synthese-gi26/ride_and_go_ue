@@ -6,33 +6,40 @@ server:
   port: 8080
   forward-headers-strategy: framework
   error:
-    include-message: always # Useful for frontend debugging
+    include-message: always
 
 spring:
   application:
     name: ride-and-go
 
-  datasource:
-    url: jdbc:postgresql://${DB_HOST:168.119.122.86}:${DB_PORT:5432}/${DB_NAME:yowyob}?currentSchema=ride_and_go
-    username: ${DB_USERNAME:master}
-    password: ${DB_PASSWORD:Azerty1234*}
-    driver-class-name: org.postgresql.Driver
-
+  # ------------------------------------------------------------------
+  # DATABASE — Liquibase
+  # ------------------------------------------------------------------
   liquibase:
-    user: ${DB_USERNAME:master}
-    password: ${DB_PASSWORD:Azerty1234*}
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:yowyob}
+    user: ${DB_LIQUIBASE_USERNAME}
+    password: ${DB_LIQUIBASE_PASSWORD}
     enabled: true
     change-log: classpath:db/changelog/db.changelog-master.yaml
     default-schema: ride_and_go
     liquibase-schema: ride_and_go
-    url: jdbc:postgresql://${DB_HOST:168.119.122.86}:${DB_PORT:5432}/${DB_NAME:yowyob}
 
+  # ------------------------------------------------------------------
+  # DATABASE — Datasource JDBC
+  # ------------------------------------------------------------------
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:yowyob}?currentSchema=ride_and_go
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
 
-  # DATABASE CONFIGURATION (REACTIVE R2DBC)
+  # ------------------------------------------------------------------
+  # DATABASE — R2DBC réactif
+  # ------------------------------------------------------------------
   r2dbc:
-    url: r2dbc:postgresql://${DB_HOST:168.119.122.86}:${DB_PORT:5432}/${DB_NAME:yowyob}?schema=ride_and_go
-    username: ${DB_USERNAME:master}
-    password: ${DB_PASSWORD:Azerty1234*}
+    url: r2dbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:yowyob}?schema=ride_and_go
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     pool:
       enabled: true
       initial-size: 5
@@ -40,44 +47,94 @@ spring:
       max-idle-time: 30m
       validation-query: SELECT 1
 
-  # CRITICAL SECURITY: Never run local scripts on production server
   sql:
     init:
       mode: never
 
-  # REDIS CACHE (CLUSTER MODE)
+  # ------------------------------------------------------------------
+  # REDIS CLUSTER
+  # ------------------------------------------------------------------
   data:
     redis:
-      password: ${REDIS_PASSWORD:Azerty1234*}
+      username: ${REDIS_USERNAME}
+      password: ${REDIS_PASSWORD}
       cluster:
         nodes:
-          - ${REDIS_HOST:168.119.122.86}:7001
-          - ${REDIS_HOST:168.119.122.86}:7002
-          - ${REDIS_HOST:168.119.122.86}:7003
+          - ${REDIS_HOST}:7001
+          - ${REDIS_HOST}:7002
+          - ${REDIS_HOST}:7003
+          - ${REDIS_HOST}:7004
+          - ${REDIS_HOST}:7005
+          - ${REDIS_HOST}:7006
+        max-redirects: 3
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
 
-  # MESSAGING SYSTEM (KAFKA)
+  # ------------------------------------------------------------------
+  # KAFKA — Connexion sécurisée SASL/SCRAM-SHA-256
+  # ------------------------------------------------------------------
   kafka:
-    bootstrap-servers: ${KAFKA_HOST:168.119.122.86}:${KAFKA_PORT:9092}
+    bootstrap-servers: ${KAFKA_HOST}:${KAFKA_PORT:29092}
+
+    # ── Authentification SASL/SCRAM-SHA-256 ────────────────────────
+    properties:
+      security.protocol: SASL_PLAINTEXT
+      sasl.mechanism: SCRAM-SHA-256
+      sasl.jaas.config: >
+        org.apache.kafka.common.security.scram.ScramLoginModule required
+        username="${KAFKA_BACKEND_USER}"
+        password="${KAFKA_BACKEND_PASSWORD}";
+
+    # ── Consumer ────────────────────────────────────────────────────
     consumer:
-      group-id: ride-and-go-group
+      # Convention : yowyob.{service}-group  (doit matcher le préfixe ACL yowyob.)
+      group-id: yowyob.ride-and-go-group
       auto-offset-reset: earliest
+      enable-auto-commit: false          # commit manuel = fiabilité garantie
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      max-poll-records: 50
       properties:
-        spring.json.trusted.packages: "*"
+        # Restreindre les packages désérialisables (ne jamais laisser "*" en prod)
+        spring.json.trusted.packages: "com.yowyob.rideandgo.*,com.yowyob.shared.*"
+        isolation.level: read_committed
+
+    # ── Producer ────────────────────────────────────────────────────
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      # acks=all : le broker confirme l'écriture sur toutes les répliques
+      # Sur single-broker (réplication=1) cela équivaut à acks=1,
+      # mais le paramètre est déjà correct pour la future migration multi-broker
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        compression.type: lz4
 
+    # ── Listener container ──────────────────────────────────────────
+    listener:
+      ack-mode: MANUAL_IMMEDIATE
+      # 3 threads = 3 partitions consommées en parallèle par instance
+      # À ajuster si le topic ride-and-go a plus de 6 partitions
+      concurrency: 3
+      missing-topics-fatal: false   # false = le service démarre même si le topic n'existe pas encore
+
+# ------------------------------------------------------------------
 # CUSTOM BUSINESS SERVICES CONFIGURATION
+# ------------------------------------------------------------------
 application:
 
   auth:
-    mode: remote # 'fake' pour ton dev local, 'remote' pour le serveur réel
+    mode: remote
     url: https://auth-service.pynfi.com
 
   fare:
-    mode: remote # 'fake' pour ton dev local, 'remote' pour le serveur réel
+    mode: remote
     url: https://fare-calculator-service.pynfi.com
     api-key: 974e9428-6ce2-48e7-b74b-93f572007ef8
 
@@ -86,12 +143,12 @@ application:
     url: https://notification-service.pynfi.com
     service-token: ${NOTIFICATION_SERVICE_TOKEN}
     templates:
-      new-offer: 12        # ID template: Nouvelle offre pour les chauffeurs
-      driver-applied: 13   # ID template: Un chauffeur a postulé (pour le client)
-      driver-selected: 14  # ID template: Vous avez été choisi (pour le chauffeur)
-      ride-confirmed: 15   # ID template: Le chauffeur arrive (pour le client)
-      ride-cancelled: 16   # ID template: Course annulée
-      admin-validation: 17 # ID template: admin a validé le profil du driver
+      new-offer: 12
+      driver-applied: 13
+      driver-selected: 14
+      ride-confirmed: 15
+      ride-cancelled: 16
+      admin-validation: 17
 
   vehicle:
     url: https://vehicule-service.pynfi.com
@@ -104,10 +161,47 @@ application:
     commission-rate: 0.10
 
   kafka:
+    # ── Topics — État actuel : PAS ENCORE CRÉÉS ─────────────────────
+    #
+    # IMPORTANT : missing-topics-fatal=false (configuré ci-dessus) permet
+    # au service de démarrer normalement même si ces topics sont absents.
+    # Les @KafkaListener annotés sur ces topics resteront inactifs jusqu'à
+    # la création du topic, puis s'activeront automatiquement au prochain
+    # rebalance du consumer group (sans redémarrage du service).
+    #
+    # Nommage : convention yowyob.{service}.{entité}.{action}
+    # Les topics doivent être créés par le DevOps via create-topic.sh
+    # avant que les producers/consumers soient actifs en prod.
+    #
+    # ── Quand les topics seront créés, lancer ces commandes : ────────
+    #
+    #   ./create-topic.sh yowyob.ride.trip.requested          12  168
+    #   ./create-topic.sh yowyob.ride.trip.started            12  168
+    #   ./create-topic.sh yowyob.ride.trip.completed          12  720
+    #   ./create-topic.sh yowyob.ride.trip.cancelled           6  168
+    #   ./create-topic.sh yowyob.ride.offer.created            6  168
+    #   ./create-topic.sh yowyob.notification.send.requested   6   24
+    #   ./create-topic.sh yowyob.ride.trip.requested.DLT       3 2160
+    #   ./create-topic.sh yowyob.ride.offer.created.DLT        3 2160
+    #
     topics:
-      notification-service-create-topic: notification-create-topic
-      offer-created: offer-created-topic
-      offer-send: notification-send-topic
+      # Topic reçu du service notification pour les tokens de session
+      notification-token: yowyob.notification.token.issued
+
+      # Topics émis par ride-and-go vers notification-service
+      notification-send: yowyob.notification.send.requested
+
+      # Topics métier ride-and-go
+      offer-created: yowyob.ride.offer.created
+      trip-requested: yowyob.ride.trip.requested
+      trip-started: yowyob.ride.trip.started
+      trip-completed: yowyob.ride.trip.completed
+      trip-cancelled: yowyob.ride.trip.cancelled
+
+      # Dead Letter Topics — messages en erreur après épuisement des retries
+      offer-created-dlt: yowyob.ride.offer.created.DLT
+      trip-requested-dlt: yowyob.ride.trip.requested.DLT
+
     notification-registration:
       name: "Ride and Go"
       email:
@@ -115,13 +209,15 @@ application:
         port: ${SMTP_PORT:587}
         username: ${SMTP_USERNAME}
         password: ${SMTP_PASSWORD}
+
     notification-service:
-      token: token-topic
       template:
         new-offer-id: 1001
         accepted-offer-id: 1002
 
+# ------------------------------------------------------------------
 # MONITORING & HEALTH CHECK (ACTUATOR)
+# ------------------------------------------------------------------
 management:
   endpoints:
     web:
@@ -137,29 +233,24 @@ management:
       prometheus:
         enabled: true
 
-# ======================================================
-# 2. CONFIGURATION TIMEOUT (Resilience4j)
-# ======================================================
+# ------------------------------------------------------------------
+# RESILIENCE4J
+# ------------------------------------------------------------------
 resilience4j:
   circuitbreaker:
     instances:
-      # Config pour le service de prix
       fare-calculator-service:
         failureRateThreshold: 50
         waitDurationInOpenState: 100s
         slidingWindowSize: 10
         permittedNumberOfCallsInHalfOpenState: 10
-
-      # Config pour le service auth (si besoin)
       auth-service:
         failureRateThreshold: 50
         waitDurationInOpenState: 5s
         slidingWindowSize: 5
-
-  # C'est ici qu'on règle le problème "Did not observe any item... within 1000ms"
   timelimiter:
     instances:
       fare-calculator-service:
-        timeoutDuration: 100s  
+        timeoutDuration: 100s
       auth-service:
         timeoutDuration: 20s
