@@ -88,21 +88,21 @@ jobs:
 
             echo "Pulling latest image ${{ env.REGISTRY_IMAGE }}"
 
-            docker login ghcr.io -u ${{ secrets.REGISTRY_NAMESPACE }} -p ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+            sudo docker login ghcr.io -u ${{ secrets.REGISTRY_NAMESPACE }} -p ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
             cd /home/${{ env.REMOTE_USER }}/yowyob/backend
 
             echo "Stopping container"
-            docker compose down ${{ env.CONTAINER_NAME }}
+            sudo docker compose down ${{ env.CONTAINER_NAME }}
 
             echo "Removing old image"
-            docker rmi -f ${{ env.REGISTRY_IMAGE }}:latest || true
+            sudo docker rmi -f ${{ env.REGISTRY_IMAGE }}:latest || true
 
             echo "Pulling new image"
-            docker pull ${{ env.REGISTRY_IMAGE }}:latest
+            sudo docker pull ${{ env.REGISTRY_IMAGE }}:latest
 
             echo " Starting container"
-            docker compose up -d ${{ env.CONTAINER_NAME }}
+            sudo docker compose up -d ${{ env.CONTAINER_NAME }}
 
             echo " Waiting ${{ env.HEALTH_DELAY }} seconds for health check"
             sleep ${{ env.HEALTH_DELAY }}
