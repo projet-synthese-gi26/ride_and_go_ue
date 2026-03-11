@@ -5,10 +5,10 @@
 -- comment: Initialisation du schéma Ride & Go
 
 -- 1. Création du schéma
-CREATE SCHEMA IF NOT EXISTS ride_and_go;
+--- CREATE SCHEMA IF NOT EXISTS ride_and_go;
 
 -- 2. Extension UUID
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+--- CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 3. Types ENUM & Casts (Crucial pour R2DBC)
 DO $$ BEGIN
