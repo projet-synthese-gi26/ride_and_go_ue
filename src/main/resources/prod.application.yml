@@ -73,10 +73,10 @@ spring:
           max-idle: 8
           min-idle: 2
         cluster:
-        refresh:
-          adaptive: true
-          period: 30s
-          dynamic-refresh-sources: false
+          refresh:
+            adaptive: true
+            period: 30s
+            dynamic-refresh-sources: false
 
   # ------------------------------------------------------------------
   # KAFKA — Connexion sécurisée SASL/SCRAM-SHA-256
