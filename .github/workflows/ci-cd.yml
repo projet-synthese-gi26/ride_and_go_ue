@@ -11,6 +11,7 @@ env:
   APP_NAME: ride-and-go
   HEALTH_DELAY: ${{ secrets.DEPLOY_DELAY }}
   CONTAINER_NAME: ride-and-go
+  REMOTE_USER: ${{ secrets.REMOTE_USER }}
 
 jobs:
   tests:
@@ -89,7 +90,7 @@ jobs:
 
             docker login ghcr.io -u ${{ secrets.REGISTRY_NAMESPACE }} -p ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
-            cd /root/projet_synthese/infra
+            cd /home/${{ env.REMOTE_USER }}/yowyob/backend
 
             echo "Stopping container"
             docker compose down ${{ env.CONTAINER_NAME }}
