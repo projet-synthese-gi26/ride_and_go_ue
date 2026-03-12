@@ -8,5 +8,5 @@ jobs:
   pipeline:
     uses: projet-synthese-gi26/workflows/.github/workflows/spring-boot-ci-cd.yml@main
     with:
-      app_name: auth-service
+      app_name: ride-and-go
     secrets: inherit          # passe TOUS les secrets automatiquement
