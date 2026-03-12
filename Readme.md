@@ -42,3 +42,4 @@ Le système va automatiquement :
 ## 🐳 Utilitaires Docker
 - Stopper l'infra : `docker-compose stop`
 - Tout supprimer (volumes inclus) : `docker-compose down -v`
+test
