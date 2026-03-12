@@ -6,7 +6,7 @@ on:
       - "**"
 jobs:
   pipeline:
-    uses: projet-synthese-gi26/workflows/.github/workflows/spring-boot-ci.yml@main
+    uses: projet-synthese-gi26/workflows/.github/workflows/spring-boot-ci-cd.yml@main
     with:
       app_name: auth-service
     secrets: inherit          # passe TOUS les secrets automatiquement
