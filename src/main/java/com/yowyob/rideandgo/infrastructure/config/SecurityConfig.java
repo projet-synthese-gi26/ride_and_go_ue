@@ -56,7 +56,8 @@ public class SecurityConfig {
                                                                 "/swagger-ui/**",
                                                                 "/swagger-ui.html",
                                                                 "/webjars/**",
-                                                                "/api/v1/health/**")
+                                                                "/api/v1/health/**",
+                                                                "/actuator/**")
                                                 .permitAll()
                                                 // Autoriser les requêtes OPTIONS (Pre-flight CORS)
                                                 .pathMatchers(org.springframework.http.HttpMethod.OPTIONS).permitAll()
