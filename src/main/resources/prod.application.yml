@@ -21,14 +21,14 @@ spring:
     password: ${DB_LIQUIBASE_PASSWORD}
     enabled: true
     change-log: classpath:db/changelog/db.changelog-master.yaml
-    default-schema: ride_and_go
-    liquibase-schema: ride_and_go
+    default-schema: ${DB_SCHEMA:ride_and_go}
+    liquibase-schema: ${DB_SCHEMA:ride_and_go}
 
   # ------------------------------------------------------------------
   # DATABASE — Datasource JDBC
   # ------------------------------------------------------------------
   datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:yowyob}?currentSchema=ride_and_go
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:yowyob}?currentSchema=${DB_SCHEMA:ride_and_go}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
@@ -37,7 +37,7 @@ spring:
   # DATABASE — R2DBC réactif
   # ------------------------------------------------------------------
   r2dbc:
-    url: r2dbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:yowyob}?schema=ride_and_go
+    url: r2dbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:yowyob}?schema=${DB_SCHEMA:ride_and_go}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     pool:
