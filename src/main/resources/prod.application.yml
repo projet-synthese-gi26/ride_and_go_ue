@@ -136,16 +136,16 @@ application:
 
   auth:
     mode: remote
-    url: https://auth-service.pynfi.com
+    url: https://traefikdev.yowyob.com/auth
 
   fare:
     mode: remote
-    url: https://fare-calculator-service.pynfi.com
+    url: https://traefikdev.yowyob.com/fare-calculator
     api-key: 974e9428-6ce2-48e7-b74b-93f572007ef8
 
   notification:
     mode: http
-    url: https://notification-service.pynfi.com
+    url: https://traefikdev.yowyob.com/notification
     service-token: ${NOTIFICATION_SERVICE_TOKEN}
     templates:
       new-offer: 12
@@ -156,13 +156,13 @@ application:
       admin-validation: 17
 
   vehicle:
-    url: https://vehicule-service.pynfi.com
+    url: https://traefikdev.yowyob.com/vehicle
 
   syndicate:
-    url: https://ugate.pynfi.com
+    url: https://traefikdev.yowyob.com/ugate
 
   payment:
-    url: https://payment-service.pynfi.com
+    url: https://traefikdev.yowyob.com/payment
     commission-rate: 0.10
 
   kafka:
