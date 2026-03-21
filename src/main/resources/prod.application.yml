@@ -156,7 +156,7 @@ application:
       admin-validation: 17
 
   vehicle:
-    url: https://traefikdev.yowyob.com/vehicle
+    url: https://traefikdev.yowyob.com/vehicule
 
   syndicate:
     url: https://traefikdev.yowyob.com/ugate
